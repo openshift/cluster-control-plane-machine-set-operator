@@ -1,0 +1,12 @@
+domain: openshift.io
+layout:
+- go.kubebuilder.io/v3
+projectName: control-plane-machine-set-operator
+repo: github.com/openshift/cluster-control-plane-machine-set-operator
+resources:
+- controller: true
+  domain: openshift.io
+  group: machine
+  kind: ControlPlaneMachineSet
+  version: v1beta1
+version: "3"
