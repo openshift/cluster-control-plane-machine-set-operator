@@ -1,0 +1,27 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-machine-openshift-io-v1beta1-controlplanemachineset
+  failurePolicy: Fail
+  name: controlplanemachineset.machine.openshift.io
+  rules:
+  - apiGroups:
+    - machine.openshift.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - controlplanemachinesets
+  sideEffects: None
