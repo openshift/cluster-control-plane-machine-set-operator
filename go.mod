@@ -5,11 +5,12 @@ go 1.17
 require (
 	github.com/golangci/golangci-lint v1.44.2
 	github.com/onsi/ginkgo/v2 v2.1.3
-	github.com/onsi/gomega v1.17.0
-	github.com/openshift/api v0.0.0-20220307153316-94bdffb41551
+	github.com/onsi/gomega v1.18.1
+	github.com/openshift/api v0.0.0-20220308093233-c21df43305c4
+	k8s.io/api v0.23.4
 	k8s.io/apimachinery v0.23.4
-	k8s.io/client-go v0.23.0
-	sigs.k8s.io/controller-runtime v0.11.0
+	k8s.io/client-go v0.23.4
+	sigs.k8s.io/controller-runtime v0.11.1-0.20220304125252-9ee63fc65a97
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220222144948-ce8bdd3d81ab
 	sigs.k8s.io/controller-tools v0.8.0
 )
@@ -134,7 +135,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polyfloyd/go-errorlint v0.0.0-20211125173453-6d6d39c5bb8b // indirect
-	github.com/prometheus/client_golang v1.11.0 // indirect
+	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.28.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
@@ -195,7 +196,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	honnef.co/go/tools v0.2.2 // indirect
-	k8s.io/api v0.23.4 // indirect
 	k8s.io/apiextensions-apiserver v0.23.0 // indirect
 	k8s.io/component-base v0.23.0 // indirect
 	k8s.io/klog/v2 v2.40.1 // indirect
