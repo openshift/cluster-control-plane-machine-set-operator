@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/onsi/ginkgo/v2 v2.1.3
 	github.com/onsi/gomega v1.17.0
+	github.com/openshift/api v0.0.0-20220222102030-354aa98a475c
 	k8s.io/apimachinery v0.23.0
 	k8s.io/client-go v0.23.0
 	sigs.k8s.io/controller-runtime v0.11.0
