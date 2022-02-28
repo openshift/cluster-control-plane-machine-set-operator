@@ -42,7 +42,7 @@ func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager
 	return nil
 }
 
-//+kubebuilder:webhook:verbs=create;update,path=/validate-machine-openshift-io-v1beta1-controlplanemachineset,mutating=false,failurePolicy=fail,groups=machine.openshift.io,resources=controlplanemachinesets,versions=v1beta1,name=controlplanemachineset.machine.openshift.io,sideEffects=None,admissionReviewVersions=v1beta1
+//+kubebuilder:webhook:verbs=create;update,path=/validate-machine-openshift-io-v1-controlplanemachineset,mutating=false,failurePolicy=fail,groups=machine.openshift.io,resources=controlplanemachinesets,versions=v1,name=controlplanemachineset.machine.openshift.io,sideEffects=None,admissionReviewVersions=v1
 
 var _ webhook.CustomValidator = &ControlPlaneMachineSetWebhook{}
 
