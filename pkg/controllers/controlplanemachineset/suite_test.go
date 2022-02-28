@@ -31,7 +31,7 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
-var cfg *rest.Config
+var cfg *rest.Config //nolint:deadcode,unused
 var k8sClient client.Client
 var testEnv *envtest.Environment
 

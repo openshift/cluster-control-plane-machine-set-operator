@@ -18,6 +18,7 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 CONTROLLER_GEN = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen
 ENVTEST = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-runtime/tools/setup-envtest
 GINKGO = go run ${PROJECT_DIR}/vendor/github.com/onsi/ginkgo/v2/ginkgo
+GOLANGCI_LINT = go run ${PROJECT_DIR}/vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
 
 .PHONY: all
 all: build
@@ -59,6 +60,10 @@ vendor: ## Ensure the vendor directory is up to date.
 	go mod vendor
 	go mod verify
 
+.PHONY: lint
+lint: ## Run golangci-lint over the codebase.
+	$(call ensure-home, ${GOLANGCI_LINT} run ./...) 
+
 .PHONY: test
 test: generate fmt vet ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" ./hack/test.sh
@@ -73,3 +78,11 @@ verify-%: ## Ensure no diff after running some other target
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/control-plane-machine-set-operator
+
+define ensure-home
+	@ export HOME=$${HOME:=/tmp/kubebuilder-testing}; \
+	if [ $${HOME} == "/" ]; then \
+	  export HOME=/tmp/kubebuilder-testing; \
+	fi; \
+	$(1)
+endef
