@@ -31,7 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
+	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
+	cpmswebhook "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/webhooks/controlplanemachineset"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -76,13 +77,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controlplanemachineset.ControlPlaneMachineSetReconciler{
+	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
 		os.Exit(1)
 	}
+
+	if err := (&cpmswebhook.ControlPlaneMachineSetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ControlPlaneMachineSet")
+		os.Exit(1)
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

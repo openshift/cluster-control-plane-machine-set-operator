@@ -42,8 +42,12 @@ help: ## Display this help.
 
 ##@ Development
 
+.PHONY: manifests
+manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) webhook paths="./..." output:webhook:artifacts:config=pkg/webhooks/controlplanemachineset/testdata
+
 .PHONY: generate
-generate: ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: manifests ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
