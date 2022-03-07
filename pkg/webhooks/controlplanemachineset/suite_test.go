@@ -22,7 +22,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	cpmsv1beta1 "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/api/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -49,8 +50,10 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		// TODO: Import CRDs from the vendor directory once the API moves to openshift/api
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "manifests")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
+		},
 		ErrorIfCRDPathMissing: true,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("testdata")},
@@ -63,7 +66,8 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	testScheme = scheme.Scheme
-	Expect(cpmsv1beta1.Install(testScheme)).To(Succeed())
+	Expect(machinev1.Install(testScheme)).To(Succeed())
+	Expect(machinev1beta1.Install(testScheme)).To(Succeed())
 
 	//+kubebuilder:scaffold:scheme
 
