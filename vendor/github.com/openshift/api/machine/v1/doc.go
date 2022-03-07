@@ -4,4 +4,4 @@
 
 // +kubebuilder:validation:Optional
 // +groupName=machine.openshift.io
-package v1beta1
+package v1

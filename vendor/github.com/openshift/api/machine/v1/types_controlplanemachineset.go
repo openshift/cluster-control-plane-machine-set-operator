@@ -1,4 +1,4 @@
-package v1beta1
+package v1
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
@@ -9,18 +9,19 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ContrlPlaneMachineSet ensures that a specified number of control plane machine replicas are running at any given time.
+// ControlPlaneMachineSet ensures that a specified number of control plane machine replicas are running at any given time.
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".spec.replicas",description="Desired Replicas"
 // +kubebuilder:printcolumn:name="Current",type="integer",JSONPath=".status.replicas",description="Current Replicas"
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyReplicas",description="Ready Replicas"
 // +kubebuilder:printcolumn:name="Updated",type="integer",JSONPath=".status.updatedReplicas",description="Updated Replicas"
-// +kubebuilder:printcolumn:name="Unavailable",type="string",JSONPath=".status.unavailableReplicas",description="Observed number of unavailable replicas"
+// +kubebuilder:printcolumn:name="Unavailable",type="integer",JSONPath=".status.unavailableReplicas",description="Observed number of unavailable replicas"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="ControlPlaneMachineSet age"
-// Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).
-// +openshift:compatibility-gen:level=2
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ControlPlaneMachineSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -29,6 +30,7 @@ type ControlPlaneMachineSet struct {
 	Status ControlPlaneMachineSetStatus `json:"status,omitempty"`
 }
 
+// ControlPlaneMachineSet represents the configuration of the ControlPlaneMachineSet.
 type ControlPlaneMachineSetSpec struct {
 	// Replicas defines how many Control Plane Machines should be
 	// created by this ControlPlaneMachineSet.
@@ -47,15 +49,6 @@ type ControlPlaneMachineSetSpec struct {
 	// +optional
 	Strategy ControlPlaneMachineSetStrategy `json:"strategy,omitempty"`
 
-	// FailureDomains is the list of failure domains (sometimes called
-	// availability zones) in which the ControlPlaneMachineSet should balance
-	// the Control Plane Machines.
-	// This will be merged into the ProviderSpec given in the template.
-	// This field is optional on platforms that do not require placement
-	// information, eg OpenStack.
-	// +optional
-	FailureDomains FailureDomains `json:"failureDomains,omitempty"`
-
 	// Label selector for Machines. Existing Machines selected by this
 	// selector will be the ones affected by this ControlPlaneMachineSet.
 	// It must match the template's labels.
@@ -69,30 +62,93 @@ type ControlPlaneMachineSetSpec struct {
 	Template ControlPlaneMachineSetTemplate `json:"template"`
 }
 
+// ControlPlaneMachineSetTemplate is a template used by the ControlPlaneMachineSet
+// to create the Machines that it will manage in the future.
+// +union
+// + ---
+// + This struct is a discriminated union which allows users to select the type of Machine
+// + that the ControlPlaneMachineSet should create and manage.
+// + For now, the only supported type is the OpenShift Machine API Machine, but in the future
+// + we plan to expand this to allow other Machine types such as Cluster API Machines or a
+// + future version of the Machine API Machine.
 type ControlPlaneMachineSetTemplate struct {
+	// MachineType determines the type of Machines that should be managed by the ControlPlaneMachineSet.
+	// Currently, the only valid value is machine.v1beta1.machine.openshift.io.
+	// +unionDiscriminator
+	// +kubebuilder:validation:Required
+	MachineType ControlPlaneMachineSetMachineType `json:"machineType"`
+
+	// OpenShiftMachineV1Beta1Machine defines the template for creating Machines
+	// from the v1beta1.machine.openshift.io API group.
+	// +kubebuilder:validation:Required
+	OpenShiftMachineV1Beta1Machine *OpenShiftMachineV1Beta1MachineTemplate `json:"machines_v1beta1_machine_openshift_io,omitempty"`
+}
+
+// ControlPlaneMachineSetMachineType is a enumeration of valid Machine types
+// supported by the ControlPlaneMachineSet.
+type ControlPlaneMachineSetMachineType string
+
+const (
+	// OpenShiftMachineV1Beta1MachineType is the OpenShift Machine API v1beta1 Machine type.
+	OpenShiftMachineV1Beta1MachineType ControlPlaneMachineSetMachineType = "machines_v1beta1_machine_openshift_io"
+)
+
+// OpenShiftMachineV1Beta1MachineTemplate is a template for the ControlPlaneMachineSet to create
+// Machines from the v1beta1.machine.openshift.io API group.
+type OpenShiftMachineV1Beta1MachineTemplate struct {
+	// FailureDomains is the list of failure domains (sometimes called
+	// availability zones) in which the ControlPlaneMachineSet should balance
+	// the Control Plane Machines.
+	// This will be merged into the ProviderSpec given in the template.
+	// This field is optional on platforms that do not require placement
+	// information, eg OpenStack.
+	// +optional
+	FailureDomains FailureDomains `json:"failureDomains,omitempty"`
+
 	// ObjectMeta is the standard object metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// Labels are required to match the ControlPlaneMachineSet selector.
 	// +kubebuilder:validation:Required
-	ObjectMeta metav1.ObjectMeta `json:"metadata"`
+	ObjectMeta ControlPlaneMachineSetTemplateObjectMeta `json:"metadata"`
 
 	// Spec contains the desired configuration of the Control Plane Machines.
 	// The ProviderSpec within contains platform specific details
 	// for creating the Control Plane Machines.
-	// The ProviderSpec should be complete apart from the platform specific
+	// The ProviderSe should be complete apart from the platform specific
 	// failure domain field. This will be overriden when the Machines
 	// are created based on the FailureDomains field.
 	// +kubebuilder:validation:Required
 	Spec machinev1beta1.MachineSpec `json:"spec"`
 }
 
+// ControlPlaneMachineSetTemplateObjectMeta is a subset of the metav1.ObjectMeta struct.
+// It allows users to specify labels and annotations that will be copied onto Machines
+// created from this template.
+type ControlPlaneMachineSetTemplateObjectMeta struct {
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	// More info: http://kubernetes.io/docs/user-guide/labels
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	// More info: http://kubernetes.io/docs/user-guide/annotations
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// ControlPlaneMachineSetStrategy defines the strategy for applying updates to the
+// Control Plane Machines managed by the ControlPlaneMachineSet.
 type ControlPlaneMachineSetStrategy struct {
 	// Type defines the type of update strategy that should be
 	// used when updating Machines owned by the ControlPlaneMachineSet.
-	// Valid values are "RollingUpdate", "Recreate" and "OnDelete".
+	// Valid values are "RollingUpdate" and "OnDelete".
 	// The current default value is "RollingUpdate".
 	// +kubebuilder:default:="RollingUpdate"
-	// +kubebuilder:validation:Enum:="RollingUpdate";"Recreate";"OnDelete"
+	// +kubebuilder:validation:Enum:="RollingUpdate";"OnDelete"
 	// +optional
 	Type ControlPlaneMachineSetStrategyType `json:"type,omitempty"`
 
@@ -154,10 +210,11 @@ type FailureDomains struct {
 }
 
 // AWSFailureDomain configures failure domain information for the AWS platform
+// +kubebuilder:validation:MinProperties:=1
 type AWSFailureDomain struct {
 	// Subnet is a reference to the subnet to use for this instance
 	// +optional
-	Subnet machinev1beta1.AWSResourceReference `json:"subnet,omitempty"`
+	Subnet AWSResourceReference `json:"subnet,omitempty"`
 
 	// Placement configures the placement information for this instance
 	// +optional
@@ -167,34 +224,44 @@ type AWSFailureDomain struct {
 // AWSFailureDomainPlacement configures the placement information for the AWSFailureDomain
 type AWSFailureDomainPlacement struct {
 	// AvailabilityZone is the availability zone of the instance
-	// +optional
-	AvailabilityZone string `json:"availabilityZone,omitempty"`
+	// +kubebuilder:validation:Required
+	AvailabilityZone string `json:"availabilityZone"`
 }
 
 // AzureFailureDomain configures failure domain information for the Azure platform
 type AzureFailureDomain struct {
 	// Availability Zone for the virtual machine.
 	// If nil, the virtual machine should be deployed to no zone
-	// +optional
-	Zone *string `json:"zone,omitempty"`
+	// +kubebuilder:validation:Required
+	Zone string `json:"zone"`
 }
 
 // GCPFailureDomain configures failure domain information for the GCP platform
 type GCPFailureDomain struct {
 	// Zone is the zone in which the GCP machine provider will create the VM.
-	// +optional
+	// +kubebuilder:validation:Required
 	Zone string `json:"zone"`
 }
 
 // OpenStackFailureDomain configures failure domain information for the OpenStack platform
 type OpenStackFailureDomain struct {
 	// The availability zone from which to launch the server.
-	// +optional
-	AvailabilityZone string `json:"availabilityZone,omitempty"`
+	// +kubebuilder:validation:Required
+	AvailabilityZone string `json:"availabilityZone"`
 }
 
 // ControlPlaneMachineSetStatus represents the status of the ControlPlaneMachineSet CRD.
 type ControlPlaneMachineSetStatus struct {
+	// Conditions represents the observations of the ControlPlaneMachineSet's current state.
+	// Known .status.conditions.type are: (TODO)
+	// TODO: Identify different condition types/reasons that will be needed.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// ObservedGeneration is the most recent generation observed for this
 	// ControlPlaneMachineSet. It corresponds to the ControlPlaneMachineSets's generation,
 	// which is updated on mutation by the API Server.
@@ -205,39 +272,33 @@ type ControlPlaneMachineSetStatus struct {
 	// ControlPlaneMachineSet controller.
 	// Note that during update operations this value may differ from the
 	// desired replica count.
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// ReadyReplicas is the number of Control Plane Machines created by the
 	// ControlPlaneMachineSet controller which are ready.
+	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 
 	// UpdatedReplicas is the number of non-terminated Control Plane Machines
 	// created by the ControlPlaneMachineSet controller that have the desired
 	// provider spec.
+	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 
 	// UnavailableReplicas is the number of Control Plane Machines that are
 	// still required before the ControlPlaneMachineSet reaches the desired
 	// available capacity. When this value is non-zero, the number of
 	// ReadyReplicas is less than the desired Replicas.
-	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
-
-	// Conditions represents the observations of the ControlPlaneMachineSet's current state.
-	// Known .status.conditions.type are: (TODO)
-	// TODO: Identify different condition types/reasons that will be needed.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
 	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControlPlaneMachineSetList contains a list of ControlPlaneMachineSet
-// Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).
-// +openshift:compatibility-gen:level=2
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ControlPlaneMachineSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

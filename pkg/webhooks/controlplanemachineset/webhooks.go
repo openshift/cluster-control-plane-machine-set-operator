@@ -19,7 +19,7 @@ package controlplanemachineset
 import (
 	"context"
 
-	cpmsv1beta1 "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/api/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -32,7 +32,7 @@ type ControlPlaneMachineSetWebhook struct{}
 func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		WithValidator(r).
-		For(&cpmsv1beta1.ControlPlaneMachineSet{}).
+		For(&machinev1.ControlPlaneMachineSet{}).
 		Complete()
 }
 
