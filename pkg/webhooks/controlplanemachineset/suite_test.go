@@ -56,7 +56,7 @@ var _ = BeforeSuite(func() {
 		},
 		ErrorIfCRDPathMissing: true,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("testdata")},
+			Paths: []string{"testdata"},
 		},
 	}
 

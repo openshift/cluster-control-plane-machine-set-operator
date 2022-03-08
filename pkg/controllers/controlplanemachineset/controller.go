@@ -18,6 +18,7 @@ package controlplanemachineset
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,13 +26,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object
+// ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
 type ControlPlaneMachineSetReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// Reconcile reconciles the ControlPlaneMachineSet object
+// Reconcile reconciles the ControlPlaneMachineSet object.
 func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
@@ -42,8 +43,12 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		// For().
-		Complete(r)
+		Complete(r); err != nil {
+		return fmt.Errorf("could not set up controller for ControlPlaneMachineSet: %w", err)
+	}
+
+	return nil
 }
