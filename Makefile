@@ -66,11 +66,11 @@ vendor: ## Ensure the vendor directory is up to date.
 
 .PHONY: lint
 lint: ## Run golangci-lint over the codebase.
-	$(call ensure-home, ${GOLANGCI_LINT} run ./...) 
+	$(call ensure-home, ${GOLANGCI_LINT} run ./...)
 
 .PHONY: test
 test: generate fmt vet ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" ./hack/test.sh
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin)" ./hack/test.sh
 
 .PHONY: verify-%
 verify-%: ## Ensure no diff after running some other target

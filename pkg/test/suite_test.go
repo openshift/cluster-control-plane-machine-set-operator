@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controlplanemachineset
+package test
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +44,7 @@ var ctx = context.Background()
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite")
+	RunSpecs(t, "Test Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -53,14 +52,8 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
-		},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1")},
 		ErrorIfCRDPathMissing: true,
-		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{"testdata"},
-		},
 	}
 
 	var err error
@@ -69,7 +62,6 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	testScheme = scheme.Scheme
-	Expect(machinev1.Install(testScheme)).To(Succeed())
 	Expect(machinev1beta1.Install(testScheme)).To(Succeed())
 
 	//+kubebuilder:scaffold:scheme
