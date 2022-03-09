@@ -18,6 +18,7 @@ package controlplanemachineset
 
 import (
 	"context"
+	"fmt"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,28 +30,33 @@ import (
 // machinev1beta1.ControlPlaneMachineSet resource.
 type ControlPlaneMachineSetWebhook struct{}
 
+// SetupWebhookWithManager sets up a new ControlPlaneMachineSet webhook with the manager.
 func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
+	if err := ctrl.NewWebhookManagedBy(mgr).
 		WithValidator(r).
 		For(&machinev1.ControlPlaneMachineSet{}).
-		Complete()
+		Complete(); err != nil {
+		return fmt.Errorf("error constructing ControlPlaneMachineSet webhook: %w", err)
+	}
+
+	return nil
 }
 
 //+kubebuilder:webhook:verbs=create;update,path=/validate-machine-openshift-io-v1beta1-controlplanemachineset,mutating=false,failurePolicy=fail,groups=machine.openshift.io,resources=controlplanemachinesets,versions=v1beta1,name=controlplanemachineset.machine.openshift.io,sideEffects=None,admissionReviewVersions=v1beta1
 
 var _ webhook.CustomValidator = &ControlPlaneMachineSetWebhook{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
+// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
 	return nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
