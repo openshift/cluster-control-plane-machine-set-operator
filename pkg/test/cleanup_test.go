@@ -19,10 +19,13 @@ package test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -31,7 +34,7 @@ var _ = Describe("Cleanup", func() {
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
+		ns := resourcebuilder.Namespace().WithGenerateName("test-utils-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
@@ -67,5 +70,34 @@ var _ = Describe("Cleanup", func() {
 		// In this case it won't actually delete anything, but that shouldn't cause any errors.
 		// Any remaining resources won't affect other tests as they are in a separate namespace.
 		CleanupResources(ctx, cfg, k8sClient, "")
+	})
+
+	It("should ignore resources in another namespace", func() {
+		ns := resourcebuilder.Namespace().WithGenerateName("test-utils-").Build()
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+
+		// Creating some Machines to cleanup
+		machineBuilder := resourcebuilder.Machine().
+			WithGenerateName("cleanup-resources-test-").
+			WithNamespace(ns.GetName())
+
+		for i := 0; i < 3; i++ {
+			Expect(k8sClient.Create(ctx, machineBuilder.Build())).To(Succeed())
+		}
+
+		// Check that it can delete all resources in the namespace
+		CleanupResources(ctx, cfg, k8sClient, namespaceName,
+			&machinev1beta1.Machine{},
+		)
+		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(namespaceName))()).To(HaveField("Items", HaveLen(0)))
+
+		// Check that it didn't delete anything in the other namespace
+		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(ns.GetName()))()).To(HaveField("Items", HaveLen(3)))
+
+		// Cleanup the second namespace
+		CleanupResources(ctx, cfg, k8sClient, ns.GetName(),
+			&machinev1beta1.Machine{},
+		)
+		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(ns.GetName()))()).To(HaveField("Items", HaveLen(0)))
 	})
 })

@@ -53,7 +53,7 @@ func cleanupResource(ctx context.Context, k8sClient client.Client, namespace str
 
 		listObj := newListFromObject(k8sClient, obj)
 
-		return komega.ObjectList(listObj)()
+		return komega.ObjectList(listObj, client.InNamespace(namespace))()
 	}).Should(HaveField("Items", HaveLen(0)))
 }
 
