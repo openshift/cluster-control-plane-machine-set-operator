@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -o errexit
 set -o nounset
 set -o pipefail
 
@@ -19,9 +18,25 @@ if [ $HOME == "/" ]; then
 fi
 
 if [ "$OPENSHIFT_CI" == "true" ] && [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then # detect ci environment there
-  GINKGO_ARGS="${GINKGO_ARGS} --junit-report=junit_control_plane_machine_set_operator.xml --cover --coverprofile=cover.out --output-dir=${ARTIFACT_DIR}"
+  GINKGO_ARGS="${GINKGO_ARGS} --junit-report=junit_control_plane_machine_set_operator.xml --cover --coverprofile=test-unit-coverage.out --output-dir=${ARTIFACT_DIR}"
 fi
 
 # Print the command we are going to run as Make would.
 echo ${GINKGO} ${GINKGO_ARGS} ./...
 ${GINKGO} ${GINKGO_ARGS} ./...
+# Capture the test result to exit on error after coverage.
+TEST_RESULT=$?
+
+if [ -f "${ARTIFACT_DIR}/test-unit-coverage.out" ]; then
+  # Convert the coverage to html for spyglass.
+  go tool cover -html=${ARTIFACT_DIR}/test-unit-coverage.out -o ${ARTIFACT_DIR}/test-unit-coverage.html
+
+  # Report the coverage at the end of the test output.
+  echo -n "Coverage "
+  go tool cover -func=${ARTIFACT_DIR}/test-unit-coverage.out | tail -n 1
+  # Blank new line after the coverage output to make it easier to read when there is an error.
+  echo
+fi
+
+# Ensure we exit based on the test result, coverage results are supplementary.
+exit ${TEST_RESULT}
