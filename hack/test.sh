@@ -9,7 +9,7 @@ REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
 OPENSHIFT_CI=${OPENSHIFT_CI:-""}
 ARTIFACT_DIR=${ARTIFACT_DIR:-""}
 GINKGO=${GINKGO:-"go run ${REPO_ROOT}/vendor/github.com/onsi/ginkgo/v2/ginkgo"}
-GINKGO_ARGS=${ARTIFACT_DIR:-"-r -v --randomize-all --randomize-suites --keep-going --race --trace --timeout=2m"}
+GINKGO_ARGS=${GINKGO_ARGS:-"-r -v --randomize-all --randomize-suites --keep-going --race --trace --timeout=2m"}
 
 # Ensure that some home var is set and that it's not the root.
 # This is required for the kubebuilder cache.
@@ -19,7 +19,9 @@ if [ $HOME == "/" ]; then
 fi
 
 if [ "$OPENSHIFT_CI" == "true" ] && [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then # detect ci environment there
-  GINKGO_ARGS="${GINKGO_ARGS} --junit-report=${ARTIFACT_DIR}/junit_control_plane_machine_set_operator.xml --cover --coverprofile=${ARTIFACT_DIR}/cover.out"
+  GINKGO_ARGS="${GINKGO_ARGS} --junit-report=junit_control_plane_machine_set_operator.xml --cover --coverprofile=cover.out --output-dir=${ARTIFACT_DIR}"
 fi
 
+# Print the command we are going to run as Make would.
+echo ${GINKGO} ${GINKGO_ARGS} ./...
 ${GINKGO} ${GINKGO_ARGS} ./...
