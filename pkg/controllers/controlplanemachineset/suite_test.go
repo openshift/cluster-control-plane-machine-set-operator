@@ -22,9 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,7 +51,11 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -56,6 +64,8 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	Expect(machinev1.Install(scheme.Scheme)).To(Succeed())
+	Expect(machinev1beta1.Install(scheme.Scheme)).To(Succeed())
+	Expect(configv1.Install(scheme.Scheme)).To(Succeed())
 
 	//+kubebuilder:scaffold:scheme
 

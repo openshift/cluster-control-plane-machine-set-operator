@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -32,15 +33,20 @@ import (
 
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
 	cpmswebhook "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/webhooks/controlplanemachineset"
+
 	//+kubebuilder:scaffold:imports
+
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 )
 
 func main() { //nolint:funlen
 	scheme := runtime.NewScheme()
 	setupLog := ctrl.Log.WithName("setup")
 
-	if err := clientgoscheme.AddToScheme(scheme); err != nil {
-		setupLog.Error(err, "unable to set up client-go scheme")
+	if err := setupScheme(scheme); err != nil {
+		setupLog.Error(err, "unable to set up scheme")
 		os.Exit(1)
 	}
 
@@ -108,4 +114,26 @@ func main() { //nolint:funlen
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// setupScheme adds the various schemes required for this operator to the
+// scheme for the manager.
+func setupScheme(scheme *runtime.Scheme) error {
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("unable to add client-go scheme: %w", err)
+	}
+
+	if err := machinev1.Install(scheme); err != nil {
+		return fmt.Errorf("unable to add machine.openshift.io/v1 scheme: %w", err)
+	}
+
+	if err := machinev1beta1.Install(scheme); err != nil {
+		return fmt.Errorf("unable to add machine.openshift.io/v1beta1 scheme: %w", err)
+	}
+
+	if err := configv1.Install(scheme); err != nil {
+		return fmt.Errorf("unable to add config.openshift.io/v1 scheme: %w", err)
+	}
+
+	return nil
 }
