@@ -44,7 +44,7 @@ var ctx = context.Background()
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Test Suite")
+	RunSpecs(t, "Test Utils Suite")
 }
 
 var _ = BeforeSuite(func() {

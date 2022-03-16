@@ -17,6 +17,7 @@ limitations under the License.
 package controlplanemachineset
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -26,19 +27,23 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
 )
 
-var cfg *rest.Config //nolint:deadcode,unused
+var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var testScheme *runtime.Scheme
+var ctx = context.Background()
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -59,19 +64,24 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	cfg, err := testEnv.Start()
+	var err error
+	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	Expect(machinev1.Install(scheme.Scheme)).To(Succeed())
-	Expect(machinev1beta1.Install(scheme.Scheme)).To(Succeed())
-	Expect(configv1.Install(scheme.Scheme)).To(Succeed())
+	testScheme = scheme.Scheme
+	Expect(machinev1.Install(testScheme)).To(Succeed())
+	Expect(machinev1beta1.Install(testScheme)).To(Succeed())
+	Expect(configv1.Install(testScheme)).To(Succeed())
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	komega.SetClient(k8sClient)
+	komega.SetContext(ctx)
 })
 
 var _ = AfterSuite(func() {

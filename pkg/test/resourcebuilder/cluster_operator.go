@@ -45,3 +45,20 @@ func (n ClusterOperatorBuilder) WithName(name string) ClusterOperatorBuilder {
 	n.name = name
 	return n
 }
+
+// ClusterOperatorStatus creates a new cluster operator status builder.
+func ClusterOperatorStatus() ClusterOperatorStatusBuilder {
+	return ClusterOperatorStatusBuilder{}
+}
+
+// ClusterOperatorStatusBuilder is used to build out a cluster operator status object.
+type ClusterOperatorStatusBuilder struct {
+	conditions []configv1.ClusterOperatorStatusCondition
+}
+
+// Build builds a new cluster operator status based on the configuration provided.
+func (n ClusterOperatorStatusBuilder) Build() configv1.ClusterOperatorStatus {
+	return configv1.ClusterOperatorStatus{
+		Conditions: n.conditions,
+	}
+}
