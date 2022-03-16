@@ -46,10 +46,15 @@ func CleanupResources(ctx context.Context, cfg *rest.Config, k8sClient client.Cl
 
 // cleanupResource removes all of a particular resource within a namespace.
 func cleanupResource(ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
-	Expect(k8sClient.DeleteAllOf(ctx, obj, client.InNamespace(namespace))).To(Succeed())
+	Eventually(func() (client.ObjectList, error) {
+		if err := k8sClient.DeleteAllOf(ctx, obj, client.InNamespace(namespace)); err != nil {
+			return nil, fmt.Errorf("error deleting resource list: %w", err)
+		}
 
-	listObj := newListFromObject(k8sClient, obj)
-	Eventually(komega.ObjectList(listObj)).Should(HaveField("Items", HaveLen(0)))
+		listObj := newListFromObject(k8sClient, obj)
+
+		return komega.ObjectList(listObj)()
+	}).Should(HaveField("Items", HaveLen(0)))
 }
 
 // newListFromObject converts an individual object type into a list object type to allow the
