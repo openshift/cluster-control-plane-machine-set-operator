@@ -100,4 +100,24 @@ var _ = Describe("Cleanup", func() {
 		)
 		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(ns.GetName()))()).To(HaveField("Items", HaveLen(0)))
 	})
+
+	It("should be able to remove objects with finalizers", func() {
+		machineList := &machinev1beta1.MachineList{}
+		Expect(k8sClient.List(ctx, machineList, client.InNamespace(namespaceName))).To(Succeed())
+
+		for _, m := range machineList.Items {
+			machine := m.DeepCopy()
+
+			Eventually(komega.Update(machine, func() {
+				machine.SetFinalizers([]string{"finalizer1", "finalizer2"})
+			})).Should(Succeed())
+
+			Eventually(komega.Object(machine)).Should(HaveField("ObjectMeta.Finalizers", ConsistOf("finalizer1", "finalizer2")))
+		}
+
+		CleanupResources(ctx, cfg, k8sClient, namespaceName,
+			&machinev1beta1.Machine{},
+		)
+		Eventually(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(namespaceName))).Should(HaveField("Items", HaveLen(0)))
+	})
 })

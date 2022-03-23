@@ -21,11 +21,14 @@ import (
 	"fmt"
 
 	. "github.com/onsi/gomega"
+
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -46,6 +49,8 @@ func CleanupResources(ctx context.Context, cfg *rest.Config, k8sClient client.Cl
 
 // cleanupResource removes all of a particular resource within a namespace.
 func cleanupResource(ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
+	removeFinalizersFromAll(ctx, k8sClient, namespace, obj)
+
 	Eventually(func() (client.ObjectList, error) {
 		if err := k8sClient.DeleteAllOf(ctx, obj, client.InNamespace(namespace)); err != nil {
 			return nil, fmt.Errorf("error deleting resource list: %w", err)
@@ -55,6 +60,46 @@ func cleanupResource(ctx context.Context, k8sClient client.Client, namespace str
 
 		return komega.ObjectList(listObj, client.InNamespace(namespace))()
 	}).Should(HaveField("Items", HaveLen(0)))
+}
+
+// removeFinalizersFromAll removes any finalizers from all of the objects of the given object kind,
+// in the namespace provided.
+func removeFinalizersFromAll(ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
+	listObj := newListFromObject(k8sClient, obj)
+
+	Expect(k8sClient.List(ctx, listObj, client.InNamespace(namespace))).Should(Succeed())
+
+	listItems, err := apimeta.ExtractList(listObj)
+	Expect(err).ToNot(HaveOccurred())
+
+	for _, item := range listItems {
+		o, ok := item.(client.Object)
+		Expect(ok).To(BeTrue())
+
+		removeFinalizers(o)
+	}
+}
+
+// removeFinalizers removes all finalizers from the object given.
+// Finalizers must be removed one by one else the API server will reject the update.
+func removeFinalizers(obj client.Object) {
+	filter := func(finalizers []string, toRemove string) []string {
+		out := []string{}
+
+		for _, f := range finalizers {
+			if f != toRemove {
+				out = append(out, f)
+			}
+		}
+
+		return out
+	}
+
+	for _, finalizer := range obj.GetFinalizers() {
+		Eventually(komega.Update(obj, func() {
+			obj.SetFinalizers(filter(obj.GetFinalizers(), finalizer))
+		})).Should(Succeed())
+	}
 }
 
 // newListFromObject converts an individual object type into a list object type to allow the

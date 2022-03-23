@@ -41,6 +41,10 @@ const (
 	// As ControlPlaneMachineSets are singletons within the namespace, only ControlPlaneMachineSets
 	// with this name should be reconciled.
 	clusterControlPlaneMachineSetName = "cluster"
+
+	// controlPlaneMachineSetFinalizer is the finalizer used by the ControlPlaneMachineSet operator
+	// to prevent deletion until the operator has cleaned up owner references on the Control Plane Machines.
+	controlPlaneMachineSetFinalizer = "controlplanemachineset.machine.openshift.io"
 )
 
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
@@ -124,5 +128,21 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 // Notably it actions the various parts of the business logic without performing any status updates on the
 // ControlPlaneMachineSet object itself, these updates are handled at the parent scope.
 func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (ctrl.Result, error) {
+	// Add the finalizer before any updates to the status. This will ensure no status changes on the same reconcile
+	// as we add the finalizer. The finalizer must be present on the object before we take any actions.
+	if updatedFinalizer, err := r.ensureFinalizer(ctx, logger, cpms); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error adding finalizer: %w", err)
+	} else if updatedFinalizer {
+		return ctrl.Result{Requeue: true}, nil
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// ensureFinalizer adds a finalizer to the ControlPlaneMachineSet if required.
+// If the finalizer already exists, this function should be a no-op.
+// If the finalizer is added, the function will return true so that the reconciler can requeue the object.
+// Adding the finalizer in a separate reconcile ensures that spec updates are separate from status updates.
+func (r *ControlPlaneMachineSetReconciler) ensureFinalizer(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (bool, error) {
+	return false, nil
 }
