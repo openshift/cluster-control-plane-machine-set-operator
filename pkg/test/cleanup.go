@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
@@ -37,52 +37,52 @@ import (
 // The namespace will then be removed once it has been emptied.
 // This utility is intended to be used in AfterEach blocks to clean up from a specific test.
 // It calls various gomega assertions so will fail a test if there are any errors.
-func CleanupResources(ctx context.Context, cfg *rest.Config, k8sClient client.Client, namespace string, objs ...client.Object) {
+func CleanupResources(g gomega.Gomega, ctx context.Context, cfg *rest.Config, k8sClient client.Client, namespace string, objs ...client.Object) {
 	for _, obj := range objs {
-		cleanupResource(ctx, k8sClient, namespace, obj)
+		cleanupResource(g, ctx, k8sClient, namespace, obj)
 	}
 
 	if namespace != "" {
-		removeNamespace(ctx, cfg, k8sClient, namespace)
+		removeNamespace(g, ctx, cfg, k8sClient, namespace)
 	}
 }
 
 // cleanupResource removes all of a particular resource within a namespace.
-func cleanupResource(ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
-	removeFinalizersFromAll(ctx, k8sClient, namespace, obj)
+func cleanupResource(g gomega.Gomega, ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
+	removeFinalizersFromAll(g, ctx, k8sClient, namespace, obj)
 
-	Eventually(func() (client.ObjectList, error) {
+	g.Eventually(func() (client.ObjectList, error) {
 		if err := k8sClient.DeleteAllOf(ctx, obj, client.InNamespace(namespace)); err != nil {
 			return nil, fmt.Errorf("error deleting resource list: %w", err)
 		}
 
-		listObj := newListFromObject(k8sClient, obj)
+		listObj := newListFromObject(g, k8sClient, obj)
 
 		return komega.ObjectList(listObj, client.InNamespace(namespace))()
-	}).Should(HaveField("Items", HaveLen(0)))
+	}).Should(gomega.HaveField("Items", gomega.HaveLen(0)))
 }
 
 // removeFinalizersFromAll removes any finalizers from all of the objects of the given object kind,
 // in the namespace provided.
-func removeFinalizersFromAll(ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
-	listObj := newListFromObject(k8sClient, obj)
+func removeFinalizersFromAll(g gomega.Gomega, ctx context.Context, k8sClient client.Client, namespace string, obj client.Object) {
+	listObj := newListFromObject(g, k8sClient, obj)
 
-	Expect(k8sClient.List(ctx, listObj, client.InNamespace(namespace))).Should(Succeed())
+	g.Expect(k8sClient.List(ctx, listObj, client.InNamespace(namespace))).Should(gomega.Succeed())
 
 	listItems, err := apimeta.ExtractList(listObj)
-	Expect(err).ToNot(HaveOccurred())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	for _, item := range listItems {
 		o, ok := item.(client.Object)
-		Expect(ok).To(BeTrue())
+		g.Expect(ok).To(gomega.BeTrue())
 
-		removeFinalizers(o)
+		removeFinalizers(g, o)
 	}
 }
 
 // removeFinalizers removes all finalizers from the object given.
 // Finalizers must be removed one by one else the API server will reject the update.
-func removeFinalizers(obj client.Object) {
+func removeFinalizers(g gomega.Gomega, obj client.Object) {
 	filter := func(finalizers []string, toRemove string) []string {
 		out := []string{}
 
@@ -96,45 +96,45 @@ func removeFinalizers(obj client.Object) {
 	}
 
 	for _, finalizer := range obj.GetFinalizers() {
-		Eventually(komega.Update(obj, func() {
+		g.Eventually(komega.Update(obj, func() {
 			obj.SetFinalizers(filter(obj.GetFinalizers(), finalizer))
-		})).Should(Succeed())
+		})).Should(gomega.Succeed())
 	}
 }
 
 // newListFromObject converts an individual object type into a list object type to allow the
 // the list to be checked for emptiness.
-func newListFromObject(k8sClient client.Client, obj client.Object) client.ObjectList {
+func newListFromObject(g gomega.Gomega, k8sClient client.Client, obj client.Object) client.ObjectList {
 	objGVKs, _, err := k8sClient.Scheme().ObjectKinds(obj)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(objGVKs).To(HaveLen(1))
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	g.Expect(objGVKs).To(gomega.HaveLen(1))
 
 	listGVK := objGVKs[0]
 	listGVK.Kind = fmt.Sprintf("%sList", listGVK.Kind)
 
 	newObj, err := k8sClient.Scheme().New(listGVK)
-	Expect(err).ToNot(HaveOccurred())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	listObj, ok := newObj.(client.ObjectList)
-	Expect(ok).To(BeTrue())
+	g.Expect(ok).To(gomega.BeTrue())
 
 	return listObj
 }
 
 // removeNamespace handles the namespace finalization act that is normally performed by the garbage collector
 // once it is happy that the namespace has no objects left within it.
-func removeNamespace(ctx context.Context, cfg *rest.Config, k8sClient client.Client, namespace string) {
+func removeNamespace(g gomega.Gomega, ctx context.Context, cfg *rest.Config, k8sClient client.Client, namespace string) {
 	coreClient, err := coreclient.NewForConfig(cfg)
-	Expect(err).ToNot(HaveOccurred())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	nsBuilder := resourcebuilder.Namespace().WithName(namespace)
 
 	// Delete the namespace
 	ns := nsBuilder.Build()
-	Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
+	g.Expect(k8sClient.Delete(ctx, ns)).To(gomega.Succeed())
 
 	// Remove the finalizer
-	Eventually(func() error {
+	g.Eventually(func() error {
 		if err := komega.Get(ns)(); err != nil {
 			return fmt.Errorf("could not get namespace: %w", err)
 		}
@@ -146,5 +146,5 @@ func removeNamespace(ctx context.Context, cfg *rest.Config, k8sClient client.Cli
 		}
 
 		return nil
-	}).Should(Succeed())
+	}).Should(gomega.Succeed())
 }
