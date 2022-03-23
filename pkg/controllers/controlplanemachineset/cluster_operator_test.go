@@ -88,7 +88,7 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 		<-mgrDone
 
-		test.CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&corev1.Node{},
 			&configv1.ClusterOperator{},
 			&machinev1beta1.Machine{},
