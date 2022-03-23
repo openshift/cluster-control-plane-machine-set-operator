@@ -128,6 +128,11 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 // Notably it actions the various parts of the business logic without performing any status updates on the
 // ControlPlaneMachineSet object itself, these updates are handled at the parent scope.
 func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (ctrl.Result, error) {
+	// If the control plane machine set is being deleted, we need to handle that rather than the regular reconcile flow.
+	if cpms.GetDeletionTimestamp() != nil {
+		return r.reconcileDelete(ctx, logger, cpms)
+	}
+
 	// Add the finalizer before any updates to the status. This will ensure no status changes on the same reconcile
 	// as we add the finalizer. The finalizer must be present on the object before we take any actions.
 	if updatedFinalizer, err := r.ensureFinalizer(ctx, logger, cpms); err != nil {
@@ -136,6 +141,15 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	return ctrl.Result{}, nil
+}
+
+// reconcileDelete handles the removal logic for the ControlPlaneMachineSet resource.
+// During the deletion process, the controller is expected to remove any owner references from Machines
+// that are owned by the ControlPlaneMachineSet.
+// Once the owner references are removed, it removes the finalizer to allow the garbage collector to reap
+// the deleted ControlPlaneMachineSet.
+func (r *ControlPlaneMachineSetReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 

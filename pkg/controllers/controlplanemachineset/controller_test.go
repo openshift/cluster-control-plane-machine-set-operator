@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -141,6 +142,44 @@ var _ = Describe("With a running controller", func() {
 			PIt("should re-add the controlplanemachineset.machine.openshift.io finalizer", func() {
 				Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
 			})
+		})
+	})
+
+	Context("when deleting the ControlPlaneMachineSet", func() {
+		var cpms *machinev1.ControlPlaneMachineSet
+
+		BeforeEach(func() {
+			By("Creating a ControlPlaneMachineSet")
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+			cpms.SetFinalizers([]string{controlPlaneMachineSetFinalizer})
+			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+			By("Creating Machines owned by the ControlPlaneMachineSet")
+			machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("delete-test-").WithNamespace(namespaceName)
+
+			for i := 0; i < 3; i++ {
+				machine := machineBuilder.Build()
+				Expect(controllerutil.SetControllerReference(cpms, machine, testScheme)).To(Succeed())
+				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+			}
+
+			machines := &machinev1beta1.MachineList{}
+			Expect(k8sClient.List(ctx, machines)).To(Succeed())
+			Expect(machines.Items).To(HaveLen(3))
+
+			By("Deleting the ControlPlaneMachineSet")
+			Expect(k8sClient.Delete(ctx, cpms)).To(Succeed())
+		})
+
+		PIt("should eventually be removed", func() {
+			Eventually(komega.Get(cpms)).Should(MatchError("controlplanemachinesets.machine.openshift.io \"cluster\" not found"))
+		})
+
+		PIt("should remove the owner references from the Machines", func() {
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", SatisfyAll(
+				HaveLen(3),
+				HaveEach(HaveField("ObjectMeta.OwnerReferences", HaveLen(0))),
+			)), "3 Machines should exist, each should have no owner references")
 		})
 	})
 })
