@@ -25,10 +25,104 @@ import (
 	"github.com/onsi/gomega/types"
 
 	configv1 "github.com/openshift/api/config/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// errActualTypeMismatchCondition is used when the type of the actual object does not match the expected type of Condition.
+var errActualTypeMismatchCondition = errors.New("actual should be of type Condition")
+
+// MatchConditions returns a custom matcher to check equality of a slice of metav1.Condtion.
+func MatchConditions(expected []metav1.Condition) types.GomegaMatcher {
+	return &matchConditions{
+		expected: expected,
+	}
+}
+
+type matchConditions struct {
+	expected []metav1.Condition
+}
+
+// Match checks for equality between the actual and expected objects.
+func (m matchConditions) Match(actual interface{}) (success bool, err error) {
+	elems := []interface{}{}
+	for _, condition := range m.expected {
+		elems = append(elems, MatchCondition(condition))
+	}
+
+	ok, err := gomega.ConsistOf(elems).Match(actual)
+	if !ok {
+		return false, wrap(err, "conditions did not match")
+	}
+
+	return true, nil
+}
+
+// FailureMessage is the message returned to the test when the actual and expected
+// objects do not match.
+func (m matchConditions) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto match\n\t%#v\n", actual, m.expected)
+}
+
+// NegatedFailureMessage is the negated version of the FailureMessage.
+func (m matchConditions) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
+}
+
+// MatchCondition returns a custom matcher to check equality of metav1.Condition.
+func MatchCondition(expected metav1.Condition) types.GomegaMatcher {
+	return &matchCondition{
+		expected: expected,
+	}
+}
+
+type matchCondition struct {
+	expected metav1.Condition
+}
+
+// Match checks for equality between the actual and expected objects.
+// nolint:dupl
+func (m matchCondition) Match(actual interface{}) (success bool, err error) {
+	actualCondition, ok := actual.(metav1.Condition)
+	if !ok {
+		return false, errActualTypeMismatchCondition
+	}
+
+	ok, err = gomega.Equal(m.expected.Type).Match(actualCondition.Type)
+	if !ok {
+		return false, wrap(err, "condition type does not match")
+	}
+
+	ok, err = gomega.Equal(m.expected.Status).Match(actualCondition.Status)
+	if !ok {
+		return false, wrap(err, "condition status does not match")
+	}
+
+	ok, err = gomega.Equal(m.expected.Reason).Match(actualCondition.Reason)
+	if !ok {
+		return false, wrap(err, "condition reason does not match")
+	}
+
+	ok, err = gomega.Equal(m.expected.Message).Match(actualCondition.Message)
+	if !ok {
+		return false, wrap(err, "condition message does not match")
+	}
+
+	return true, nil
+}
+
+// FailureMessage is the message returned to the test when the actual and expected
+// objects do not match.
+func (m matchCondition) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto match\n\t%#v\n", actual, m.expected)
+}
+
+// NegatedFailureMessage is the negated version of the FailureMessage.
+func (m matchCondition) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
+}
+
 // errActualTypeMismatchClusterOperatorStatusCondition is used when the type of the actual object does not match
-// the expected type or ClusterOperatorStatusCondition.
+// the expected type of ClusterOperatorStatusCondition.
 var errActualTypeMismatchClusterOperatorStatusCondition = errors.New("actual should be of type ClusterOperatorStatusCondition")
 
 // MatchClusterOperatorStatusConditions returns a custom matcher to check equality of configv1.ClusterOperatorStatusConditions.
@@ -80,6 +174,7 @@ type matchClusterOperatorCondition struct {
 }
 
 // Match checks for equality between the actual and expected objects.
+// nolint:dupl
 func (m matchClusterOperatorCondition) Match(actual interface{}) (success bool, err error) {
 	actualCondition, ok := actual.(configv1.ClusterOperatorStatusCondition)
 	if !ok {
