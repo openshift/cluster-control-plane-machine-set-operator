@@ -33,17 +33,17 @@ var errActualTypeMismatchClusterOperatorStatusCondition = errors.New("actual sho
 
 // MatchClusterOperatorStatusConditions returns a custom matcher to check equality of configv1.ClusterOperatorStatusConditions.
 func MatchClusterOperatorStatusConditions(expected []configv1.ClusterOperatorStatusCondition) types.GomegaMatcher {
-	return &matchConditions{
+	return &matchClusterOperatorConditions{
 		expected: expected,
 	}
 }
 
-type matchConditions struct {
+type matchClusterOperatorConditions struct {
 	expected []configv1.ClusterOperatorStatusCondition
 }
 
 // Match checks for equality between the actual and expected objects.
-func (m matchConditions) Match(actual interface{}) (success bool, err error) {
+func (m matchClusterOperatorConditions) Match(actual interface{}) (success bool, err error) {
 	elems := []interface{}{}
 	for _, condition := range m.expected {
 		elems = append(elems, MatchClusterOperatorStatusCondition(condition))
@@ -59,28 +59,28 @@ func (m matchConditions) Match(actual interface{}) (success bool, err error) {
 
 // FailureMessage is the message returned to the test when the actual and expected
 // objects do not match.
-func (m matchConditions) FailureMessage(actual interface{}) (message string) {
+func (m matchClusterOperatorConditions) FailureMessage(actual interface{}) (message string) {
 	return fmt.Sprintf("expected\n\t%#v\nto match\n\t%#v\n", actual, m.expected)
 }
 
 // NegatedFailureMessage is the negated version of the FailureMessage.
-func (m matchConditions) NegatedFailureMessage(actual interface{}) (message string) {
+func (m matchClusterOperatorConditions) NegatedFailureMessage(actual interface{}) (message string) {
 	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
 }
 
 // MatchClusterOperatorStatusCondition returns a custom matcher to check equality of configv1.ClusterOperatorStatusCondition.
 func MatchClusterOperatorStatusCondition(expected configv1.ClusterOperatorStatusCondition) types.GomegaMatcher {
-	return &matchCondition{
+	return &matchClusterOperatorCondition{
 		expected: expected,
 	}
 }
 
-type matchCondition struct {
+type matchClusterOperatorCondition struct {
 	expected configv1.ClusterOperatorStatusCondition
 }
 
 // Match checks for equality between the actual and expected objects.
-func (m matchCondition) Match(actual interface{}) (success bool, err error) {
+func (m matchClusterOperatorCondition) Match(actual interface{}) (success bool, err error) {
 	actualCondition, ok := actual.(configv1.ClusterOperatorStatusCondition)
 	if !ok {
 		return false, errActualTypeMismatchClusterOperatorStatusCondition
@@ -111,12 +111,12 @@ func (m matchCondition) Match(actual interface{}) (success bool, err error) {
 
 // FailureMessage is the message returned to the test when the actual and expected
 // objects do not match.
-func (m matchCondition) FailureMessage(actual interface{}) (message string) {
+func (m matchClusterOperatorCondition) FailureMessage(actual interface{}) (message string) {
 	return fmt.Sprintf("expected\n\t%#v\nto match\n\t%#v\n", actual, m.expected)
 }
 
 // NegatedFailureMessage is the negated version of the FailureMessage.
-func (m matchCondition) NegatedFailureMessage(actual interface{}) (message string) {
+func (m matchClusterOperatorCondition) NegatedFailureMessage(actual interface{}) (message string) {
 	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
 }
 
