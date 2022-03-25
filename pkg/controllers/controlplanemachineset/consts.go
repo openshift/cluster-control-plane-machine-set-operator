@@ -65,6 +65,12 @@ const (
 	// and is not currently encountering any issues in operation.
 	reasonAsExpected = "AsExpected"
 
+	// reasonInvalidStrategy denotes that the ControlPlaneMachineSet has identified an
+	// invalid value for the spec.strategy.type field.
+	// This must be resolved by the user before operation of the ControlPlaneMachineSet
+	// can continue.
+	reasonInvalidStrategy = "InvalidStrategy"
+
 	// reasonMachinesAlreadyOwned denotes that the ControlPlaneMachineSet has identified
 	// some Control Plane Machines that are already owned by a different controller.
 	// In this scenario, the operator must cease operations to prevent possible conflicts
