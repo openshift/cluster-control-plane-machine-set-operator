@@ -94,7 +94,26 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonAllReplicasAvailable,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAllReplicasUpdated,
+							ObservedGeneration: 1,
+						},
+					},
 					ObservedGeneration:  1,
 					Replicas:            3,
 					ReadyReplicas:       3,
@@ -124,7 +143,27 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonAllReplicasAvailable,
+							ObservedGeneration: 2,
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 2,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonNeedsUpdateReplicas,
+							ObservedGeneration: 2,
+							Message:            "Observed 2 replica(s) in need of update",
+						},
+					},
 					ObservedGeneration:  2,
 					Replicas:            3,
 					ReadyReplicas:       3,
@@ -156,7 +195,27 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonAllReplicasAvailable,
+							ObservedGeneration: 3,
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 3,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonNeedsUpdateReplicas,
+							ObservedGeneration: 3,
+							Message:            "Observed 2 replica(s) in need of update",
+						},
+					},
 					ObservedGeneration:  3,
 					Replicas:            5,
 					ReadyReplicas:       3,
@@ -188,7 +247,27 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonAllReplicasAvailable,
+							ObservedGeneration: 4,
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 4,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonExcessReplicas,
+							ObservedGeneration: 4,
+							Message:            "Waiting for 2 old replica(s) to be removed",
+						},
+					},
 					ObservedGeneration:  4,
 					Replicas:            5,
 					ReadyReplicas:       5,
@@ -216,9 +295,30 @@ var _ = Describe("Status", func() {
 					missingMachineBuilder.WithIndex(1).WithNodeName("node-1").Build(),
 					missingMachineBuilder.WithIndex(2).WithNodeName("node-2").Build(),
 				},
-				expectedError: errors.New("found unmanaged control plane nodes, the following nodes do not have associated machines: node-0, node-1, node-2"),
+				expectedError: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-0, node-1, node-2"),
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonUnavailableReplicas,
+							ObservedGeneration: 5,
+							Message:            "Missing 3 available replica(s)",
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonUnmanagedNodes,
+							ObservedGeneration: 5,
+							Message:            "Found 3 unmanaged node(s)",
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonOperatorDegraded,
+							ObservedGeneration: 5,
+						},
+					},
 					ObservedGeneration:  5,
 					Replicas:            0,
 					ReadyReplicas:       0,
@@ -227,7 +327,7 @@ var _ = Describe("Status", func() {
 				},
 				expectedLogs: []test.LogEntry{
 					{
-						Error: errors.New("found unmanaged control plane nodes, the following nodes do not have associated machines: node-0, node-1, node-2"),
+						Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-0, node-1, node-2"),
 						KeysAndValues: []interface{}{
 							"UnmanagedNodes", "node-0,node-1,node-2",
 						},
@@ -242,9 +342,30 @@ var _ = Describe("Status", func() {
 					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
 					missingMachineBuilder.WithIndex(2).WithNodeName("node-2").Build(),
 				},
-				expectedError: errors.New("found unmanaged control plane nodes, the following nodes do not have associated machines: node-2"),
+				expectedError: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-2"),
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonUnavailableReplicas,
+							ObservedGeneration: 6,
+							Message:            "Missing 1 available replica(s)",
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonUnmanagedNodes,
+							ObservedGeneration: 6,
+							Message:            "Found 1 unmanaged node(s)",
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonOperatorDegraded,
+							ObservedGeneration: 6,
+						},
+					},
 					ObservedGeneration:  6,
 					Replicas:            2,
 					ReadyReplicas:       2,
@@ -253,7 +374,7 @@ var _ = Describe("Status", func() {
 				},
 				expectedLogs: []test.LogEntry{
 					{
-						Error: errors.New("found unmanaged control plane nodes, the following nodes do not have associated machines: node-2"),
+						Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-2"),
 						KeysAndValues: []interface{}{
 							"UnmanagedNodes", "node-2",
 						},
@@ -270,7 +391,28 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonUnavailableReplicas,
+							ObservedGeneration: 7,
+							Message:            "Missing 1 available replica(s)",
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 7,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonNeedsUpdateReplicas,
+							ObservedGeneration: 7,
+							Message:            "Observed 1 replica(s) in need of update",
+						},
+					},
 					ObservedGeneration:  7,
 					Replicas:            3,
 					ReadyReplicas:       2,
@@ -302,7 +444,28 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonUnavailableReplicas,
+							ObservedGeneration: 8,
+							Message:            "Missing 1 available replica(s)",
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 8,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonNeedsUpdateReplicas,
+							ObservedGeneration: 8,
+							Message:            "Observed 1 replica(s) in need of update",
+						},
+					},
 					ObservedGeneration:  4,
 					Replicas:            5,
 					ReadyReplicas:       5,
@@ -332,7 +495,28 @@ var _ = Describe("Status", func() {
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions:          []metav1.Condition{},
+					Conditions: []metav1.Condition{
+						{
+							Type:               conditionAvailable,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonUnavailableReplicas,
+							ObservedGeneration: 8,
+							Message:            "Missing 1 available replica(s)",
+						},
+						{
+							Type:               conditionDegraded,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
+							ObservedGeneration: 8,
+						},
+						{
+							Type:               conditionProgressing,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonNeedsUpdateReplicas,
+							ObservedGeneration: 8,
+							Message:            "Observed 1 replica(s) in need of update",
+						},
+					},
 					ObservedGeneration:  9,
 					Replicas:            2,
 					ReadyReplicas:       2,
