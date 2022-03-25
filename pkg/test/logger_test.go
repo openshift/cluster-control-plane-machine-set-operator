@@ -50,7 +50,7 @@ var _ = Describe("TestLogger", func() {
 	})
 
 	It("adds error logs to the entries", func() {
-		err := errors.New("error") //nolint:goerr113
+		err := errors.New("error")
 		logger.Logger().Error(err, "some log message", "extra", "detail")
 
 		Expect(logger.Entries()).To(ConsistOf(
