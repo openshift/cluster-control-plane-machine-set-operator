@@ -25,28 +25,28 @@ import (
 	"github.com/onsi/gomega/types"
 
 	configv1 "github.com/openshift/api/config/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// errActualTypeMismatchClusterOperatorStatusCondition is used when the type of the actual object does not match
-// the expected type or ClusterOperatorStatusCondition.
-var errActualTypeMismatchClusterOperatorStatusCondition = errors.New("actual should be of type ClusterOperatorStatusCondition")
+// errActualTypeMismatchCondition is used when the type of the actual object does not match the expected type of Condition.
+var errActualTypeMismatchCondition = errors.New("actual should be of type Condition")
 
-// MatchClusterOperatorStatusConditions returns a custom matcher to check equality of configv1.ClusterOperatorStatusConditions.
-func MatchClusterOperatorStatusConditions(expected []configv1.ClusterOperatorStatusCondition) types.GomegaMatcher {
+// MatchConditions returns a custom matcher to check equality of a slice of metav1.Condtion.
+func MatchConditions(expected []metav1.Condition) types.GomegaMatcher {
 	return &matchConditions{
 		expected: expected,
 	}
 }
 
 type matchConditions struct {
-	expected []configv1.ClusterOperatorStatusCondition
+	expected []metav1.Condition
 }
 
 // Match checks for equality between the actual and expected objects.
 func (m matchConditions) Match(actual interface{}) (success bool, err error) {
 	elems := []interface{}{}
 	for _, condition := range m.expected {
-		elems = append(elems, MatchClusterOperatorStatusCondition(condition))
+		elems = append(elems, MatchCondition(condition))
 	}
 
 	ok, err := gomega.ConsistOf(elems).Match(actual)
@@ -68,22 +68,23 @@ func (m matchConditions) NegatedFailureMessage(actual interface{}) (message stri
 	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
 }
 
-// MatchClusterOperatorStatusCondition returns a custom matcher to check equality of configv1.ClusterOperatorStatusCondition.
-func MatchClusterOperatorStatusCondition(expected configv1.ClusterOperatorStatusCondition) types.GomegaMatcher {
+// MatchCondition returns a custom matcher to check equality of metav1.Condition.
+func MatchCondition(expected metav1.Condition) types.GomegaMatcher {
 	return &matchCondition{
 		expected: expected,
 	}
 }
 
 type matchCondition struct {
-	expected configv1.ClusterOperatorStatusCondition
+	expected metav1.Condition
 }
 
 // Match checks for equality between the actual and expected objects.
+// nolint:dupl
 func (m matchCondition) Match(actual interface{}) (success bool, err error) {
-	actualCondition, ok := actual.(configv1.ClusterOperatorStatusCondition)
+	actualCondition, ok := actual.(metav1.Condition)
 	if !ok {
-		return false, errActualTypeMismatchClusterOperatorStatusCondition
+		return false, errActualTypeMismatchCondition
 	}
 
 	ok, err = gomega.Equal(m.expected.Type).Match(actualCondition.Type)
@@ -117,6 +118,100 @@ func (m matchCondition) FailureMessage(actual interface{}) (message string) {
 
 // NegatedFailureMessage is the negated version of the FailureMessage.
 func (m matchCondition) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
+}
+
+// errActualTypeMismatchClusterOperatorStatusCondition is used when the type of the actual object does not match
+// the expected type of ClusterOperatorStatusCondition.
+var errActualTypeMismatchClusterOperatorStatusCondition = errors.New("actual should be of type ClusterOperatorStatusCondition")
+
+// MatchClusterOperatorStatusConditions returns a custom matcher to check equality of configv1.ClusterOperatorStatusConditions.
+func MatchClusterOperatorStatusConditions(expected []configv1.ClusterOperatorStatusCondition) types.GomegaMatcher {
+	return &matchClusterOperatorConditions{
+		expected: expected,
+	}
+}
+
+type matchClusterOperatorConditions struct {
+	expected []configv1.ClusterOperatorStatusCondition
+}
+
+// Match checks for equality between the actual and expected objects.
+func (m matchClusterOperatorConditions) Match(actual interface{}) (success bool, err error) {
+	elems := []interface{}{}
+	for _, condition := range m.expected {
+		elems = append(elems, MatchClusterOperatorStatusCondition(condition))
+	}
+
+	ok, err := gomega.ConsistOf(elems).Match(actual)
+	if !ok {
+		return false, wrap(err, "conditions did not match")
+	}
+
+	return true, nil
+}
+
+// FailureMessage is the message returned to the test when the actual and expected
+// objects do not match.
+func (m matchClusterOperatorConditions) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto match\n\t%#v\n", actual, m.expected)
+}
+
+// NegatedFailureMessage is the negated version of the FailureMessage.
+func (m matchClusterOperatorConditions) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
+}
+
+// MatchClusterOperatorStatusCondition returns a custom matcher to check equality of configv1.ClusterOperatorStatusCondition.
+func MatchClusterOperatorStatusCondition(expected configv1.ClusterOperatorStatusCondition) types.GomegaMatcher {
+	return &matchClusterOperatorCondition{
+		expected: expected,
+	}
+}
+
+type matchClusterOperatorCondition struct {
+	expected configv1.ClusterOperatorStatusCondition
+}
+
+// Match checks for equality between the actual and expected objects.
+// nolint:dupl
+func (m matchClusterOperatorCondition) Match(actual interface{}) (success bool, err error) {
+	actualCondition, ok := actual.(configv1.ClusterOperatorStatusCondition)
+	if !ok {
+		return false, errActualTypeMismatchClusterOperatorStatusCondition
+	}
+
+	ok, err = gomega.Equal(m.expected.Type).Match(actualCondition.Type)
+	if !ok {
+		return false, wrap(err, "condition type does not match")
+	}
+
+	ok, err = gomega.Equal(m.expected.Status).Match(actualCondition.Status)
+	if !ok {
+		return false, wrap(err, "condition status does not match")
+	}
+
+	ok, err = gomega.Equal(m.expected.Reason).Match(actualCondition.Reason)
+	if !ok {
+		return false, wrap(err, "condition reason does not match")
+	}
+
+	ok, err = gomega.Equal(m.expected.Message).Match(actualCondition.Message)
+	if !ok {
+		return false, wrap(err, "condition message does not match")
+	}
+
+	return true, nil
+}
+
+// FailureMessage is the message returned to the test when the actual and expected
+// objects do not match.
+func (m matchClusterOperatorCondition) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("expected\n\t%#v\nto match\n\t%#v\n", actual, m.expected)
+}
+
+// NegatedFailureMessage is the negated version of the FailureMessage.
+func (m matchClusterOperatorCondition) NegatedFailureMessage(actual interface{}) (message string) {
 	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
 }
 
