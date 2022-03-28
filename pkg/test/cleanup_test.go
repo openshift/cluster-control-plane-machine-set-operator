@@ -48,11 +48,11 @@ var _ = Describe("Cleanup", func() {
 		}
 	})
 
-	It("should delete all Machines", func() {
+	It("should delete all Machines in the namespace", func() {
 		CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 		)
-		Expect(komega.ObjectList(&machinev1beta1.MachineList{})()).To(HaveField("Items", HaveLen(0)))
+		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(namespaceName))()).To(HaveField("Items", HaveLen(0)))
 	})
 
 	It("should delete the namespace when given", func() {
