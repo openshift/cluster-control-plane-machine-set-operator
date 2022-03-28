@@ -65,6 +65,12 @@ const (
 	// and is not currently encountering any issues in operation.
 	reasonAsExpected = "AsExpected"
 
+	// reasonMachinesAlreadyOwned denotes that the ControlPlaneMachineSet has identified
+	// some Control Plane Machines that are already owned by a different controller.
+	// In this scenario, the operator must cease operations to prevent possible conflicts
+	// with the other controller.
+	reasonMachinesAlreadyOwned = "MachinesAlreadyOwned"
+
 	// reasonUnmanagedNodes denotes that the ControlPlaneMachineSet has identified some
 	// Control Plane Node that is not currently managed by a Control Plane Machine.
 	// In this scenario, to prevent potential for degrading the cluster into an unsupported
