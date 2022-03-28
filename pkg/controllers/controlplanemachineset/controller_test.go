@@ -89,7 +89,7 @@ var _ = Describe("With a running controller", func() {
 		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 		<-mgrDone
 
-		test.CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&corev1.Node{},
 			&configv1.ClusterOperator{},
 			&machinev1beta1.Machine{},
@@ -214,7 +214,7 @@ var _ = Describe("ensureFinalizer", func() {
 	})
 
 	AfterEach(func() {
-		test.CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1.ControlPlaneMachineSet{},
 		)
 	})

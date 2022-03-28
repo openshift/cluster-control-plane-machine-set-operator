@@ -48,15 +48,15 @@ var _ = Describe("Cleanup", func() {
 		}
 	})
 
-	It("should delete all Machines", func() {
-		CleanupResources(ctx, cfg, k8sClient, namespaceName,
+	It("should delete all Machines in the namespace", func() {
+		CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 		)
-		Expect(komega.ObjectList(&machinev1beta1.MachineList{})()).To(HaveField("Items", HaveLen(0)))
+		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(namespaceName))()).To(HaveField("Items", HaveLen(0)))
 	})
 
 	It("should delete the namespace when given", func() {
-		CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 		)
 
@@ -69,7 +69,7 @@ var _ = Describe("Cleanup", func() {
 	It("should not error when no namespace is given", func() {
 		// In this case it won't actually delete anything, but that shouldn't cause any errors.
 		// Any remaining resources won't affect other tests as they are in a separate namespace.
-		CleanupResources(ctx, cfg, k8sClient, "")
+		CleanupResources(Default, ctx, cfg, k8sClient, "")
 	})
 
 	It("should ignore resources in another namespace", func() {
@@ -86,7 +86,7 @@ var _ = Describe("Cleanup", func() {
 		}
 
 		// Check that it can delete all resources in the namespace
-		CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 		)
 		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(namespaceName))()).To(HaveField("Items", HaveLen(0)))
@@ -95,7 +95,7 @@ var _ = Describe("Cleanup", func() {
 		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(ns.GetName()))()).To(HaveField("Items", HaveLen(3)))
 
 		// Cleanup the second namespace
-		CleanupResources(ctx, cfg, k8sClient, ns.GetName(),
+		CleanupResources(Default, ctx, cfg, k8sClient, ns.GetName(),
 			&machinev1beta1.Machine{},
 		)
 		Expect(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(ns.GetName()))()).To(HaveField("Items", HaveLen(0)))
@@ -115,7 +115,7 @@ var _ = Describe("Cleanup", func() {
 			Eventually(komega.Object(machine)).Should(HaveField("ObjectMeta.Finalizers", ConsistOf("finalizer1", "finalizer2")))
 		}
 
-		CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 		)
 		Eventually(komega.ObjectList(&machinev1beta1.MachineList{}, client.InNamespace(namespaceName))).Should(HaveField("Items", HaveLen(0)))

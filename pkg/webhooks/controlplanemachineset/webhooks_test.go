@@ -74,7 +74,7 @@ var _ = Describe("Webhooks", func() {
 		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 		<-mgrDone
 
-		test.CleanupResources(ctx, cfg, k8sClient, namespaceName,
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 			&machinev1.ControlPlaneMachineSet{},
 		)
