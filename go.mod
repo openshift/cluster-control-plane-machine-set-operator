@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/go-logr/logr v1.2.2
+	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.44.2
 	github.com/onsi/ginkgo/v2 v2.1.3
 	github.com/onsi/gomega v1.18.2-0.20220228162959-c8ba5823d8c2
