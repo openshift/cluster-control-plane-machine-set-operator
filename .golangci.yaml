@@ -106,3 +106,4 @@ issues:
         - dupl
         - gosec
         - gochecknoglobals
+        - goerr113

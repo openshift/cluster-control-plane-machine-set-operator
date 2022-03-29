@@ -45,6 +45,7 @@ func ControlPlaneMachineSet() ControlPlaneMachineSetBuilder {
 
 // ControlPlaneMachineSetBuilder is used to build out a controlplanemachineset object.
 type ControlPlaneMachineSetBuilder struct {
+	generation             int64
 	machineTemplateBuilder ControlPlaneMachineSetTemplateBuilder
 	name                   string
 	namespace              string
@@ -56,8 +57,9 @@ type ControlPlaneMachineSetBuilder struct {
 func (m ControlPlaneMachineSetBuilder) Build() *machinev1.ControlPlaneMachineSet {
 	cpms := &machinev1.ControlPlaneMachineSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.name,
-			Namespace: m.namespace,
+			Name:       m.name,
+			Namespace:  m.namespace,
+			Generation: m.generation,
 		},
 		Spec: machinev1.ControlPlaneMachineSetSpec{
 			Replicas: int32Ptr(m.replicas),
@@ -87,6 +89,12 @@ func (m ControlPlaneMachineSetBuilder) WithName(name string) ControlPlaneMachine
 // WithNamespace sets the namespace for the controlplanemachineset builder.
 func (m ControlPlaneMachineSetBuilder) WithNamespace(namespace string) ControlPlaneMachineSetBuilder {
 	m.namespace = namespace
+	return m
+}
+
+// WithGeneration sets the generation for the controlerplanemachineset builder.
+func (m ControlPlaneMachineSetBuilder) WithGeneration(generation int64) ControlPlaneMachineSetBuilder {
+	m.generation = generation
 	return m
 }
 

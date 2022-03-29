@@ -24,6 +24,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
@@ -141,7 +142,26 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	return ctrl.Result{}, nil
+	machineProvider, err := machineproviders.NewMachineProvider(ctx, logger, r.Client, cpms)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error constructing machine provider: %w", err)
+	}
+
+	machineInfos, err := machineProvider.GetMachineInfos()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error fetching machine info: %w", err)
+	}
+
+	if err := reconcileStatusWithMachineInfo(logger, cpms, machineInfos); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error reconciling machine info with status: %w", err)
+	}
+
+	result, err := r.reconcileMachineUpdates(ctx, logger, cpms, machineProvider, machineInfos)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error reconciling machine updates: %w", err)
+	}
+
+	return result, nil
 }
 
 // reconcileDelete handles the removal logic for the ControlPlaneMachineSet resource.
