@@ -32,9 +32,10 @@ func MachineInfo() MachineInfoBuilder {
 
 // MachineInfoBuilder is used to build out a machineinfo object.
 type MachineInfoBuilder struct {
-	machineGVR       schema.GroupVersionResource
-	machineName      string
-	machineOwnerRefs []metav1.OwnerReference
+	machineDeletiontimestamp *metav1.Time
+	machineGVR               schema.GroupVersionResource
+	machineName              string
+	machineOwnerRefs         []metav1.OwnerReference
 
 	nodeGVR  schema.GroupVersionResource
 	nodeName string
@@ -58,8 +59,9 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 		info.MachineRef = &machineproviders.ObjectRef{
 			GroupVersionResource: m.machineGVR,
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            m.machineName,
-				OwnerReferences: m.machineOwnerRefs,
+				DeletionTimestamp: m.machineDeletiontimestamp,
+				Name:              m.machineName,
+				OwnerReferences:   m.machineOwnerRefs,
 			},
 		}
 	}
@@ -74,6 +76,12 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 	}
 
 	return info
+}
+
+// WithMachineDeletionTimestamp sets the machine deletion timestamp for the machineinfo builder.
+func (m MachineInfoBuilder) WithMachineDeletionTimestamp(deletion metav1.Time) MachineInfoBuilder {
+	m.machineDeletiontimestamp = &deletion
+	return m
 }
 
 // WithMachineGVR sets the machine groupversionresource for the machineinfo builder.
