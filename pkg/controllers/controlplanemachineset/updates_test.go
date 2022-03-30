@@ -492,6 +492,595 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		BeforeEach(func() {
 			cpms.Spec.Strategy.Type = machinev1.OnDelete
 		})
+
+		type onDeleteUpdateTableInput struct {
+			machineInfos   []machineproviders.MachineInfo
+			setupMock      func()
+			expectedError  error
+			expectedResult ctrl.Result
+			expectedLogs   []test.LogEntry
+		}
+
+		DescribeTable("should implement the update strategy based on the MachineInfo", func(in onDeleteUpdateTableInput) {
+			// We setup the mock machine provider on each test with the expected assertions.
+			in.setupMock()
+
+			originalCPMS := cpms.DeepCopy()
+
+			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), cpms, mockMachineProvider, in.machineInfos)
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			Expect(result).To(Equal(in.expectedResult))
+			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
+		},
+			PEntry("with no updates required", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+						},
+						Message: noUpdatesRequired,
+					},
+				},
+			}),
+			PEntry("with updates required in a single index, and the machine is not yet deleted", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: machineRequiresUpdate,
+					},
+				},
+			}),
+			PEntry("with updates required in a single index, and the machine has been deleted", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: createdReplacement,
+					},
+				},
+			}),
+			PEntry("with updates required in a single index, and the machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
+				expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: errorCreatingMachine,
+					},
+				},
+			}),
+			PEntry("with updates required in a single index, and replacement machine is pending", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(0).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+							"ReplacementName", "machine-replacement-1",
+						},
+						Message: waitingForReplacement,
+					},
+				},
+			}),
+			PEntry("with updates required in a single index, and replacement machine is ready", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(0).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: waitingForRemoved,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and the machines are not yet deleted", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: machineRequiresUpdate,
+					},
+				},
+			}),
+			PEntry("with updates required in a multiple indexes, and machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
+				expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: errorCreatingMachine,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and a machine has been deleted", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: createdReplacement,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and multiple machines have been deleted", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(0).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: createdReplacement,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: createdReplacement,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is pending", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+							"ReplacementName", "machine-replacement-1",
+						},
+						Message: waitingForReplacement,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and the replacement machines are pending", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+							"ReplacementName", "machine-replacement-0",
+						},
+						Message: waitingForReplacement,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+							"ReplacementName", "machine-replacement-1",
+						},
+						Message: waitingForReplacement,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is ready", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: waitingForRemoved,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and a replacement machine is ready, and a replacement machine is pending", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+							"ReplacementName", "machine-replacement-0",
+						},
+						Message: waitingForReplacement,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: waitingForRemoved,
+					},
+				},
+			}),
+			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and all replacement machines are ready", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 0,
+							"Namespace", namespaceName,
+							"Name", "machine-0",
+						},
+						Message: waitingForRemoved,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: waitingForRemoved,
+					},
+				},
+			}),
+			PEntry("with a missing index", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
+					resourcebuilder.MachineInfo().WithIndex(2).Build(), // This is an empty Machine info to show the index is missing.
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(2).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 2,
+							"Namespace", namespaceName,
+							"Name", "<Unknown>",
+						},
+						Message: createdReplacement,
+					},
+				},
+			}),
+			PEntry("with a pending machine in an index", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
+					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 2,
+							"Namespace", namespaceName,
+							"Name", "machine-replacement-2",
+						},
+						Message: waitingForReady,
+					},
+				},
+			}),
+			PEntry("with a missing index, and other indexes need updating", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+					resourcebuilder.MachineInfo().WithIndex(2).Build(), // This is an empty Machine info to show the index is missing.
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(2).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 2,
+							"Namespace", namespaceName,
+							"Name", "<Unknown>",
+						},
+						Message: createdReplacement,
+					},
+				},
+			}),
+			PEntry("with a pending machine in an index, and other indexes need updating", onDeleteUpdateTableInput{
+				machineInfos: []machineproviders.MachineInfo{
+					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 1,
+							"Namespace", namespaceName,
+							"Name", "machine-1",
+						},
+						Message: machineRequiresUpdate,
+					},
+					{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"UpdateStrategy", machinev1.OnDelete,
+							"Index", 2,
+							"Namespace", namespaceName,
+							"Name", "machine-replacement-2",
+						},
+						Message: waitingForReady,
+					},
+				},
+			}),
+		)
 	})
 
 	Context("When the update strategy is Recreate", func() {

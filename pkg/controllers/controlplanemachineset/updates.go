@@ -44,6 +44,11 @@ const (
 	// for the update strategy.
 	invalidStrategyMessage = "invalid value for spec.strategy.type"
 
+	// machineRequiresUpdate is a log message used to inform the user that a Machine requires an update,
+	// but that they must first delete the Machine to trigger a replacement.
+	// This is used with the OnDelete replacement strategy.
+	machineRequiresUpdate = "Machine requires an update, delete the machine to trigger a replacement"
+
 	// noUpdatesRequired is a log message used to inform the user that no updates are required within
 	// the current set of Machines.
 	noUpdatesRequired = "No updates required"
