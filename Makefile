@@ -82,7 +82,7 @@ verify-%: ## Ensure no diff after running some other target
 
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/control-plane-machine-set-operator
+	go build -o bin/manager ./cmd/control-plane-machine-set-operator
 
 define ensure-home
 	@ export HOME=$${HOME:=/tmp/kubebuilder-testing}; \
