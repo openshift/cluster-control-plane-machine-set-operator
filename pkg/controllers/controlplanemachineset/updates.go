@@ -28,9 +28,43 @@ import (
 )
 
 const (
+	// createdReplacement is a log message used to inform the user that a new Machine was created to
+	// replace an existing Machine.
+	createdReplacement = "Created replacement machine"
+
+	// errorCreatingMachine is a log message used to inform the user that an error occurred while
+	// attempting to create a replacement Machine.
+	errorCreatingMachine = "Error creating machine"
+
+	// errorDeletingMachine is a log message used to inform the user that an error occurred while
+	// attempting to delete replacement Machine.
+	errorDeletingMachine = "Error deleting machine"
+
 	// invalidStrategyMessage is used to inform the user that they have provided an invalid value
 	// for the update strategy.
 	invalidStrategyMessage = "invalid value for spec.strategy.type"
+
+	// noUpdatesRequired is a log message used to inform the user that no updates are required within
+	// the current set of Machines.
+	noUpdatesRequired = "No updates required"
+
+	// removingOldMachine is a log message used to inform the user that an old Machine has been
+	// deleted as a part of the rollout operation.
+	removingOldMachine = "Removing old machine"
+
+	// waitingForReady is a log message used to inform the user that no operations are taking
+	// place because the rollout is waiting for a Machine to be ready.
+	// This is used exclusively when adding a new Machine to a missing index.
+	waitingForReady = "Waiting for machine to become ready"
+
+	// waitingForRemoved is a log message used to inform the user that no operations are taking
+	// place because the rollout is waiting for a Machine to be removed.
+	waitingForRemoved = "Waiting for machine to be removed"
+
+	// waitingForReplacement is a log message used to inform the user that no operations are taking
+	// place because the rollout is waiting for a replacement Machine to become ready.
+	// This is used when replacing a Machine within an index.
+	waitingForReplacement = "Waiting for replacement machine to become ready"
 )
 
 var (
