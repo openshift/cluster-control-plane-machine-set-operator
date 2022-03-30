@@ -25,7 +25,9 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 
@@ -51,7 +53,8 @@ const (
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
 type ControlPlaneMachineSetReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme     *runtime.Scheme
+	RESTMapper meta.RESTMapper
 
 	// Namespace is the namespace in which the ControlPlaneMachineSet controller should operate.
 	// Any ControlPlaneMachineSet not in this namespace should be ignored.
@@ -71,6 +74,10 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Complete(r); err != nil {
 		return fmt.Errorf("could not set up controller for ControlPlaneMachineSet: %w", err)
 	}
+
+	// Set up API helpers from the manager.
+	r.Scheme = mgr.GetScheme()
+	r.RESTMapper = mgr.GetRESTMapper()
 
 	return nil
 }
@@ -156,6 +163,10 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{}, fmt.Errorf("error reconciling machine info with status: %w", err)
 	}
 
+	if err := r.ensureOwnerReferences(ctx, logger, cpms, machineInfos); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error ensuring owner references: %w", err)
+	}
+
 	result, err := r.reconcileMachineUpdates(ctx, logger, cpms, machineProvider, machineInfos)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling machine updates: %w", err)
@@ -179,4 +190,15 @@ func (r *ControlPlaneMachineSetReconciler) reconcileDelete(ctx context.Context, 
 // Adding the finalizer in a separate reconcile ensures that spec updates are separate from status updates.
 func (r *ControlPlaneMachineSetReconciler) ensureFinalizer(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (bool, error) {
 	return false, nil
+}
+
+// ensureOwnerReferences determines if any of the Machines within the machineInfos require a new controller owner
+// reference to be added, and then uses PartialObjectMetadata to ensure that the owner reference is added.
+func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos []machineproviders.MachineInfo) error {
+	// TODO: Iterate over the MachineInfos, for each Machine, check the owner references for an owner reference matching
+	// that of the current CPMS (it should be the controller so should be easy to find).
+	// If required, look up the GVK using the rest mapper from the GVR, then uses metav1.PartialObjectMetadata to Patch
+	// the owner references. This should mean we can update the metadata of any type given we know the GVR and existing
+	// ObjectMeta.
+	return nil
 }

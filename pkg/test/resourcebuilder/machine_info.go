@@ -32,8 +32,9 @@ func MachineInfo() MachineInfoBuilder {
 
 // MachineInfoBuilder is used to build out a machineinfo object.
 type MachineInfoBuilder struct {
-	machineGVR  schema.GroupVersionResource
-	machineName string
+	machineGVR       schema.GroupVersionResource
+	machineName      string
+	machineOwnerRefs []metav1.OwnerReference
 
 	nodeGVR  schema.GroupVersionResource
 	nodeName string
@@ -57,7 +58,8 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 		info.MachineRef = &machineproviders.ObjectRef{
 			GroupVersionResource: m.machineGVR,
 			ObjectMeta: metav1.ObjectMeta{
-				Name: m.machineName,
+				Name:            m.machineName,
+				OwnerReferences: m.machineOwnerRefs,
 			},
 		}
 	}
@@ -83,6 +85,18 @@ func (m MachineInfoBuilder) WithMachineGVR(gvr schema.GroupVersionResource) Mach
 // WithMachineName sets the machine name for the machineinfo builder.
 func (m MachineInfoBuilder) WithMachineName(name string) MachineInfoBuilder {
 	m.machineName = name
+	return m
+}
+
+// WithMachineOwnerReference adds an owner reference for the machine for the machineinfo builder.
+func (m MachineInfoBuilder) WithMachineOwnerReference(or metav1.OwnerReference) MachineInfoBuilder {
+	m.machineOwnerRefs = append(m.machineOwnerRefs, or)
+	return m
+}
+
+// WithMachineOwnerReferences replaces the owner references for the machine for the machineinfo builder.
+func (m MachineInfoBuilder) WithMachineOwnerReferences(ors []metav1.OwnerReference) MachineInfoBuilder {
+	m.machineOwnerRefs = ors
 	return m
 }
 

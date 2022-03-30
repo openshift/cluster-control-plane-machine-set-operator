@@ -18,6 +18,7 @@ package controlplanemachineset
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,9 +26,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -320,6 +323,285 @@ var _ = Describe("ensureFinalizer", func() {
 
 		It("does not remove any existing finalizers", func() {
 			Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ConsistOf(controlPlaneMachineSetFinalizer, existingFinalizer)))
+		})
+	})
+})
+
+var _ = Describe("ensureOwnerRefrences", func() {
+	var namespaceName string
+	var reconciler *ControlPlaneMachineSetReconciler
+	var cpms *machinev1.ControlPlaneMachineSet
+	var logger test.TestLogger
+
+	var expectedOwnerReference metav1.OwnerReference
+	var machines []*machinev1beta1.Machine
+	var machineInfos []machineproviders.MachineInfo
+	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
+
+	BeforeEach(func() {
+		By("Setting up a namespace for the test")
+		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-ensure-owner-references-").Build()
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		namespaceName = ns.GetName()
+
+		reconciler = &ControlPlaneMachineSetReconciler{
+			Client:     k8sClient,
+			Scheme:     testScheme,
+			RESTMapper: testRESTMapper,
+			Namespace:  namespaceName,
+		}
+
+		// The ControlPlaneMachineSet should already exist by the time we get here.
+		By("Creating a ControlPlaneMachineSet")
+		cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithGeneration(2).Build()
+		Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+		logger = test.NewTestLogger()
+
+		machine := resourcebuilder.Machine().WithNamespace(namespaceName).Build()
+
+		Expect(controllerutil.SetControllerReference(cpms, machine, testScheme)).To(Succeed())
+		Expect(machine.GetOwnerReferences()).To(HaveLen(1))
+
+		// We know the owner reference we expect to find at the end as the controller util is
+		// already tested and trusted.
+		expectedOwnerReference = machine.GetOwnerReferences()[0]
+
+		By("Creating machines to add owner references to")
+		machines = []*machinev1beta1.Machine{}
+		machineInfos = []machineproviders.MachineInfo{}
+		machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName).WithGenerateName("ensure-owner-references-test-")
+
+		for i := 0; i < 3; i++ {
+			machine := machineBuilder.Build()
+			Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+
+			machines = append(machines, machine)
+
+			machineInfo := resourcebuilder.MachineInfo().WithMachineGVR(machineGVR).WithMachineName(machine.GetName()).Build()
+			machineInfos = append(machineInfos, machineInfo)
+		}
+	})
+
+	AfterEach(func() {
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			&machinev1beta1.Machine{},
+			&machinev1.ControlPlaneMachineSet{},
+		)
+	})
+
+	Context("when the machines do not have existing owner references", func() {
+		BeforeEach(func() {
+			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		PIt("should add the expected owner references", func() {
+			for _, machine := range machines {
+				Eventually(komega.Object(machine)).Should(HaveField("ObjectMeta.OwnerReferences", ConsistOf(expectedOwnerReference)))
+			}
+		})
+
+		PIt("should log that it has updated the owner references", func() {
+			expectedEntries := []test.LogEntry{}
+
+			for _, machine := range machines {
+				expectedEntries = append(expectedEntries, test.LogEntry{
+					KeysAndValues: []interface{}{"MachineNamespace", machine.GetNamespace(), "MachineName", machine.GetName()},
+					Level:         2,
+					Message:       "Added owner reference to machine",
+				})
+			}
+
+			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
+		})
+	})
+
+	Context("when the machines already have an existing owner references", func() {
+		BeforeEach(func() {
+			By("Setting up the appropriate MachineInfos")
+			machineInfos = []machineproviders.MachineInfo{}
+
+			for i := range machineInfos {
+				Expect(machineInfos[i].MachineRef).ToNot(BeNil())
+				machineInfos[i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+			}
+
+			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		PIt("should not update the owner references", func() {
+			for _, machine := range machines {
+				Eventually(komega.Object(machine)).Should(HaveField("ObjectMeta.OwnerReferences", ConsistOf(expectedOwnerReference)))
+			}
+		})
+
+		PIt("should log that no update was needed", func() {
+			expectedEntries := []test.LogEntry{}
+
+			for _, machine := range machines {
+				expectedEntries = append(expectedEntries, test.LogEntry{
+					KeysAndValues: []interface{}{"MachineNamespace", machine.GetNamespace(), "MachineName", machine.GetName()},
+					Level:         4,
+					Message:       "Owner reference already present on machine",
+				})
+			}
+
+			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
+		})
+	})
+
+	Context("when some machines already have an existing owner reference", func() {
+		BeforeEach(func() {
+			By("Adding an owner reference to some of the machine infos")
+			Expect(machineInfos).To(HaveLen(3))
+			for i := range machineInfos[1:] {
+				Expect(machineInfos[i].MachineRef).ToNot(BeNil())
+				machineInfos[i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+			}
+
+			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		PIt("should update the owner reference where needed", func() {
+			for _, machine := range machines {
+				Eventually(komega.Object(machine)).Should(HaveField("ObjectMeta.OwnerReferences", ConsistOf(expectedOwnerReference)))
+			}
+		})
+
+		PIt("should log the update that was needed", func() {
+			expectedEntries := []test.LogEntry{}
+
+			machineInfo := machineInfos[0]
+			Expect(machineInfo.MachineRef).ToNot(BeNil())
+			expectedEntries = append(expectedEntries, test.LogEntry{
+				KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+				Level:         2,
+				Message:       "Added owner reference to machine",
+			})
+
+			for _, machineInfo := range machineInfos[1:] {
+				Expect(machineInfo.MachineRef).ToNot(BeNil())
+				expectedEntries = append(expectedEntries, test.LogEntry{
+					KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+					Level:         4,
+					Message:       "Owner reference already present on machine",
+				})
+			}
+
+			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
+		})
+	})
+
+	Context("when not all MachineInfos contain a Machine", func() {
+		var skipMachine string
+
+		BeforeEach(func() {
+			Expect(machineInfos[0].MachineRef).ToNot(BeNil())
+			skipMachine = machineInfos[0].MachineRef.ObjectMeta.GetName()
+			machineInfos[0].MachineRef = nil
+
+			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		PIt("should add the expected owner references", func() {
+			for _, machine := range machines {
+				if machine.GetName() == skipMachine {
+					continue
+				}
+
+				Eventually(komega.Object(machine)).Should(HaveField("ObjectMeta.OwnerReferences", ConsistOf(expectedOwnerReference)))
+			}
+		})
+
+		PIt("should log that it has updated the owner references", func() {
+			expectedEntries := []test.LogEntry{}
+
+			for _, machine := range machines {
+				if machine.GetName() == skipMachine {
+					continue
+				}
+
+				expectedEntries = append(expectedEntries, test.LogEntry{
+					KeysAndValues: []interface{}{"MachineNamespace", machine.GetNamespace(), "MachineName", machine.GetName()},
+					Level:         2,
+					Message:       "Added owner reference to machine",
+				})
+			}
+
+			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
+		})
+	})
+
+	Context("when a machine has a conflicting controller owner reference", func() {
+		var err, expectedError error
+
+		BeforeEach(func() {
+			By("Adding an owner reference to some of the machine infos")
+			Expect(machineInfos).To(HaveLen(3))
+			for i := range machineInfos[1:] {
+				Expect(machineInfos[i].MachineRef).ToNot(BeNil())
+				machineInfos[i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+			}
+
+			By("Adding an owner reference for an alternative controller owner")
+			badOwnerReference := expectedOwnerReference
+			badOwnerReference.Name = "different-owner"
+
+			Expect(machineInfos[0].MachineRef).ToNot(BeNil())
+			machineInfos[0].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{badOwnerReference}
+
+			By("Formulating the expected error")
+			machine := resourcebuilder.Machine().WithNamespace(namespaceName).Build()
+			machine.ObjectMeta.OwnerReferences = []metav1.OwnerReference{badOwnerReference}
+
+			setControllerErr := controllerutil.SetControllerReference(cpms, machine, testScheme)
+			Expect(setControllerErr).To(HaveOccurred())
+			expectedError = fmt.Errorf("error setting owner reference: %w", setControllerErr)
+
+			err = reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
+		})
+
+		PIt("should return an error", func() {
+			Expect(err).To(MatchError(expectedError))
+		})
+
+		PIt("should add an error log", func() {
+			expectedEntries := []test.LogEntry{}
+
+			machineInfo := machineInfos[0]
+			Expect(machineInfo.MachineRef).ToNot(BeNil())
+			expectedEntries = append(expectedEntries, test.LogEntry{
+				Error:         expectedError,
+				KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+				Message:       "Cannot add owner reference to machine",
+			})
+
+			for _, machineInfo := range machineInfos[1:] {
+				Expect(machineInfo.MachineRef).ToNot(BeNil())
+				expectedEntries = append(expectedEntries, test.LogEntry{
+					KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+					Level:         4,
+					Message:       "Owner reference already present on machine",
+				})
+			}
+
+			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
+		})
+
+		PIt("should set the degraded condition on the ControlPlaneMachineSet", func() {
+			Expect(cpms.Status.Conditions).To(ContainElement(test.MatchCondition(
+				metav1.Condition{
+					Type:               conditionDegraded,
+					Status:             metav1.ConditionTrue,
+					Reason:             reasonMachinesAlreadyOwned,
+					ObservedGeneration: 2,
+					Message:            "Observed already owned machine(s) in target machines",
+				},
+			)))
 		})
 	})
 })
