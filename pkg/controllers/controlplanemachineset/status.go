@@ -25,9 +25,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// updatingStatus is a log message used to inform users that the ControlPlaneMachineSet status is being updated.
+	updatingStatus = "Updating control plane machine set status"
+
+	// notUpdatingStatus is a log message used to inform users that the ControlPlaneMachineSet status is not being updated.
+	notUpdatingStatus = "No update to control plane machine set status required"
+)
+
 // updateControlPlaneMachineSetStatus ensures that the status of the ControlPlaneMachineSet is up to date after
 // the resource has been reconciled.
 func (r *ControlPlaneMachineSetReconciler) updateControlPlaneMachineSetStatus(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, patchBase client.Patch) error {
+	// TODO: Observe the data from the patchBase.Data() to determine if we actually need to update the status or not.
+	// Then log and update as per the test cases.
 	return nil
 }
 
