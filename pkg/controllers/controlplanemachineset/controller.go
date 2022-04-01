@@ -72,7 +72,7 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&machinev1beta1.Machine{}, builder.WithPredicates(filterControlPlaneMachines(r.Namespace))).
 		Watches(&source.Kind{Type: &configv1.ClusterOperator{}}, handler.EnqueueRequestsFromMapFunc(clusterOperatorToControlPlaneMachineSet(r.Namespace, r.OperatorName))).
 		Complete(r); err != nil {
-		return fmt.Errorf("could not set up controller for ControlPlaneMachineSet: %w", err)
+		return fmt.Errorf("could not set up controller for control plane machine set: %w", err)
 	}
 
 	// Set up API helpers from the manager.
@@ -84,7 +84,7 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 // Reconcile reconciles the ControlPlaneMachineSet object.
 func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx, "namepace", req.Namespace, "name", req.Name)
+	logger := log.FromContext(ctx, "Namespace", req.Namespace, "Name", req.Name)
 
 	logger.V(1).Info("Reconciling control plane machine set")
 	defer logger.V(1).Info("Finished reconciling control plane machine set")
