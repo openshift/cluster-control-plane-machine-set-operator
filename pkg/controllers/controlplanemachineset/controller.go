@@ -25,6 +25,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -156,7 +157,7 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	machineProvider, err := machineproviders.NewMachineProvider(ctx, logger, r.Client, cpms)
+	machineProvider, err := providers.NewMachineProvider(ctx, logger, r.Client, cpms)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error constructing machine provider: %w", err)
 	}

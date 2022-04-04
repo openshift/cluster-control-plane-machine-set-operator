@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package machineproviders
+package providers
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -30,6 +31,6 @@ var errNotImplemented = errors.New("not implemented")
 
 // NewMachineProvider constructs a MachineProvider based on the machine type passed.
 // This can then be used to access and manipulate machines within the cluster.
-func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (MachineProvider, error) {
+func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
 	return nil, errNotImplemented
 }
