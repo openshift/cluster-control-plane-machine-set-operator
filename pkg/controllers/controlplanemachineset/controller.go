@@ -159,7 +159,7 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{}, fmt.Errorf("error constructing machine provider: %w", err)
 	}
 
-	machineInfos, err := machineProvider.GetMachineInfos()
+	machineInfos, err := machineProvider.GetMachineInfos(ctx, logger)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error fetching machine info: %w", err)
 	}

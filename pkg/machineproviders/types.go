@@ -17,6 +17,9 @@ limitations under the License.
 package machineproviders
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -66,15 +69,15 @@ type ObjectRef struct {
 type MachineProvider interface {
 	// GetMachineInfos is used to collect information about the Control Plane Machines and Nodes that currently exist
 	// within the Cluster, as referred to by the ControlPlaneMachineSet.
-	GetMachineInfos() ([]MachineInfo, error)
+	GetMachineInfos(context.Context, logr.Logger) ([]MachineInfo, error)
 
 	// CreateMachine is used to instruct the Machine Provider to create a new Machine. The only input is the index for
 	// the new Machine. During construction of the MachineProvider, it should map indexes to failure domains so that it
 	// has all the required information for creating a new Machine stored, based solely on the index.
-	CreateMachine(int32) error
+	CreateMachine(context.Context, logr.Logger, int32) error
 
 	// DeleteMachine is used to instruct the Machine Provider to delete a paritcular Machine. This is used by the
 	// RollingUpdate strategy of the ControlPlaneMachineSet so that it can remove old Machines once they have been
 	// replaced.
-	DeleteMachine(*ObjectRef) error
+	DeleteMachine(context.Context, logr.Logger, *ObjectRef) error
 }
