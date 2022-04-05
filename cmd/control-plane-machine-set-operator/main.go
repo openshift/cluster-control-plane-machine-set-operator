@@ -77,6 +77,7 @@ func main() { //nolint:funlen
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "control-plane-machine-set-operator",
+		Namespace:              "openshift-machine-api",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
