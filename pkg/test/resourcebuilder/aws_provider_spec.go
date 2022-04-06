@@ -41,6 +41,16 @@ func AWSProviderSpec() AWSProviderSpecBuilder {
 				},
 			},
 		},
+		subnet: machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
+				{
+					Name: "tag:Name",
+					Values: []string{
+						"aws-subnet-12345678",
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -48,6 +58,7 @@ func AWSProviderSpec() AWSProviderSpecBuilder {
 type AWSProviderSpecBuilder struct {
 	availabilityZone string
 	securityGroups   []machinev1beta1.AWSResourceReference
+	subnet           machinev1beta1.AWSResourceReference
 }
 
 // Build builds a new AWS machine config based on the configuration provided.
@@ -91,6 +102,7 @@ func (m AWSProviderSpecBuilder) Build() *machinev1beta1.AWSMachineProviderConfig
 			AvailabilityZone: m.availabilityZone,
 		},
 		SecurityGroups: m.securityGroups,
+		Subnet:         m.subnet,
 		UserDataSecret: &corev1.LocalObjectReference{
 			Name: "aws-user-data-12345678",
 		},
@@ -121,5 +133,11 @@ func (m AWSProviderSpecBuilder) WithAvailabilityZone(az string) AWSProviderSpecB
 // WithSecurityGroups sets the securityGroups for the AWS machine config builder.
 func (m AWSProviderSpecBuilder) WithSecurityGroups(sgs []machinev1beta1.AWSResourceReference) AWSProviderSpecBuilder {
 	m.securityGroups = sgs
+	return m
+}
+
+// WithSubnet sets the subnet for the AWS machine config builder.
+func (m AWSProviderSpecBuilder) WithSubnet(subnet machinev1beta1.AWSResourceReference) AWSProviderSpecBuilder {
+	m.subnet = subnet
 	return m
 }
