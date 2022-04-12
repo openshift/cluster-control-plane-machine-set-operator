@@ -1163,12 +1163,19 @@ var _ = Describe("machineInfosByIndex", func() {
 	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-2-0").Build()
 
 	type tableInput struct {
-		in       []machineproviders.MachineInfo
-		expected map[int32][]machineproviders.MachineInfo
+		cpms          *machinev1.ControlPlaneMachineSet
+		machineInfos  []machineproviders.MachineInfo
+		expected      map[int32][]machineproviders.MachineInfo
+		expectedError error
 	}
 
 	DescribeTable("should sort Machine Infos by index", func(in tableInput) {
-		out := machineInfosByIndex(in.in)
+		out, err := machineInfosByIndex(in.cpms, in.machineInfos)
+		if in.expectedError != nil {
+			Expect(err).To(MatchError(in.expectedError))
+			return
+		}
+		Expect(err).ToNot(HaveOccurred())
 
 		Expect(out).To(HaveLen(len(in.expected)))
 		// Check each key and its values separately to avoid ordering within the lists
@@ -1177,12 +1184,22 @@ var _ = Describe("machineInfosByIndex", func() {
 			Expect(out).To(HaveKeyWithValue(key, ConsistOf(values)))
 		}
 	},
-		Entry("no input", tableInput{
-			in:       []machineproviders.MachineInfo{},
-			expected: map[int32][]machineproviders.MachineInfo{},
+		Entry("with no replicas in the ControlPlaneMachineSet", tableInput{
+			cpms:          &machinev1.ControlPlaneMachineSet{},
+			expectedError: errReplicasRequired,
+		}),
+		Entry("no machine infos with 3 replicas", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {},
+				1: {},
+				2: {},
+			},
 		}),
 		Entry("separately indexed machines", tableInput{
-			in: []machineproviders.MachineInfo{i0m0, i1m0, i2m0},
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0},
 				1: {i1m0},
@@ -1190,17 +1207,28 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("a mixture of indexed machines", tableInput{
-			in: []machineproviders.MachineInfo{i0m0, i1m0, i2m0, i0m1, i1m1, i0m2},
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0, i0m1, i1m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
 				1: {i1m0, i1m1},
 				2: {i2m0},
 			},
 		}),
-		Entry("all machines in the same index", tableInput{
-			in: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
+		Entry("all machines in the same index with 1 replica", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(1).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
+			},
+		}),
+		Entry("all machines in the same index with 3 replicas", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0, i0m1, i0m2},
+				1: {},
+				2: {},
 			},
 		}),
 	)

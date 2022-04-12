@@ -66,9 +66,6 @@ type ObjectRef struct {
 type MachineProvider interface {
 	// GetMachineInfos is used to collect information about the Control Plane Machines and Nodes that currently exist
 	// within the Cluster, as referred to by the ControlPlaneMachineSet.
-	// If there are any Machines missing (eg a failure domain is missing a Machine, or there are only 2 Machines when we
-	// expect 3), then a placeholder MachineInfo should be returned with enough information to create the Machine should
-	// that be required. It is up to the caller to decide how to handle the missing Machine.
 	GetMachineInfos() ([]MachineInfo, error)
 
 	// CreateMachine is used to instruct the Machine Provider to create a new Machine. The only input is the index for
