@@ -53,7 +53,7 @@ func (r *ControlPlaneMachineSetReconciler) updateControlPlaneMachineSetStatus(ct
 		return fmt.Errorf("failed to sync status for control plane machine set object: %w", err)
 	}
 
-	logger.V(3).Info(updatingStatus, "Data", string(data))
+	logger.V(3).Info(updatingStatus, "data", string(data))
 
 	return nil
 }

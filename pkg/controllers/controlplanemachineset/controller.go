@@ -89,7 +89,7 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 // Reconcile reconciles the ControlPlaneMachineSet object.
 func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx, "Namespace", req.Namespace, "Name", req.Name)
+	logger := log.FromContext(ctx, "namespace", req.Namespace, "name", req.Name)
 
 	logger.V(1).Info("Reconciling control plane machine set")
 	defer logger.V(1).Info("Finished reconciling control plane machine set")

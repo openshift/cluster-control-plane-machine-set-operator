@@ -407,7 +407,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 			for _, machine := range machines {
 				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"MachineNamespace", machine.GetNamespace(), "MachineName", machine.GetName()},
+					KeysAndValues: []interface{}{"machineNamespace", machine.GetNamespace(), "machineName", machine.GetName()},
 					Level:         2,
 					Message:       "Added owner reference to machine",
 				})
@@ -442,7 +442,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 			for _, machine := range machines {
 				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"MachineNamespace", machine.GetNamespace(), "MachineName", machine.GetName()},
+					KeysAndValues: []interface{}{"machineNamespace", machine.GetNamespace(), "machineName", machine.GetName()},
 					Level:         4,
 					Message:       "Owner reference already present on machine",
 				})
@@ -477,7 +477,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			machineInfo := machineInfos[0]
 			Expect(machineInfo.MachineRef).ToNot(BeNil())
 			expectedEntries = append(expectedEntries, test.LogEntry{
-				KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+				KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
 				Level:         2,
 				Message:       "Added owner reference to machine",
 			})
@@ -485,7 +485,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			for _, machineInfo := range machineInfos[1:] {
 				Expect(machineInfo.MachineRef).ToNot(BeNil())
 				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+					KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
 					Level:         4,
 					Message:       "Owner reference already present on machine",
 				})
@@ -526,7 +526,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 				}
 
 				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"MachineNamespace", machine.GetNamespace(), "MachineName", machine.GetName()},
+					KeysAndValues: []interface{}{"machineNamespace", machine.GetNamespace(), "machineName", machine.GetName()},
 					Level:         2,
 					Message:       "Added owner reference to machine",
 				})
@@ -576,14 +576,14 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			Expect(machineInfo.MachineRef).ToNot(BeNil())
 			expectedEntries = append(expectedEntries, test.LogEntry{
 				Error:         expectedError,
-				KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+				KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
 				Message:       "Cannot add owner reference to machine",
 			})
 
 			for _, machineInfo := range machineInfos[1:] {
 				Expect(machineInfo.MachineRef).ToNot(BeNil())
 				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"MachineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "MachineName", machineInfo.MachineRef.ObjectMeta.GetName()},
+					KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
 					Level:         4,
 					Message:       "Owner reference already present on machine",
 				})
