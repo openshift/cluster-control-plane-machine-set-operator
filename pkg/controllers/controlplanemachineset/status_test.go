@@ -29,9 +29,121 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("Status", func() {
+	Context("updateControlPlaneMachineSetStatus", func() {
+		var namespaceName string
+		var logger test.TestLogger
+		var reconciler *ControlPlaneMachineSetReconciler
+		var cpms *machinev1.ControlPlaneMachineSet
+		var patchBase client.Patch
+
+		BeforeEach(func() {
+			By("Setting up a namespace for the test")
+			ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+			namespaceName = ns.GetName()
+
+			By("Setting up the reconciler")
+			logger = test.NewTestLogger()
+			reconciler = &ControlPlaneMachineSetReconciler{
+				Namespace: namespaceName,
+				Scheme:    testScheme,
+			}
+
+			By("Setting up supporting resources")
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+			Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+
+			// These values are dummy values for now.
+			// We want to set values on the API and use them to check later
+			// whether the code called the update, or skipped the update.
+			cpms.Status.ObservedGeneration = 1
+			cpms.Status.Replicas = 2
+			cpms.Status.ReadyReplicas = 3
+			Expect(k8sClient.Status().Update(ctx, cpms)).To(Succeed())
+
+			patchBase = client.MergeFrom(cpms.DeepCopy())
+			logger = test.NewTestLogger()
+		})
+
+		AfterEach(func() {
+			test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+				&machinev1.ControlPlaneMachineSet{},
+			)
+		})
+
+		Context("when the status has changed", func() {
+			BeforeEach(func() {
+				// Changing these values from before means it should send a status
+				// update to the kube api.
+				cpms.Status.ObservedGeneration = 2
+				cpms.Status.Replicas = 3
+				cpms.Status.ReadyReplicas = 4
+
+				// Use a DeepCopy of the CPMS to avoid any reflection from the update affecting the test cases.
+				Expect(reconciler.updateControlPlaneMachineSetStatus(ctx, logger.Logger(), cpms.DeepCopy(), patchBase)).To(Succeed())
+			})
+
+			PIt("updates the status on the API", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", 2),
+					HaveField("Replicas", 3),
+					HaveField("ReadyReplicas", 4),
+				)))
+			})
+
+			PIt("should log the patch data", func() {
+				data, err := patchBase.Data(cpms)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
+					Level: 3,
+					KeysAndValues: []interface{}{
+						"Data", string(data),
+					},
+					Message: updatingStatus,
+				}))
+			})
+		})
+
+		Context("when the status has not changed", func() {
+			BeforeEach(func() {
+				// Use different values to what is set on the API, but a different patch base to prove
+				// that when the status is not considered updated, we don't send a patch.
+				cpms.Status.ObservedGeneration = 2
+				cpms.Status.Replicas = 3
+				cpms.Status.ReadyReplicas = 4
+
+				// Override the patchbase so that the input CPMS and patchbase create a no-change update.
+				// We should be detecting that the update isn't required and not patching when we don't need to.
+				patchBase = client.MergeFrom(cpms.DeepCopy())
+
+				// Use a DeepCopy of the CPMS to avoid any reflection from the update affecting the test cases.
+				Expect(reconciler.updateControlPlaneMachineSetStatus(ctx, logger.Logger(), cpms.DeepCopy(), patchBase)).To(Succeed())
+			})
+
+			PIt("does not update the status on the API", func() {
+				Consistently(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", 1),
+					HaveField("Replicas", 2),
+					HaveField("ReadyReplicas", 3),
+				)))
+			})
+
+			PIt("should log that no status update was required", func() {
+				Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
+					Level:   3,
+					Message: notUpdatingStatus,
+				}))
+			})
+		})
+	})
+
 	Context("reconcileStatusWithMachineInfo", func() {
 		type reconcileStatusTableInput struct {
 			cpms           *machinev1.ControlPlaneMachineSet
