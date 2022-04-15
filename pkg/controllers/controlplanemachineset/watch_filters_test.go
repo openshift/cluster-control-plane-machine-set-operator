@@ -37,23 +37,12 @@ var _ = Describe("Watch Filters", func() {
 		var clusterOperatorFilter func(client.Object) []reconcile.Request
 
 		BeforeEach(func() {
-			clusterOperatorFilter = clusterOperatorToControlPlaneMachineSet(testNamespace, operatorName)
+			clusterOperatorFilter = clusterOperatorToControlPlaneMachineSet(testNamespace)
 		})
 
-		PIt("Panics with the wrong object kind", func() {
-			cpms := resourcebuilder.ControlPlaneMachineSet().Build()
-			Expect(func() {
-				clusterOperatorFilter(cpms)
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
-		})
-
-		It("returns nothing when the wrong cluster operator is provided", func() {
-			co := resourcebuilder.ClusterOperator().WithName("machine-api-operator").Build()
-			Expect(clusterOperatorFilter(co)).To(BeEmpty())
-		})
-
-		PIt("returns a request for the cluster ControlPlaneMachineSet when the correct cluster operator is provided", func() {
+		It("returns a correct request for the cluster ControlPlaneMachineSet", func() {
 			co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+
 			Expect(clusterOperatorFilter(co)).To(ConsistOf(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: testNamespace,
@@ -91,6 +80,55 @@ var _ = Describe("Watch Filters", func() {
 		}
 	}
 
+	Context("filterClusterOperator", func() {
+		const operatorName = "control-plane-machine-set"
+
+		var clusterOperatorPredicate predicate.Predicate
+
+		BeforeEach(func() {
+			clusterOperatorPredicate = filterClusterOperator(operatorName)
+		})
+
+		It("Panics with the wrong object kind", func() {
+			expectedMessage := "expected to get an of object of type configv1.ClusterOperator"
+			machine := resourcebuilder.Machine().Build()
+
+			Expect(func() {
+				clusterOperatorPredicate.Create(createEvent(machine))
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
+
+			Expect(func() {
+				clusterOperatorPredicate.Update(updateEvent(machine))
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
+
+			Expect(func() {
+				clusterOperatorPredicate.Delete(deleteEvent(machine))
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
+
+			Expect(func() {
+				clusterOperatorPredicate.Generic(genericEvent(machine))
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
+		})
+
+		It("returns false when the wrong cluster operator is provided", func() {
+			co := resourcebuilder.ClusterOperator().WithName("machine-api-operator").Build()
+
+			Expect(clusterOperatorPredicate.Create(createEvent(co))).To(BeFalse())
+			Expect(clusterOperatorPredicate.Update(updateEvent(co))).To(BeFalse())
+			Expect(clusterOperatorPredicate.Delete(deleteEvent(co))).To(BeFalse())
+			Expect(clusterOperatorPredicate.Generic(genericEvent(co))).To(BeFalse())
+		})
+
+		It("returns true when the correct cluster operator is provided", func() {
+			co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+
+			Expect(clusterOperatorPredicate.Create(createEvent(co))).To(BeTrue())
+			Expect(clusterOperatorPredicate.Update(updateEvent(co))).To(BeTrue())
+			Expect(clusterOperatorPredicate.Delete(deleteEvent(co))).To(BeTrue())
+			Expect(clusterOperatorPredicate.Generic(genericEvent(co))).To(BeTrue())
+		})
+	})
+
 	Context("filterControlPlaneMachineSet", func() {
 		const testNamespace = "test"
 
@@ -100,23 +138,24 @@ var _ = Describe("Watch Filters", func() {
 			cpmsPredicate = filterControlPlaneMachineSet(testNamespace)
 		})
 
-		PIt("Panics with the wrong object kind", func() {
+		It("Panics with the wrong object kind", func() {
+			expectedMessage := "expected to get an of object of type machinev1.ControlPlaneMachineSet"
 			machine := resourcebuilder.Machine().Build()
 			Expect(func() {
 				cpmsPredicate.Create(createEvent(machine))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 
 			Expect(func() {
 				cpmsPredicate.Update(updateEvent(machine))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 
 			Expect(func() {
 				cpmsPredicate.Delete(deleteEvent(machine))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 
 			Expect(func() {
 				cpmsPredicate.Generic(genericEvent(machine))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 		})
 
 		It("Returns false with the wrong namespace", func() {
@@ -143,7 +182,7 @@ var _ = Describe("Watch Filters", func() {
 			Expect(cpmsPredicate.Generic(genericEvent(cpms))).To(BeFalse())
 		})
 
-		PIt("Returns true with the correct namespace and name", func() {
+		It("Returns true with the correct namespace and name", func() {
 			cpms := resourcebuilder.ControlPlaneMachineSet().
 				WithName(clusterControlPlaneMachineSetName).
 				WithNamespace(testNamespace).
@@ -165,23 +204,25 @@ var _ = Describe("Watch Filters", func() {
 			machinePredicate = filterControlPlaneMachines(testNamespace)
 		})
 
-		PIt("Panics with the wrong object kind", func() {
+		It("Panics with the wrong object kind", func() {
+			expectedMessage := "expected to get an of object of type machinev1beta1.Machine"
 			cpms := resourcebuilder.ControlPlaneMachineSet().Build()
+
 			Expect(func() {
 				machinePredicate.Create(createEvent(cpms))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 
 			Expect(func() {
 				machinePredicate.Update(updateEvent(cpms))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 
 			Expect(func() {
 				machinePredicate.Delete(deleteEvent(cpms))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 
 			Expect(func() {
 				machinePredicate.Generic(genericEvent(cpms))
-			}).To(PanicWith("TODO"), "A programming error occurs when passing the wrong object, the function should panic")
+			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
 		})
 
 		It("Returns false with the wrong namespace", func() {
@@ -236,7 +277,7 @@ var _ = Describe("Watch Filters", func() {
 			Expect(machinePredicate.Generic(genericEvent(machine))).To(BeFalse())
 		})
 
-		PIt("Returns true with the correct namespace and labels", func() {
+		It("Returns true with the correct namespace and labels", func() {
 			machine := resourcebuilder.Machine().
 				WithNamespace(testNamespace).
 				AsMaster().

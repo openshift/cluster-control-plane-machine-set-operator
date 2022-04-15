@@ -67,10 +67,15 @@ type ControlPlaneMachineSetReconciler struct {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// All predicates are executed before the event handler is called
 	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(filterControlPlaneMachineSet(r.Namespace))).
 		Owns(&machinev1beta1.Machine{}, builder.WithPredicates(filterControlPlaneMachines(r.Namespace))).
-		Watches(&source.Kind{Type: &configv1.ClusterOperator{}}, handler.EnqueueRequestsFromMapFunc(clusterOperatorToControlPlaneMachineSet(r.Namespace, r.OperatorName))).
+		Watches(
+			&source.Kind{Type: &configv1.ClusterOperator{}},
+			handler.EnqueueRequestsFromMapFunc(clusterOperatorToControlPlaneMachineSet(r.Namespace)),
+			builder.WithPredicates(filterClusterOperator(r.OperatorName)),
+		).
 		Complete(r); err != nil {
 		return fmt.Errorf("could not set up controller for control plane machine set: %w", err)
 	}

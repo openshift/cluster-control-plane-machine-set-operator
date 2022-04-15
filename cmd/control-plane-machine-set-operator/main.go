@@ -77,6 +77,7 @@ func main() { //nolint:funlen
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "control-plane-machine-set-operator",
+		Namespace:              "openshift-machine-api",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -84,8 +85,10 @@ func main() { //nolint:funlen
 	}
 
 	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		Namespace:    "openshift-machine-api",
+		OperatorName: "control-plane-machine-set",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
 		os.Exit(1)
