@@ -53,6 +53,7 @@ type ControlPlaneMachineSetBuilder struct {
 	replicas               int32
 	selector               metav1.LabelSelector
 	strategyType           machinev1.ControlPlaneMachineSetStrategyType
+	conditions             []metav1.Condition
 }
 
 // Build builds a new controlplanemachineset based on the configuration provided.
@@ -69,6 +70,9 @@ func (m ControlPlaneMachineSetBuilder) Build() *machinev1.ControlPlaneMachineSet
 			Strategy: machinev1.ControlPlaneMachineSetStrategy{
 				Type: m.strategyType,
 			},
+		},
+		Status: machinev1.ControlPlaneMachineSetStatus{
+			Conditions: m.conditions,
 		},
 	}
 
@@ -118,5 +122,11 @@ func (m ControlPlaneMachineSetBuilder) WithSelector(selector metav1.LabelSelecto
 // WithStrategyType sets the update strategy type for the controlplanemachineset builder.
 func (m ControlPlaneMachineSetBuilder) WithStrategyType(strategy machinev1.ControlPlaneMachineSetStrategyType) ControlPlaneMachineSetBuilder {
 	m.strategyType = strategy
+	return m
+}
+
+// WithConditions sets the conditions for the controlplanemachineset builder.
+func (m ControlPlaneMachineSetBuilder) WithConditions(conditions []metav1.Condition) ControlPlaneMachineSetBuilder {
+	m.conditions = conditions
 	return m
 }
