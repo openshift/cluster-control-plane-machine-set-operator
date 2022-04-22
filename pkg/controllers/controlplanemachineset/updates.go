@@ -156,7 +156,9 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx co
 func machineInfosByIndex(machineInfos []machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
 	out := make(map[int32][]machineproviders.MachineInfo)
 
-	// TODO: Convert the list of machineInfos into a map that maps the index to a list of MachineInfos.
+	for _, machineInfo := range machineInfos {
+		out[machineInfo.Index] = append(out[machineInfo.Index], machineInfo)
+	}
 
 	return out
 }
