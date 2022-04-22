@@ -18,6 +18,7 @@ package controlplanemachineset
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -36,8 +37,24 @@ const (
 // updateControlPlaneMachineSetStatus ensures that the status of the ControlPlaneMachineSet is up to date after
 // the resource has been reconciled.
 func (r *ControlPlaneMachineSetReconciler) updateControlPlaneMachineSetStatus(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, patchBase client.Patch) error {
-	// TODO: Observe the data from the patchBase.Data() to determine if we actually need to update the status or not.
-	// Then log and update as per the test cases.
+	data, err := patchBase.Data(cpms)
+	if err != nil {
+		return fmt.Errorf("cannot calculate patch data from control plane machine set object: %w", err)
+	}
+
+	// Apply changes only if the patch is not empty
+	if string(data) == "{}" {
+		logger.V(3).Info(notUpdatingStatus)
+
+		return nil
+	}
+
+	if err := r.Status().Update(ctx, cpms); err != nil {
+		return fmt.Errorf("failed to sync status for control plane machine set object: %w", err)
+	}
+
+	logger.V(3).Info(updatingStatus, "Data", string(data))
+
 	return nil
 }
 
