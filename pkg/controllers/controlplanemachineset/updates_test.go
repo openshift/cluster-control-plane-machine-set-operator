@@ -1108,7 +1108,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}))
 		})
 
-		PIt("Sets the degraded condition", func() {
+		It("Sets the degraded condition", func() {
 			Expect(cpms.Status.Conditions).To(ConsistOf(test.MatchCondition(metav1.Condition{
 				Type:    conditionDegraded,
 				Status:  metav1.ConditionTrue,
@@ -1143,7 +1143,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}))
 		})
 
-		PIt("Sets the degraded condition", func() {
+		It("Sets the degraded condition", func() {
 			Expect(cpms.Status.Conditions).To(ConsistOf(test.MatchCondition(metav1.Condition{
 				Type:    conditionDegraded,
 				Status:  metav1.ConditionTrue,
