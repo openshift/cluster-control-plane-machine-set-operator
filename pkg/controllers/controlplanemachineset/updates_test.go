@@ -1108,7 +1108,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}))
 		})
 
-		PIt("Sets the degraded condition", func() {
+		It("Sets the degraded condition", func() {
 			Expect(cpms.Status.Conditions).To(ConsistOf(test.MatchCondition(metav1.Condition{
 				Type:    conditionDegraded,
 				Status:  metav1.ConditionTrue,
@@ -1143,7 +1143,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}))
 		})
 
-		PIt("Sets the degraded condition", func() {
+		It("Sets the degraded condition", func() {
 			Expect(cpms.Status.Conditions).To(ConsistOf(test.MatchCondition(metav1.Condition{
 				Type:    conditionDegraded,
 				Status:  metav1.ConditionTrue,
@@ -1181,7 +1181,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			in:       []machineproviders.MachineInfo{},
 			expected: map[int32][]machineproviders.MachineInfo{},
 		}),
-		PEntry("separately indexed machines", tableInput{
+		Entry("separately indexed machines", tableInput{
 			in: []machineproviders.MachineInfo{i0m0, i1m0, i2m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0},
@@ -1189,7 +1189,7 @@ var _ = Describe("machineInfosByIndex", func() {
 				2: {i2m0},
 			},
 		}),
-		PEntry("a mixture of indexed machines", tableInput{
+		Entry("a mixture of indexed machines", tableInput{
 			in: []machineproviders.MachineInfo{i0m0, i1m0, i2m0, i0m1, i1m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
@@ -1197,7 +1197,7 @@ var _ = Describe("machineInfosByIndex", func() {
 				2: {i2m0},
 			},
 		}),
-		PEntry("all machines in the same index", tableInput{
+		Entry("all machines in the same index", tableInput{
 			in: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},

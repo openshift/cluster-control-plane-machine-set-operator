@@ -24,6 +24,8 @@ import (
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -93,10 +95,23 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineUpdates(ctx context.C
 	case machinev1.OnDelete:
 		return r.reconcileMachineOnDeleteUpdate(ctx, logger, cpms, machineProvider, indexedMachineInfos)
 	case machinev1.Recreate:
-		// TODO: Set CPMS condition degraded
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:    conditionDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonInvalidStrategy,
+			Message: fmt.Sprintf("%s: %s", invalidStrategyMessage, errRecreateStrategyNotSupported),
+		})
+
 		logger.Error(errRecreateStrategyNotSupported, invalidStrategyMessage)
 	default:
-		// TODO: Set CPMS condition degraded
+		meta.SetStatusCondition(&cpms.Status.Conditions,
+			metav1.Condition{
+				Type:    conditionDegraded,
+				Status:  metav1.ConditionTrue,
+				Reason:  reasonInvalidStrategy,
+				Message: fmt.Sprintf("%s: %s: %s", invalidStrategyMessage, errUnknownStrategy, cpms.Spec.Strategy.Type),
+			})
+
 		logger.Error(fmt.Errorf("%w: %s", errUnknownStrategy, cpms.Spec.Strategy.Type), invalidStrategyMessage)
 	}
 
@@ -141,7 +156,9 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx co
 func machineInfosByIndex(machineInfos []machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
 	out := make(map[int32][]machineproviders.MachineInfo)
 
-	// TODO: Convert the list of machineInfos into a map that maps the index to a list of MachineInfos.
+	for _, machineInfo := range machineInfos {
+		out[machineInfo.Index] = append(out[machineInfo.Index], machineInfo)
+	}
 
 	return out
 }
