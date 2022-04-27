@@ -53,6 +53,7 @@ var _ = Describe("Status", func() {
 			reconciler = &ControlPlaneMachineSetReconciler{
 				Namespace: namespaceName,
 				Scheme:    testScheme,
+				Client:    k8sClient,
 			}
 
 			By("Setting up supporting resources")
@@ -89,15 +90,15 @@ var _ = Describe("Status", func() {
 				Expect(reconciler.updateControlPlaneMachineSetStatus(ctx, logger.Logger(), cpms.DeepCopy(), patchBase)).To(Succeed())
 			})
 
-			PIt("updates the status on the API", func() {
+			It("updates the status on the API", func() {
 				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-					HaveField("ObservedGeneration", 2),
-					HaveField("Replicas", 3),
-					HaveField("ReadyReplicas", 4),
+					HaveField("ObservedGeneration", int64(2)),
+					HaveField("Replicas", int32(3)),
+					HaveField("ReadyReplicas", int32(4)),
 				)))
 			})
 
-			PIt("should log the patch data", func() {
+			It("should log the patch data", func() {
 				data, err := patchBase.Data(cpms)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -127,15 +128,15 @@ var _ = Describe("Status", func() {
 				Expect(reconciler.updateControlPlaneMachineSetStatus(ctx, logger.Logger(), cpms.DeepCopy(), patchBase)).To(Succeed())
 			})
 
-			PIt("does not update the status on the API", func() {
+			It("does not update the status on the API", func() {
 				Consistently(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-					HaveField("ObservedGeneration", 1),
-					HaveField("Replicas", 2),
-					HaveField("ReadyReplicas", 3),
+					HaveField("ObservedGeneration", int64(1)),
+					HaveField("Replicas", int32(2)),
+					HaveField("ReadyReplicas", int32(3)),
 				)))
 			})
 
-			PIt("should log that no status update was required", func() {
+			It("should log that no status update was required", func() {
 				Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
 					Level:   3,
 					Message: notUpdatingStatus,
