@@ -68,6 +68,7 @@ vendor: ## Ensure the vendor directory is up to date.
 .PHONY: lint
 lint: ## Run golangci-lint over the codebase.
 	$(call ensure-home, ${GOLANGCI_LINT} run ./...)
+	./hack/verify-log-keys.sh
 
 .PHONY: test
 test: generate fmt vet ## Run tests.

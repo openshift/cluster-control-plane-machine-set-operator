@@ -58,7 +58,7 @@ consistent and follow the following guidelines:
     ```golang
     logger = logger.WithValues("UpdateStrategy", cpms.Spec.Strategy.Type)
     ```
-* Logger keys and values should be CamelCase with the first letter capitalised
+* Logger keys and values should be lowerCamelCase (as per [Kubernetes Guidelines](https://github.com/kubernetes/community/blob/HEAD/contributors/devel/sig-instrumentation/migration-to-structured-logging.md#name-arguments))
 
 ### Testing
 

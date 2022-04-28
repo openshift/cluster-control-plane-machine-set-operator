@@ -105,7 +105,7 @@ var _ = Describe("Status", func() {
 				Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
 					Level: 3,
 					KeysAndValues: []interface{}{
-						"Data", string(data),
+						"data", string(data),
 					},
 					Message: updatingStatus,
 				}))
@@ -237,11 +237,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "1",
-							"Replicas", "3",
-							"ReadyReplicas", "3",
-							"UpdatedReplicas", "3",
-							"UnavailableReplicas", "0",
+							"observedGeneration", "1",
+							"replicas", "3",
+							"readyReplicas", "3",
+							"updatedReplicas", "3",
+							"unavailableReplicas", "0",
 						},
 						Message: "Observed Machine Configuration",
 					},
@@ -287,11 +287,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "2",
-							"Replicas", "3",
-							"ReadyReplicas", "3",
-							"UpdatedReplicas", "1",
-							"UnavailableReplicas", "0",
+							"observedGeneration", "2",
+							"replicas", "3",
+							"readyReplicas", "3",
+							"updatedReplicas", "1",
+							"unavailableReplicas", "0",
 						},
 						Message: "Observed Machine Configuration",
 					},
@@ -339,11 +339,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "3",
-							"Replicas", "5",
-							"ReadyReplicas", "3",
-							"UpdatedReplicas", "1",
-							"UnavailableReplicas", "0",
+							"observedGeneration", "3",
+							"replicas", "5",
+							"readyReplicas", "3",
+							"updatedReplicas", "1",
+							"unavailableReplicas", "0",
 						},
 						Message: "Observed Machine Configuration",
 					},
@@ -391,11 +391,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "4",
-							"Replicas", "5",
-							"ReadyReplicas", "5",
-							"UpdatedReplicas", "3",
-							"UnavailableReplicas", "0",
+							"observedGeneration", "4",
+							"replicas", "5",
+							"readyReplicas", "5",
+							"updatedReplicas", "3",
+							"unavailableReplicas", "0",
 						},
 						Message: "Observed Machine Configuration",
 					},
@@ -442,7 +442,7 @@ var _ = Describe("Status", func() {
 					{
 						Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-0, node-1, node-2"),
 						KeysAndValues: []interface{}{
-							"UnmanagedNodes", "node-0,node-1,node-2",
+							"unmanagedNodes", "node-0,node-1,node-2",
 						},
 						Message: "Observed unmanaged control plane nodes",
 					},
@@ -489,7 +489,7 @@ var _ = Describe("Status", func() {
 					{
 						Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-2"),
 						KeysAndValues: []interface{}{
-							"UnmanagedNodes", "node-2",
+							"unmanagedNodes", "node-2",
 						},
 						Message: "Observed unmanaged control plane nodes",
 					},
@@ -536,11 +536,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "7",
-							"Replicas", "3",
-							"ReadyReplicas", "2",
-							"UpdatedReplicas", "2",
-							"UnavailableReplicas", "1",
+							"observedGeneration", "7",
+							"replicas", "3",
+							"readyReplicas", "2",
+							"updatedReplicas", "2",
+							"unavailableReplicas", "1",
 						},
 						Message: "Observed Machine Configuration",
 					},
@@ -589,11 +589,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "8",
-							"Replicas", "5",
-							"ReadyReplicas", "3",
-							"UpdatedReplicas", "2",
-							"UnavailableReplicas", "1",
+							"observedGeneration", "8",
+							"replicas", "5",
+							"readyReplicas", "3",
+							"updatedReplicas", "2",
+							"unavailableReplicas", "1",
 						},
 						Message: "Observed Machine Configuration",
 					},
@@ -640,11 +640,11 @@ var _ = Describe("Status", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"ObservedGeneration", "7",
-							"Replicas", "2",
-							"ReadyReplicas", "2",
-							"UpdatedReplicas", "2",
-							"UnavailableReplicas", "1",
+							"observedGeneration", "7",
+							"replicas", "2",
+							"readyReplicas", "2",
+							"updatedReplicas", "2",
+							"unavailableReplicas", "1",
 						},
 						Message: "Observed Machine Configuration",
 					},
