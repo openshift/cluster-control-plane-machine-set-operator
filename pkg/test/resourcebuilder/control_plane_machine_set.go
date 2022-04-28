@@ -40,6 +40,7 @@ func ControlPlaneMachineSet() ControlPlaneMachineSetBuilder {
 				machineTypeLabelName: "master",
 			},
 		},
+		strategyType: machinev1.RollingUpdate,
 	}
 }
 
@@ -51,6 +52,7 @@ type ControlPlaneMachineSetBuilder struct {
 	namespace              string
 	replicas               int32
 	selector               metav1.LabelSelector
+	strategyType           machinev1.ControlPlaneMachineSetStrategyType
 }
 
 // Build builds a new controlplanemachineset based on the configuration provided.
@@ -64,6 +66,9 @@ func (m ControlPlaneMachineSetBuilder) Build() *machinev1.ControlPlaneMachineSet
 		Spec: machinev1.ControlPlaneMachineSetSpec{
 			Replicas: int32Ptr(m.replicas),
 			Selector: m.selector,
+			Strategy: machinev1.ControlPlaneMachineSetStrategy{
+				Type: m.strategyType,
+			},
 		},
 	}
 
@@ -107,5 +112,11 @@ func (m ControlPlaneMachineSetBuilder) WithReplicas(replicas int32) ControlPlane
 // WithSelector sets the selector for the controlplanemachineset builder.
 func (m ControlPlaneMachineSetBuilder) WithSelector(selector metav1.LabelSelector) ControlPlaneMachineSetBuilder {
 	m.selector = selector
+	return m
+}
+
+// WithStrategyType sets the update strategy type for the controlplanemachineset builder.
+func (m ControlPlaneMachineSetBuilder) WithStrategyType(strategy machinev1.ControlPlaneMachineSetStrategyType) ControlPlaneMachineSetBuilder {
+	m.strategyType = strategy
 	return m
 }

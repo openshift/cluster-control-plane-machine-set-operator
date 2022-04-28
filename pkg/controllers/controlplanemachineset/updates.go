@@ -79,6 +79,10 @@ var (
 	// It may be supported in a future version.
 	errRecreateStrategyNotSupported = fmt.Errorf("update strategy %q is not supported", machinev1.Recreate)
 
+	// errReplicasRequired is used to inform users that the replicas field is currently unset, and
+	// must be set to continue operation.
+	errReplicasRequired = errors.New("spec.replicas is unset: replicas is required")
+
 	// errUnknownStrategy is used to inform users that the update strategy they have provided is not recognised.
 	errUnknownStrategy = errors.New("unknown update strategy")
 )
@@ -87,7 +91,10 @@ var (
 // update strategy within the ControlPlaneMachineSet.
 // When a Machine needs an update, this function should create a replacement where appropriate.
 func (r *ControlPlaneMachineSetReconciler) reconcileMachineUpdates(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, machineInfos []machineproviders.MachineInfo) (ctrl.Result, error) {
-	indexedMachineInfos := machineInfosByIndex(machineInfos)
+	indexedMachineInfos, err := machineInfosByIndex(cpms, machineInfos)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("could not sort machine info by index: %w", err)
+	}
 
 	switch cpms.Spec.Strategy.Type {
 	case machinev1.RollingUpdate:
@@ -153,12 +160,23 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx co
 
 // machineInfosByIndex groups MachineInfo entries by index inside a map of index to MachineInfo.
 // This allows the update strategies to process each index in turn.
-func machineInfosByIndex(machineInfos []machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
+// It is expected to add an entry for each expected index (0-(replicas-1)) so that later logic of updates can process
+// indexes that do not have any associated Machines.
+func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []machineproviders.MachineInfo) (map[int32][]machineproviders.MachineInfo, error) {
 	out := make(map[int32][]machineproviders.MachineInfo)
+
+	if cpms.Spec.Replicas == nil {
+		return nil, errReplicasRequired
+	}
+
+	// Make sure that every expected index is accounted for.
+	for i := int32(0); i < *cpms.Spec.Replicas; i++ {
+		out[i] = []machineproviders.MachineInfo{}
+	}
 
 	for _, machineInfo := range machineInfos {
 		out[machineInfo.Index] = append(out[machineInfo.Index], machineInfo)
 	}
 
-	return out
+	return out, nil
 }
