@@ -9,7 +9,7 @@ for f in $(find . -name "*_test.go"); do
 
   # Find all lines that have a compliant set of keys (ie lowerCamelCase).
   # We have to use pcregrep here so that it captures multi line regexes.
-  compliantKeys=$(pcregrep --line-offsets -M 'KeysAndValues: \[\]interface{}{(\n)?(\s*\"[a-z][A-Za-z]*\",.*,?\n?)*\n?\s*},' ${f})
+  compliantKeys=$(pcregrep --line-offsets -M 'KeysAndValues: \[\]interface{}{(\n)?(\s*\"[a-z][A-Za-z]*\",[^}]*,?\n?)*\n?\s*},' ${f})
 
   # Find the lines which are only present in the first of these
   nonCompliantLines=$(echo $allKeys $compliantKeys | xargs -n1 | sort | uniq -u)
