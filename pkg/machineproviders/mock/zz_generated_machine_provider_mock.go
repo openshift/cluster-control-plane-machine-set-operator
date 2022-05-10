@@ -5,8 +5,10 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
+	logr "github.com/go-logr/logr"
 	gomock "github.com/golang/mock/gomock"
 	machineproviders "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 )
@@ -35,44 +37,44 @@ func (m *MockMachineProvider) EXPECT() *MockMachineProviderMockRecorder {
 }
 
 // CreateMachine mocks base method.
-func (m *MockMachineProvider) CreateMachine(arg0 int32) error {
+func (m *MockMachineProvider) CreateMachine(arg0 context.Context, arg1 logr.Logger, arg2 int32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateMachine", arg0)
+	ret := m.ctrl.Call(m, "CreateMachine", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateMachine indicates an expected call of CreateMachine.
-func (mr *MockMachineProviderMockRecorder) CreateMachine(arg0 interface{}) *gomock.Call {
+func (mr *MockMachineProviderMockRecorder) CreateMachine(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMachine", reflect.TypeOf((*MockMachineProvider)(nil).CreateMachine), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMachine", reflect.TypeOf((*MockMachineProvider)(nil).CreateMachine), arg0, arg1, arg2)
 }
 
 // DeleteMachine mocks base method.
-func (m *MockMachineProvider) DeleteMachine(arg0 *machineproviders.ObjectRef) error {
+func (m *MockMachineProvider) DeleteMachine(arg0 context.Context, arg1 logr.Logger, arg2 *machineproviders.ObjectRef) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteMachine", arg0)
+	ret := m.ctrl.Call(m, "DeleteMachine", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteMachine indicates an expected call of DeleteMachine.
-func (mr *MockMachineProviderMockRecorder) DeleteMachine(arg0 interface{}) *gomock.Call {
+func (mr *MockMachineProviderMockRecorder) DeleteMachine(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMachine", reflect.TypeOf((*MockMachineProvider)(nil).DeleteMachine), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMachine", reflect.TypeOf((*MockMachineProvider)(nil).DeleteMachine), arg0, arg1, arg2)
 }
 
 // GetMachineInfos mocks base method.
-func (m *MockMachineProvider) GetMachineInfos() ([]machineproviders.MachineInfo, error) {
+func (m *MockMachineProvider) GetMachineInfos(arg0 context.Context, arg1 logr.Logger) ([]machineproviders.MachineInfo, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMachineInfos")
+	ret := m.ctrl.Call(m, "GetMachineInfos", arg0, arg1)
 	ret0, _ := ret[0].([]machineproviders.MachineInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetMachineInfos indicates an expected call of GetMachineInfos.
-func (mr *MockMachineProviderMockRecorder) GetMachineInfos() *gomock.Call {
+func (mr *MockMachineProviderMockRecorder) GetMachineInfos(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMachineInfos", reflect.TypeOf((*MockMachineProvider)(nil).GetMachineInfos))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMachineInfos", reflect.TypeOf((*MockMachineProvider)(nil).GetMachineInfos), arg0, arg1)
 }

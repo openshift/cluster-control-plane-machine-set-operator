@@ -127,8 +127,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -148,8 +148,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -173,8 +173,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(transientError).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(transientError).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -198,8 +198,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -224,11 +224,11 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
 					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
-					mockMachineProvider.EXPECT().DeleteMachine(machineInfo.MachineRef).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -253,11 +253,11 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
 					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
-					mockMachineProvider.EXPECT().DeleteMachine(machineInfo.MachineRef).Return(transientError).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(transientError).Times(1)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -281,8 +281,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -306,8 +306,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 				setupMock: func() {
 					// Note, in this case it should only create a single machine.
-					mockMachineProvider.EXPECT().CreateMachine(0).Return(nil).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -332,8 +332,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 				setupMock: func() {
 					// Note, in this case it should not create anything new because we are at surge capacity.
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -359,11 +359,11 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 				setupMock: func() {
 					// Note, in this case, it should wait for the old Machine to go away before starting a new update.
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
 					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
-					mockMachineProvider.EXPECT().DeleteMachine(machineInfo.MachineRef).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
 
 				expectedLogs: []test.LogEntry{
@@ -388,8 +388,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -411,8 +411,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(2).Return(nil).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -435,8 +435,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -459,8 +459,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 				setupMock: func() {
 					// The missing index should take priority over the index in need of an update.
-					mockMachineProvider.EXPECT().CreateMachine(2).Return(nil).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -483,8 +483,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -541,8 +541,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -562,8 +562,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -586,8 +586,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -610,8 +610,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -635,8 +635,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(0).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -661,8 +661,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(0).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -685,8 +685,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -719,8 +719,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -753,8 +753,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -787,9 +787,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(0).Return(nil).Times(0)
-					mockMachineProvider.EXPECT().CreateMachine(1).Return(nil).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -823,8 +823,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -860,8 +860,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -897,8 +897,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -933,8 +933,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -970,8 +970,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -1003,8 +1003,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(2).Return(nil).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -1027,8 +1027,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -1050,8 +1050,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(2).Return(nil).Times(1)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
@@ -1084,8 +1084,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
 				},
 				setupMock: func() {
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any()).Times(0)
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogs: []test.LogEntry{
 					{
