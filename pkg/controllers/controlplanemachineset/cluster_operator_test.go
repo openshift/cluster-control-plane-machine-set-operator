@@ -28,9 +28,21 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+)
+
+var (
+	statusConditionAvailable    = resourcebuilder.StatusCondition().WithType(conditionAvailable).WithStatus(metav1.ConditionTrue).WithReason(reasonAllReplicasAvailable).Build()
+	statusConditionNotAvailable = resourcebuilder.StatusCondition().WithType(conditionAvailable).WithStatus(metav1.ConditionFalse).WithReason(reasonUnavailableReplicas).WithMessage("Missing 3 available replica(s)").Build()
+
+	statusConditionProgressing    = resourcebuilder.StatusCondition().WithType(conditionProgressing).WithStatus(metav1.ConditionTrue).WithReason(reasonNeedsUpdateReplicas).WithMessage("Observed 1 replica(s) in need of update").Build()
+	statusConditionNotProgressing = resourcebuilder.StatusCondition().WithType(conditionProgressing).WithStatus(metav1.ConditionFalse).WithReason(reasonAllReplicasUpdated).Build()
+
+	statusConditionDegraded    = resourcebuilder.StatusCondition().WithType(conditionDegraded).WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 3 unmanaged node(s)").Build()
+	statusConditionNotDegraded = resourcebuilder.StatusCondition().WithType(conditionDegraded).WithStatus(metav1.ConditionFalse).WithReason(reasonAsExpected).Build()
 )
 
 var _ = Describe("Cluster Operator Status with a running controller", func() {
@@ -56,10 +68,12 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
 			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
 			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Namespace:          namespaceName,
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		reconciler := &ControlPlaneMachineSetReconciler{
+			Client:       k8sClient,
 			Namespace:    namespaceName,
 			OperatorName: operatorName,
 		}
@@ -97,25 +111,31 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 	})
 
 	Context("with no ControlPlaneMachineSet", func() {
-		PIt("Set the cluster operator available", func() {
+		It("Set the cluster operator available", func() {
 			co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 
-			Eventually(komega.Object(co)).Should(HaveField(".Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 				{
-					Type:   configv1.OperatorAvailable,
-					Status: configv1.ConditionTrue,
+					Type:    configv1.OperatorAvailable,
+					Status:  configv1.ConditionTrue,
+					Reason:  reasonAsExpected,
+					Message: "cluster operator is available",
 				},
 				{
 					Type:   configv1.OperatorProgressing,
 					Status: configv1.ConditionFalse,
+					Reason: reasonAsExpected,
 				},
 				{
 					Type:   configv1.OperatorDegraded,
 					Status: configv1.ConditionFalse,
+					Reason: reasonAsExpected,
 				},
 				{
-					Type:   configv1.OperatorUpgradeable,
-					Status: configv1.ConditionTrue,
+					Type:    configv1.OperatorUpgradeable,
+					Status:  configv1.ConditionTrue,
+					Reason:  reasonAsExpected,
+					Message: "cluster operator is upgradable",
 				},
 			})))
 		})
@@ -128,29 +148,215 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 				})).Should(Succeed())
 			})
 
-			PIt("Set the cluster operator available", func() {
-				co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
-
-				Eventually(komega.Object(co)).Should(HaveField(".Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+			It("Set the cluster operator available", func() {
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 					{
-						Type:   configv1.OperatorAvailable,
-						Status: configv1.ConditionTrue,
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is available",
 					},
 					{
 						Type:   configv1.OperatorProgressing,
 						Status: configv1.ConditionFalse,
+						Reason: reasonAsExpected,
 					},
 					{
 						Type:   configv1.OperatorDegraded,
 						Status: configv1.ConditionFalse,
+						Reason: reasonAsExpected,
 					},
 					{
-						Type:   configv1.OperatorUpgradeable,
-						Status: configv1.ConditionTrue,
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is upgradable",
 					},
 				})))
 			})
 		})
+	})
+})
 
+var _ = Describe("Cluster Operator Status", func() {
+	const operatorName = "control-plane-machine-set"
+	var co *configv1.ClusterOperator
+	var reconciler *ControlPlaneMachineSetReconciler
+	var logger test.TestLogger
+	var namespaceName string
+
+	var cpmsBuilder resourcebuilder.ControlPlaneMachineSetBuilder
+
+	BeforeEach(func() {
+		By("Setting up a namespace for the test")
+		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		namespaceName = ns.GetName()
+
+		cpmsBuilder = resourcebuilder.ControlPlaneMachineSet().WithName(clusterControlPlaneMachineSetName).WithNamespace(namespaceName)
+
+		reconciler = &ControlPlaneMachineSetReconciler{
+			Client:       k8sClient,
+			Namespace:    namespaceName,
+			OperatorName: operatorName,
+		}
+
+		// CVO will create a blank cluster operator for us before the operator starts.
+		co = resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+		Expect(k8sClient.Create(ctx, co)).To(Succeed())
+
+		logger = test.NewTestLogger()
+	})
+
+	AfterEach(func() {
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			&configv1.ClusterOperator{},
+			&machinev1.ControlPlaneMachineSet{},
+		)
+	})
+
+	Context("updateClusterOperatorStatus", func() {
+		type updateClusterOperatorStatusTableInput struct {
+			cpms               *machinev1.ControlPlaneMachineSet
+			expectedConditions []configv1.ClusterOperatorStatusCondition
+			expectedError      error
+			expectedLogs       []test.LogEntry
+		}
+
+		DescribeTable("should update the cluster operator status based on the ControlPlaneMachineSet conditions", func(in updateClusterOperatorStatusTableInput) {
+			originalCPMS := in.cpms.DeepCopy()
+
+			err := reconciler.updateClusterOperatorStatus(ctx, logger.Logger(), in.cpms)
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+				return
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions(in.expectedConditions)))
+			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+			Expect(in.cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
+		},
+			Entry("with an available control plane machine set", updateClusterOperatorStatusTableInput{
+				cpms: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionAvailable, statusConditionNotProgressing, statusConditionNotDegraded}).Build(),
+				expectedConditions: []configv1.ClusterOperatorStatusCondition{
+					{
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonAllReplicasAvailable,
+						Message: "",
+					},
+					{
+						Type:   configv1.OperatorProgressing,
+						Status: configv1.ConditionFalse,
+						Reason: reasonAllReplicasUpdated,
+					},
+					{
+						Type:   configv1.OperatorDegraded,
+						Status: configv1.ConditionFalse,
+						Reason: reasonAsExpected,
+					},
+					{
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is upgradable",
+					},
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level:   4,
+						Message: "Syncing cluster operator status",
+						KeysAndValues: []interface{}{
+							"available", string(metav1.ConditionTrue),
+							"progressing", string(metav1.ConditionFalse),
+							"degraded", string(metav1.ConditionFalse),
+							"upgradable", string(metav1.ConditionTrue),
+						},
+					},
+				},
+			}),
+			Entry("with a degraded control plane machine set", updateClusterOperatorStatusTableInput{
+				cpms: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionNotAvailable, statusConditionNotProgressing, statusConditionDegraded}).Build(),
+				expectedConditions: []configv1.ClusterOperatorStatusCondition{
+					{
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionFalse,
+						Reason:  reasonUnavailableReplicas,
+						Message: "Missing 3 available replica(s)",
+					},
+					{
+						Type:   configv1.OperatorProgressing,
+						Status: configv1.ConditionFalse,
+						Reason: reasonAllReplicasUpdated,
+					},
+					{
+						Type:    configv1.OperatorDegraded,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonUnmanagedNodes,
+						Message: "Found 3 unmanaged node(s)",
+					},
+					{
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionFalse,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is not upgradable",
+					},
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level:   4,
+						Message: "Syncing cluster operator status",
+						KeysAndValues: []interface{}{
+							"available", string(metav1.ConditionFalse),
+							"progressing", string(metav1.ConditionFalse),
+							"degraded", string(metav1.ConditionTrue),
+							"upgradable", string(metav1.ConditionFalse),
+						},
+					},
+				},
+			}),
+			Entry("with a progressing control plane machine set", updateClusterOperatorStatusTableInput{
+				cpms: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionNotAvailable, statusConditionProgressing, statusConditionNotDegraded}).Build(),
+				expectedConditions: []configv1.ClusterOperatorStatusCondition{
+					{
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionFalse,
+						Reason:  reasonUnavailableReplicas,
+						Message: "Missing 3 available replica(s)",
+					},
+					{
+						Type:    configv1.OperatorProgressing,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonNeedsUpdateReplicas,
+						Message: "Observed 1 replica(s) in need of update",
+					},
+					{
+						Type:   configv1.OperatorDegraded,
+						Status: configv1.ConditionFalse,
+						Reason: reasonAsExpected,
+					},
+					{
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionFalse,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is not upgradable",
+					},
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level:   4,
+						Message: "Syncing cluster operator status",
+						KeysAndValues: []interface{}{
+							"available", string(metav1.ConditionFalse),
+							"progressing", string(metav1.ConditionTrue),
+							"degraded", string(metav1.ConditionFalse),
+							"upgradable", string(metav1.ConditionFalse),
+						},
+					},
+				},
+			}),
+		)
 	})
 })

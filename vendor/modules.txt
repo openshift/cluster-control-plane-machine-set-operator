@@ -485,6 +485,9 @@ github.com/onsi/gomega/types
 github.com/openshift/api/config/v1
 github.com/openshift/api/machine/v1
 github.com/openshift/api/machine/v1beta1
+# github.com/openshift/library-go v0.0.0-20220419144511-5b7d3d77b85e
+## explicit; go 1.17
+github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers
 # github.com/pelletier/go-toml v1.9.4
 ## explicit; go 1.12
 github.com/pelletier/go-toml
@@ -604,8 +607,8 @@ github.com/spf13/viper/internal/encoding/yaml
 # github.com/ssgreg/nlreturn/v2 v2.2.1
 ## explicit; go 1.13
 github.com/ssgreg/nlreturn/v2/pkg/nlreturn
-# github.com/stretchr/objx v0.1.1
-## explicit
+# github.com/stretchr/objx v0.2.0
+## explicit; go 1.12
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.7.0
 ## explicit; go 1.13

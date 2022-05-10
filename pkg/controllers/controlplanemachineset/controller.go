@@ -104,6 +104,8 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 		if err := r.setClusterOperatorAvailable(ctx, logger); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to reconcile cluster operator status: %w", err)
 		}
+
+		return ctrl.Result{}, nil
 	} else if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to fetch control plane machine set: %w", err)
 	}
