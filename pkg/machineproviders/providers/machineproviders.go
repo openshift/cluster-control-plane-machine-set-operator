@@ -19,18 +19,34 @@ package providers
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+	openshiftmachinev1beta1 "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var errNotImplemented = errors.New("not implemented")
+var (
+	// errUnexpectedMachineType is used to denote that the machine provider could not be
+	// constructed because an unknown machine type was requested.
+	errUnexpectedMachineType = errors.New("unexpected value for spec.template.machineType")
+)
 
 // NewMachineProvider constructs a MachineProvider based on the machine type passed.
 // This can then be used to access and manipulate machines within the cluster.
 func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
-	return nil, errNotImplemented
+	switch cpms.Spec.Template.MachineType {
+	case machinev1.OpenShiftMachineV1Beta1MachineType:
+		provider, err := openshiftmachinev1beta1.NewMachineProvider(ctx, logger, cl, cpms)
+		if err != nil {
+			return nil, fmt.Errorf("error constructing %s machine provider: %w", machinev1.OpenShiftMachineV1Beta1MachineType, err)
+		}
+
+		return provider, nil
+	default:
+		return nil, fmt.Errorf("%w: %s", errUnexpectedMachineType, cpms.Spec.Template.MachineType)
+	}
 }
