@@ -34,17 +34,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("MachineProvider", func() {
 	const ownerUID = "uid-1234abcd"
+	const ownerName = "machineOwner"
 
 	var namespaceName string
 	var logger test.TestLogger
 
-	BeforeEach(func() {
+	BeforeEach(OncePerOrdered, func() {
 		By("Setting up a namespace for the test")
 		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
@@ -53,11 +56,160 @@ var _ = Describe("MachineProvider", func() {
 		logger = test.NewTestLogger()
 	})
 
-	AfterEach(func() {
+	AfterEach(OncePerOrdered, func() {
 		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&corev1.Node{},
 			&machinev1beta1.Machine{},
 		)
+	})
+
+	Context("CreateMachine", func() {
+		var provider machineproviders.MachineProvider
+		var template machinev1.ControlPlaneMachineSetTemplate
+
+		assertCreatesMachine := func(index int32, expectedProviderConfig resourcebuilder.RawExtensionBuilder, clusterID, failureDomain string) {
+			Context(fmt.Sprintf("creating a machine in index %d", index), Ordered, func() {
+				// NOTE: this is an ordered container, each assertion in this
+				// function will run ordered, rather than in parallel.
+				// This means state can be shared between these.
+				// We use this so that we can break up individual assertions
+				// on the Machine state into separate containers.
+
+				var err error
+				var machine machinev1beta1.Machine
+
+				BeforeAll(func() {
+					err = provider.CreateMachine(ctx, logger.Logger(), index)
+				})
+
+				PIt("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				Context("should create a machine", func() {
+					PIt("with a name in the correct format", func() {
+						nameMatcher := MatchRegexp(fmt.Sprintf("%s-master-[a-z]{5}-%d", clusterID, index))
+
+						machineList := &machinev1beta1.MachineList{}
+						Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items", ContainElement(
+							HaveField("ObjectMeta.Name", nameMatcher),
+						)))
+
+						// Set the machine variable to the new Machine so that we can
+						// inspect it on subsequent tests.
+						for _, m := range machineList.Items {
+							if ok, err := nameMatcher.Match(m.Name); err == nil && ok {
+								machine = m
+								break
+							}
+						}
+					})
+
+					PIt("with the labels from the Machine template", func() {
+						Expect(machine.Labels).To(Equal(
+							template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels,
+						))
+					})
+
+					PIt("with annotations from the Machine template", func() {
+						Expect(machine.Annotations).To(Equal(
+							template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Annotations,
+						))
+					})
+
+					PIt("with the correct owner reference", func() {
+						Expect(machine.OwnerReferences).To(ConsistOf(metav1.OwnerReference{
+							APIVersion:         machinev1.GroupVersion.String(),
+							Kind:               "ControlPlaneMachineSet",
+							Name:               ownerName,
+							UID:                ownerUID,
+							Controller:         pointer.Bool(true),
+							BlockOwnerDeletion: pointer.Bool(true),
+						}))
+					})
+
+					PIt("with the correct provider spec", func() {
+						Expect(machine.Spec.ProviderSpec.Value).To(SatisfyAll(
+							Not(BeNil()),
+							HaveField("Raw", MatchJSON(expectedProviderConfig.BuildRawExtension().Raw)),
+						))
+					})
+
+					PIt("with no providerID set", func() {
+						Expect(machine.Spec.ProviderID).To(BeNil())
+					})
+
+					PIt("logs that the machine was created", func() {
+						Expect(logger.Entries()).To(ConsistOf(
+							test.LogEntry{
+								Level: 2,
+								KeysAndValues: []interface{}{
+									"index", index,
+									"machineName", machine.Name,
+									"failureDomain", failureDomain,
+								},
+								Message: "Created machine",
+							},
+						))
+					})
+				})
+			})
+		}
+
+		Context("with an AWS template", func() {
+			providerConfigBuilder := resourcebuilder.AWSProviderSpec()
+			template = resourcebuilder.OpenShiftMachineV1Beta1Template().
+				WithProviderSpecBuilder(providerConfigBuilder).
+				WithLabel(machinev1beta1.MachineClusterIDLabel, "cpms-aws-cluster-id").
+				BuildTemplate()
+
+			BeforeEach(OncePerOrdered, func() {
+				providerConfig, err := providerconfig.NewProviderConfig(*template.OpenShiftMachineV1Beta1Machine)
+				Expect(err).ToNot(HaveOccurred())
+
+				provider = &openshiftMachineProvider{
+					client: k8sClient,
+					indexToFailureDomain: map[int32]failuredomain.FailureDomain{
+						0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+						1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+						2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					},
+					machineSelector: resourcebuilder.ControlPlaneMachineSet().Build().Spec.Selector,
+					machineTemplate: *template.OpenShiftMachineV1Beta1Machine,
+					ownerMetadata: metav1.ObjectMeta{
+						Name: ownerName,
+						UID:  ownerUID,
+					},
+					providerConfig: providerConfig,
+				}
+			})
+
+			assertCreatesMachine(0, providerConfigBuilder.WithAvailabilityZone("us-east-1a"), "cpms-aws-cluster-id", "us-east-1a")
+			assertCreatesMachine(1, providerConfigBuilder.WithAvailabilityZone("us-east-1b"), "cpms-aws-cluster-id", "us-east-1b")
+			assertCreatesMachine(2, providerConfigBuilder.WithAvailabilityZone("us-east-1c"), "cpms-aws-cluster-id", "us-east-1c")
+
+			Context("if the Machine template is missing the cluster ID label", func() {
+				var err error
+
+				BeforeEach(func() {
+					p, ok := provider.(*openshiftMachineProvider)
+					Expect(ok).To(BeTrue())
+
+					delete(p.machineTemplate.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
+
+					err = provider.CreateMachine(ctx, logger.Logger(), 0)
+				})
+
+				PIt("returns an error", func() {
+					Expect(err).To(MatchError(errMissingClusterIDLabel))
+				})
+
+				PIt("does not create any Machines", func() {
+					Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", BeEmpty()))
+				})
+			})
+		})
+
 	})
 
 	Context("DeleteMachine", func() {

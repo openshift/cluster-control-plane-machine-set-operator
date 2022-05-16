@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
@@ -36,6 +37,11 @@ var (
 	// errEmptyConfig is used to denote that the machine provider could not be constructed
 	// because no configuration was provided by the user.
 	errEmptyConfig = fmt.Errorf("cannot initialise %s provider with empty config", machinev1.OpenShiftMachineV1Beta1MachineType)
+
+	// errMissingClusterIDLabel is used to denote that the cluster ID label, expected to be on the Machine template
+	// is not present and therefore a Machine cannot be created. The Cluster ID is required to construct the name for
+	// the new Machines.
+	errMissingClusterIDLabel = fmt.Errorf("missing required label on machine template metadata: %s", machinev1beta1.MachineClusterIDLabel)
 
 	// errUnexpectedMachineType is used to denote that the machine provider was requested
 	// for an unsupported machine provider type (ie not OpenShift Machine v1beta1).
