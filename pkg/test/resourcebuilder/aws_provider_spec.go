@@ -29,6 +29,7 @@ import (
 func AWSProviderSpec() AWSProviderSpecBuilder {
 	return AWSProviderSpecBuilder{
 		availabilityZone: "us-east-1a",
+		instanceType:     "m6i.xlarge",
 		securityGroups: []machinev1beta1.AWSResourceReference{
 			{
 				Filters: []machinev1beta1.Filter{
@@ -57,6 +58,7 @@ func AWSProviderSpec() AWSProviderSpecBuilder {
 // AWSProviderSpecBuilder is used to build out a AWS machine config object.
 type AWSProviderSpecBuilder struct {
 	availabilityZone string
+	instanceType     string
 	securityGroups   []machinev1beta1.AWSResourceReference
 	subnet           machinev1beta1.AWSResourceReference
 }
@@ -86,7 +88,7 @@ func (m AWSProviderSpecBuilder) Build() *machinev1beta1.AWSMachineProviderConfig
 		IAMInstanceProfile: &machinev1beta1.AWSResourceReference{
 			ID: stringPtr("aws-iam-instance-profile-12345678"),
 		},
-		InstanceType: "m6i.xlarge",
+		InstanceType: m.instanceType,
 		LoadBalancers: []machinev1beta1.LoadBalancerReference{
 			{
 				Type: "network",
@@ -127,6 +129,12 @@ func (m AWSProviderSpecBuilder) BuildRawExtension() *runtime.RawExtension {
 // WithAvailabilityZone sets the availabilityZone for the AWS machine config builder.
 func (m AWSProviderSpecBuilder) WithAvailabilityZone(az string) AWSProviderSpecBuilder {
 	m.availabilityZone = az
+	return m
+}
+
+// WithInstanceType sets the isntanceType for the AWS machine config builder.
+func (m AWSProviderSpecBuilder) WithInstanceType(instanceType string) AWSProviderSpecBuilder {
+	m.instanceType = instanceType
 	return m
 }
 
