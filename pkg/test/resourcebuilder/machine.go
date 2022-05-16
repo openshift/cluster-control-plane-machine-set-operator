@@ -18,6 +18,7 @@ package resourcebuilder
 
 import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,6 +39,11 @@ type MachineBuilder struct {
 	namespace           string
 	labels              map[string]string
 	providerSpecBuilder RawExtensionBuilder
+
+	// status fields
+	errorMessage *string
+	nodeRef      *corev1.ObjectReference
+	phase        *string
 }
 
 // Build builds a new machine based on the configuration provided.
@@ -48,6 +54,11 @@ func (m MachineBuilder) Build() *machinev1beta1.Machine {
 			Name:         m.name,
 			Namespace:    m.namespace,
 			Labels:       m.labels,
+		},
+		Status: machinev1beta1.MachineStatus{
+			ErrorMessage: m.errorMessage,
+			Phase:        m.phase,
+			NodeRef:      m.nodeRef,
 		},
 	}
 
@@ -110,5 +121,25 @@ func (m MachineBuilder) WithNamespace(namespace string) MachineBuilder {
 // WithProviderSpecBuilder sets the providerSpec builder for the machine builder.
 func (m MachineBuilder) WithProviderSpecBuilder(builder RawExtensionBuilder) MachineBuilder {
 	m.providerSpecBuilder = builder
+	return m
+}
+
+// Status Fields
+
+// WithErrorMessage sets the error message status field for the machine builder.
+func (m MachineBuilder) WithErrorMessage(errorMsg string) MachineBuilder {
+	m.errorMessage = &errorMsg
+	return m
+}
+
+// WithPhase sets the phase status field for the machine builder.
+func (m MachineBuilder) WithPhase(phase string) MachineBuilder {
+	m.phase = &phase
+	return m
+}
+
+// WithNodeRef sets the node ref status field for the machine builder.
+func (m MachineBuilder) WithNodeRef(nodeRef corev1.ObjectReference) MachineBuilder {
+	m.nodeRef = &nodeRef
 	return m
 }
