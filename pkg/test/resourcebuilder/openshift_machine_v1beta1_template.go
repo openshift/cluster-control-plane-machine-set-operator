@@ -18,6 +18,7 @@ package resourcebuilder
 
 import (
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 )
 
 // OpenShiftMachineV1Beta1Template creates a new OpenShift machine template builder.
@@ -25,8 +26,9 @@ func OpenShiftMachineV1Beta1Template() OpenShiftMachineV1Beta1TemplateBuilder {
 	return OpenShiftMachineV1Beta1TemplateBuilder{
 		failureDomainsBuilder: AWSFailureDomains(),
 		labels: map[string]string{
-			machineRoleLabelName: "master",
-			machineTypeLabelName: "master",
+			machineRoleLabelName:                 "master",
+			machineTypeLabelName:                 "master",
+			machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
 		},
 	}
 }
