@@ -109,11 +109,27 @@ var _ = Describe("Webhooks", func() {
 		PIt("with mismatched selector and machine labels", func() {
 			cpms := builder.WithSelector(metav1.LabelSelector{
 				MatchLabels: map[string]string{
+					"role":                               "master",
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
+				},
+			}).WithMachineTemplateBuilder(
+				machineTemplate.WithLabels(map[string]string{
+					"role":                               "worker",
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
+				}),
+			).Build()
+
+			Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("TODO")))
+		})
+
+		PIt("with no cluster ID label is set", func() {
+			cpms := builder.WithSelector(metav1.LabelSelector{
+				MatchLabels: map[string]string{
 					"role": "master",
 				},
 			}).WithMachineTemplateBuilder(
 				machineTemplate.WithLabels(map[string]string{
-					"role": "worker",
+					"role": "master",
 				}),
 			).Build()
 
@@ -265,9 +281,16 @@ var _ = Describe("Webhooks", func() {
 		PIt("when modifying the machine labels so that the selector no longer matches", func() {
 			Eventually(komega.Update(cpms, func() {
 				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels = map[string]string{
-					"different": "labels",
+					"different":                          "labels",
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
 				}
 			})).Should(MatchError(ContainSubstring("TODO")), "The selector must always match the machine labels")
+		})
+
+		PIt("when modifying the machine labels to remove the cluster ID label", func() {
+			Eventually(komega.Update(cpms, func() {
+				delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
+			})).Should(MatchError(ContainSubstring("TODO")), "The labels must always contain a cluster ID label")
 		})
 
 		PIt("when mutating the selector", func() {
