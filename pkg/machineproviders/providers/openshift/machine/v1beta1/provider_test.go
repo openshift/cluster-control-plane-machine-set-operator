@@ -63,6 +63,707 @@ var _ = Describe("MachineProvider", func() {
 		)
 	})
 
+	Context("GetMachineInfos", func() {
+		const clusterID = "cpms-machine-info-test-id"
+
+		providerSpecBuilder := resourcebuilder.AWSProviderSpec()
+		masterMachineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+		machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
+		nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
+
+		masterLabels := resourcebuilder.NewMachineRoleLabels("master")
+
+		unreadyMachineInfoBuilder := resourcebuilder.MachineInfo().
+			WithMachineGVR(machineGVR).
+			WithMachineLabels(masterLabels).
+			WithMachineNamespace(namespaceName).
+			WithReady(false).
+			WithNeedsUpdate(false)
+
+		readyMachineInfoBuilder := resourcebuilder.MachineInfo().
+			WithMachineGVR(machineGVR).
+			WithMachineLabels(masterLabels).
+			WithMachineNamespace(namespaceName).
+			WithNodeGVR(nodeGVR).
+			WithReady(true).
+			WithNeedsUpdate(false)
+
+		masterMachineName := func(suffix string) string {
+			return fmt.Sprintf("%s-master-%s", clusterID, suffix)
+		}
+
+		type getMachineInfosTableInput struct {
+			machines             []*machinev1beta1.Machine
+			failureDomains       map[int32]failuredomain.FailureDomain
+			expectedError        error
+			expectedMachineInfos []machineproviders.MachineInfo
+			expectedLogs         []test.LogEntry
+		}
+
+		DescribeTable("builds machine info based on the cluster state", func(in getMachineInfosTableInput) {
+			for _, machine := range in.machines {
+				machine.SetNamespace(namespaceName)
+
+				status := machine.Status.DeepCopy()
+
+				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+
+				machine.Status = *status
+				Expect(k8sClient.Status().Update(ctx, machine)).To(Succeed())
+			}
+
+			cpms := resourcebuilder.ControlPlaneMachineSet().Build()
+
+			template := resourcebuilder.OpenShiftMachineV1Beta1Template().
+				WithProviderSpecBuilder(providerSpecBuilder).
+				WithLabel(machinev1beta1.MachineClusterIDLabel, clusterID).
+				BuildTemplate().OpenShiftMachineV1Beta1Machine
+			Expect(template).ToNot(BeNil())
+
+			providerConfig, err := providerconfig.NewProviderConfig(*template)
+			Expect(err).ToNot(HaveOccurred())
+
+			provider := &openshiftMachineProvider{
+				client:               k8sClient,
+				indexToFailureDomain: in.failureDomains,
+				machineSelector:      cpms.Spec.Selector,
+				machineTemplate:      *template,
+				providerConfig:       providerConfig,
+			}
+
+			machineInfos, err := provider.GetMachineInfos(ctx, logger.Logger())
+
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			Expect(machineInfos).To(ConsistOf(in.expectedMachineInfos))
+			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+		},
+			PEntry("with no Machines", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{},
+				expectedLogs:         []test.LogEntry{},
+			}),
+			PEntry("with unready Machines", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("").Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Provisioning").Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Provisioned").Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					unreadyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).Build(),
+					unreadyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).Build(),
+					unreadyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "",
+							"index", 0,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "",
+							"index", 1,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "",
+							"index", 2,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("with ready Machines", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("with Machines using the random suffix pattern", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("abcde-0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("fghij-1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("abcde-0")).WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("fghij-1")).WithNodeName("node-1").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("abcde-0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("fghij-1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("with one Machine with a different instance type", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithInstanceType("different").WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", true,
+							"needsUpdate", true,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("with one Machine with an unknown failure domain", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1d")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", true,
+							"needsUpdate", true,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("with multiple Machines in an index in different states", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithInstanceType("different").WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("abcde-2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-replacement-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").WithNeedsUpdate(true).Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("abcde-2")).WithNodeName("node-replacement-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", true,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("abcde-2"),
+							"nodeName", "node-replacement-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("when the failure domain mapping does not match, names take precedence for indexing", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("when the machine names do not fit the pattern, fall back to matching on failure domains", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(clusterID + "-machine-a").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(clusterID + "-machine-1").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(clusterID + "-master-c").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(clusterID + "-machine-1").WithNodeName("node-1").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(clusterID + "master-c").WithNodeName("node-2").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(clusterID + "machine-a").WithNodeName("node-0").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", clusterID + "-machine-1",
+							"nodeName", "node-1",
+							"index", 0,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", clusterID + "master-c",
+							"nodeName", "node-2",
+							"index", 1,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", clusterID + "machine-a",
+							"nodeName", "node-0",
+							"index", 2,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("when the machine names do not fit the pattern, and the failure domains are not recognised, returns an error", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(clusterID + "-machine-a").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(clusterID + "-machine-1").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1f")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.WithName(clusterID + "-master-c").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1d")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+				},
+				expectedError:        errCouldNotDetermineMachineIndex,
+				expectedMachineInfos: []machineproviders.MachineInfo{},
+				expectedLogs: []test.LogEntry{
+					{
+						Error: errCouldNotDetermineMachineIndex,
+						KeysAndValues: []interface{}{
+							"machineName", clusterID + "-machine-a",
+						},
+						Message: "Could not gather Machine Info",
+					},
+				},
+			}),
+			PEntry("with Machines that have errored in some way", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Failed").WithErrorMessage("Node missing").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Failed").WithErrorMessage("Cannot create VM").Build(),
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					unreadyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithReady(false).WithErrorMessage("Node missing").WithNodeName("node-0").Build(),
+					unreadyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithReady(false).WithErrorMessage("Cannot create VM").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(masterMachineName("2")).WithNodeName("node-2").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "Node missing",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "",
+							"index", 1,
+							"ready", false,
+							"needsUpdate", false,
+							"errorMessage", "Cannot create VM",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("2"),
+							"nodeName", "node-2",
+							"index", 2,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+			PEntry("with additional Machines, not matched by the selector, ignores them", getMachineInfosTableInput{
+				machines: []*machinev1beta1.Machine{
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
+					masterMachineBuilder.AsWorker().WithName("worker-abcde").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
+				},
+				failureDomains: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+				},
+				expectedMachineInfos: []machineproviders.MachineInfo{
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").Build(),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("0"),
+							"nodeName", "node-0",
+							"index", 0,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", masterMachineName("1"),
+							"nodeName", "node-1",
+							"index", 1,
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+				},
+			}),
+		)
+	})
+
 	Context("CreateMachine", func() {
 		var provider machineproviders.MachineProvider
 		var template machinev1.ControlPlaneMachineSetTemplate

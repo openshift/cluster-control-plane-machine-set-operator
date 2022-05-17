@@ -34,6 +34,12 @@ import (
 )
 
 var (
+	// errCouldNotDetermineMachineIndex is used to denote that the MachineProvider could not infer an
+	// index to assign to a Machine based on either the name or the failure domain.
+	// This means the Machine has been created in some manor outside of OpenShift norms and is in a failure domain
+	// not currently specified in the ControlPlaneMachineSet definition. User intervention is required here.
+	errCouldNotDetermineMachineIndex = errors.New("could not determine Machine index from name or failure domain")
+
 	// errEmptyConfig is used to denote that the machine provider could not be constructed
 	// because no configuration was provided by the user.
 	errEmptyConfig = fmt.Errorf("cannot initialise %s provider with empty config", machinev1.OpenShiftMachineV1Beta1MachineType)
