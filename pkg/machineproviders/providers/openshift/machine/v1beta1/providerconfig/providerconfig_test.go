@@ -25,6 +25,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
@@ -78,6 +79,183 @@ var _ = Describe("Provider Config", func() {
 				failureDomainsBuilder: nil,
 				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
 				providerConfigMatcher: HaveField(".AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
+			}),
+		)
+	})
+
+	Context("InjectFailureDomain", func() {
+		type injectFailureDomainTableInput struct {
+			providerConfig   ProviderConfig
+			failureDomain    failuredomain.FailureDomain
+			matchPath        string
+			matchExpectation interface{}
+			expectedError    error
+		}
+
+		DescribeTable("should inject the failure domain into the provider config", func(in injectFailureDomainTableInput) {
+			pc, err := in.providerConfig.InjectFailureDomain(in.failureDomain)
+
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			Expect(pc).To(HaveField(in.matchPath, Equal(in.matchExpectation)))
+		},
+			PEntry("when keeping an AWS availability zone the same", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewAWSFailureDomain(
+					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+				),
+				matchPath:        "AWS().Config().Placement.AvailabilityZone",
+				matchExpectation: "us-east-1a",
+			}),
+			PEntry("when changing an AWS availability zone", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewAWSFailureDomain(
+					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build(),
+				),
+				matchPath:        "AWS().Config().Placement.AvailabilityZone",
+				matchExpectation: "us-east-1b",
+			}),
+		)
+	})
+
+	Context("ExtractFailureDomain", func() {
+		type extractFailureDomainTableInput struct {
+			providerConfig        ProviderConfig
+			expectedFailureDomain failuredomain.FailureDomain
+		}
+
+		DescribeTable("should correctly extract the failure domain", func(in extractFailureDomainTableInput) {
+			fd := in.providerConfig.ExtractFailureDomain()
+
+			Expect(fd).To(Equal(in.expectedFailureDomain))
+		},
+			PEntry("with an AWS us-east-1a failure domain", extractFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				expectedFailureDomain: failuredomain.NewAWSFailureDomain(
+					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+				),
+			}),
+			PEntry("with an AWS us-east-1b failure domain", extractFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").Build(),
+					},
+				},
+				expectedFailureDomain: failuredomain.NewAWSFailureDomain(
+					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build(),
+				),
+			}),
+		)
+	})
+
+	Context("Equal", func() {
+		type equalTableInput struct {
+			basePC        ProviderConfig
+			comparePC     ProviderConfig
+			expectedEqual bool
+			expectedError error
+		}
+
+		DescribeTable("should compare provider configs", func(in equalTableInput) {
+			equal, err := in.basePC.Equal(in.comparePC)
+
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			Expect(equal).To(Equal(in.expectedEqual), "Equality of provider configs was not as expected")
+		},
+			PEntry("with different platform types", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+				},
+				expectedEqual: false,
+				expectedError: errMismatchedPlatformTypes,
+			}),
+			PEntry("with matching AWS configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				expectedEqual: true,
+			}),
+			PEntry("with mis-matched AWS configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").Build(),
+					},
+				},
+				expectedEqual: false,
+			}),
+		)
+	})
+
+	Context("RawConfig", func() {
+		type rawConfigTableInput struct {
+			providerConfig ProviderConfig
+			expectedError  error
+			expectedOut    []byte
+		}
+
+		DescribeTable("should marshal the correct config", func(in rawConfigTableInput) {
+			out, err := in.providerConfig.RawConfig()
+
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			Expect(out).To(Equal(in.expectedOut))
+		},
+			PEntry("with an AWS config", rawConfigTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().Build(),
+					},
+				},
+				expectedOut: resourcebuilder.AWSProviderSpec().BuildRawExtension().Raw,
 			}),
 		)
 	})

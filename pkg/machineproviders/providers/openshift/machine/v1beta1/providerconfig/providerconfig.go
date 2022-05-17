@@ -22,9 +22,14 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 )
 
 var (
+	// errMismatchedPlatformTypes is an error used when two provider configs
+	// are being compared but are from different platform types.
+	errMismatchedPlatformTypes = errors.New("mistmatched platform types")
+
 	// errUnsupportedPlatformType is an error used when an unknown platform
 	// type is configured within the failure domain config.
 	errUnsupportedPlatformType = errors.New("unsupported platform type")
@@ -33,6 +38,20 @@ var (
 // ProviderConfig is an interface that allows external code to interact
 // with provider configuration across different platform types.
 type ProviderConfig interface {
+	// InjectFailureDomain is used to inject a failure domain into the ProviderConfig.
+	// The returned ProviderConfig will be a copy of the current ProviderConfig with
+	// the new failure domain injected.
+	InjectFailureDomain(failuredomain.FailureDomain) (ProviderConfig, error)
+
+	// ExtractFailureDomain is used to extract a failure domain from the ProviderConfig.
+	ExtractFailureDomain() failuredomain.FailureDomain
+
+	// Equal compares two ProviderConfigs to determine whether or not they are equal.
+	Equal(ProviderConfig) (bool, error)
+
+	// RawConfig marshalls the configuration into a JSON byte slice.
+	RawConfig() ([]byte, error)
+
 	// Type returns the platform type of the provider config.
 	Type() configv1.PlatformType
 
@@ -59,6 +78,28 @@ func NewProviderConfig(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (P
 type providerConfig struct {
 	platformType configv1.PlatformType
 	aws          AWSProviderConfig
+}
+
+// InjectFailureDomain is used to inject a failure domain into the ProviderConfig.
+// The returned ProviderConfig will be a copy of the current ProviderConfig with
+// the new failure domain injected.
+func (p providerConfig) InjectFailureDomain(failuredomain.FailureDomain) (ProviderConfig, error) {
+	return p, nil
+}
+
+// ExtractFailureDomain is used to extract a failure domain from the ProviderConfig.
+func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
+	return nil
+}
+
+// Equal compares two ProviderConfigs to determine whether or not they are equal.
+func (p providerConfig) Equal(ProviderConfig) (bool, error) {
+	return false, nil
+}
+
+// RawConfig marshalls the configuration into a JSON byte slice.
+func (p providerConfig) RawConfig() ([]byte, error) {
+	return []byte{}, nil
 }
 
 // Type returns the platform type of the provider config.

@@ -99,6 +99,16 @@ func newAWSFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDom
 	return []FailureDomain{dummyFailureDomains}, nil
 }
 
+// NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
+// Note this is exported to allow other packages to construct individual failure domains
+// in tests.
+func NewAWSFailureDomain(fd machinev1.AWSFailureDomain) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.AWSPlatformType,
+		aws:          fd,
+	}
+}
+
 // awsFailureDomainToString converts the AWSFailureDomain into a string.
 // Typically most failure domains are represented by their availability zone,
 // so we return the AWS AvailabilityZone if it is set.
