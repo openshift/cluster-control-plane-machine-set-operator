@@ -40,6 +40,10 @@ var (
 	// errUnexpectedMachineType is used to denote that the machine provider was requested
 	// for an unsupported machine provider type (ie not OpenShift Machine v1beta1).
 	errUnexpectedMachineType = fmt.Errorf("unexpected machine type while initialising %s provider", machinev1.OpenShiftMachineV1Beta1MachineType)
+
+	// errUnknownGroupVersionResource is used to denote that the machine provider received an
+	// unknown GroupVersionResource while processing a Machine deletion request.
+	errUnknownGroupVersionResource = fmt.Errorf("unknown group/version/resource")
 )
 
 // NewMachineProvider creates a new OpenShift Machine v1beta1 machine provider implementation.
