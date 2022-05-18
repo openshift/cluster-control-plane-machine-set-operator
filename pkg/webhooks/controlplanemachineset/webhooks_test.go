@@ -109,13 +109,15 @@ var _ = Describe("Webhooks", func() {
 		PIt("with mismatched selector and machine labels", func() {
 			cpms := builder.WithSelector(metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"role":                               "master",
+					openshiftMachineRoleLabel:            masterMachineRole,
+					openshiftMachineTypeLabel:            masterMachineRole,
 					machinev1beta1.MachineClusterIDLabel: "cluster-id",
 				},
 			}).WithMachineTemplateBuilder(
 				machineTemplate.WithLabels(map[string]string{
-					"role":                               "worker",
-					machinev1beta1.MachineClusterIDLabel: "cluster-id",
+					openshiftMachineRoleLabel:            masterMachineRole,
+					openshiftMachineTypeLabel:            masterMachineRole,
+					machinev1beta1.MachineClusterIDLabel: "different-id",
 				}),
 			).Build()
 
@@ -125,11 +127,45 @@ var _ = Describe("Webhooks", func() {
 		PIt("with no cluster ID label is set", func() {
 			cpms := builder.WithSelector(metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"role": "master",
+					openshiftMachineRoleLabel: masterMachineRole,
+					openshiftMachineTypeLabel: masterMachineRole,
 				},
 			}).WithMachineTemplateBuilder(
 				machineTemplate.WithLabels(map[string]string{
-					"role": "master",
+					openshiftMachineRoleLabel: masterMachineRole,
+					openshiftMachineTypeLabel: masterMachineRole,
+				}),
+			).Build()
+
+			Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("TODO")))
+		})
+
+		PIt("with no master role label on the template", func() {
+			cpms := builder.WithSelector(metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					openshiftMachineTypeLabel:            masterMachineRole,
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
+				},
+			}).WithMachineTemplateBuilder(
+				machineTemplate.WithLabels(map[string]string{
+					openshiftMachineTypeLabel:            masterMachineRole,
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
+				}),
+			).Build()
+
+			Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("TODO")))
+		})
+
+		PIt("with no master type label on the template", func() {
+			cpms := builder.WithSelector(metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					openshiftMachineRoleLabel:            masterMachineRole,
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
+				},
+			}).WithMachineTemplateBuilder(
+				machineTemplate.WithLabels(map[string]string{
+					openshiftMachineRoleLabel:            masterMachineRole,
+					machinev1beta1.MachineClusterIDLabel: "cluster-id",
 				}),
 			).Build()
 
