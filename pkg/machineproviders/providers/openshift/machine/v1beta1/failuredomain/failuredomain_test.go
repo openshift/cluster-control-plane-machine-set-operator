@@ -27,6 +27,23 @@ import (
 
 var _ = Describe("FailureDomains", func() {
 	Context("NewFailureDomains", func() {
+		Context("with no failure domains configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				failureDomains, err = NewFailureDomains(machinev1.FailureDomains{})
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should return a nil list", func() {
+				Expect(failureDomains).To(BeNil())
+			})
+		})
+
 		Context("With AWS failure domain configuration", func() {
 			var failureDomains []FailureDomain
 			var err error

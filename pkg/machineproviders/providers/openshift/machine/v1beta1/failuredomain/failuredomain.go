@@ -82,6 +82,9 @@ func NewFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain
 	switch failureDomains.Platform {
 	case configv1.AWSPlatformType:
 		return newAWSFailureDomains(failureDomains)
+	case configv1.PlatformType(""):
+		// An empty failure domains definition is allowed.
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, failureDomains.Platform)
 	}
