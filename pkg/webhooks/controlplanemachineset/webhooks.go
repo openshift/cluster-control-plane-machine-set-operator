@@ -26,6 +26,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
+const (
+	// openshiftMachineRoleLabel is the OpenShift Machine API machine role label.
+	// This must be present on all OpenShift Machine API Machine templates.
+	openshiftMachineRoleLabel = "machine.openshift.io/cluster-api-machine-role"
+
+	// openshiftMachineRoleLabel is the OpenShift Machine API machine type label.
+	// This must be present on all OpenShift Machine API Machine templates.
+	openshiftMachineTypeLabel = "machine.openshift.io/cluster-api-machine-type"
+
+	// masterMachineRole is the master role/type that is required to be set on
+	// all OpenShift Machine API Machine templates.
+	masterMachineRole = "master"
+)
+
 // ControlPlaneMachineSetWebhook acts as a webhook validator for the
 // machinev1beta1.ControlPlaneMachineSet resource.
 type ControlPlaneMachineSetWebhook struct{}
