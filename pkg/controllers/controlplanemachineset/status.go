@@ -62,10 +62,8 @@ func (r *ControlPlaneMachineSetReconciler) updateControlPlaneMachineSetStatus(ct
 // ControlPlaneMachineSet to match the data gathered.
 // In particular, it will update the ObservedGeneration, Replicas, ReadyReplicas, UnreadyReplicas and UpdatedReplicas
 // fields based on the information gathered, and then set any relevant conditions if applicable.
-// Eg. If there are any unowned Control Plane Nodes, or failed ControlPlaneMachines, it should add conditions to
-// to denote the state of the Machines.
 // It observes the following rules for setting the status:
-// - Replicas is the number of Machines present (a missing index or unmanaged node does not count towards this).
+// - Replicas is the number of Machines present
 // - ReadyReplicas is the number of the above Replicas which are reporting as Ready
 // - UpdatedReplicas is the number of Ready Replicas that do not need an update (this should be at most 1 per index).
 // - UnavailableReplicas is the number of Machines required to satisfy the requirement of at least 1 Ready Replica per
