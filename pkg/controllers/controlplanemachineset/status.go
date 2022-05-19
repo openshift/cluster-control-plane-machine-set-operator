@@ -71,6 +71,6 @@ func (r *ControlPlaneMachineSetReconciler) updateControlPlaneMachineSetStatus(ct
 // - UnavailableReplicas is the number of Machines required to satisfy the requirement of at least 1 Ready Replica per
 //   index. Eg. if one index has no ready replicas, this is 1, if an index has 2 ready replicas, this does not count as
 //   2 available replicas.
-func reconcileStatusWithMachineInfo(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos []machineproviders.MachineInfo) error {
+func reconcileStatusWithMachineInfo(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfosByIndex map[int32][]machineproviders.MachineInfo) error {
 	return nil
 }

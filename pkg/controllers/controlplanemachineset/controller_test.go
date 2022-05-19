@@ -335,7 +335,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 	var expectedOwnerReference metav1.OwnerReference
 	var machines []*machinev1beta1.Machine
-	var machineInfos []machineproviders.MachineInfo
+	var machineInfos map[int32][]machineproviders.MachineInfo
 	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 
 	BeforeEach(func() {
@@ -369,7 +369,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 		By("Creating machines to add owner references to")
 		machines = []*machinev1beta1.Machine{}
-		machineInfos = []machineproviders.MachineInfo{}
+		machineInfos = map[int32][]machineproviders.MachineInfo{}
 		machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName).WithGenerateName("ensure-owner-references-test-")
 
 		for i := 0; i < 3; i++ {
@@ -379,7 +379,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			machines = append(machines, machine)
 
 			machineInfo := resourcebuilder.MachineInfo().WithMachineGVR(machineGVR).WithMachineName(machine.GetName()).Build()
-			machineInfos = append(machineInfos, machineInfo)
+			machineInfos[int32(i)] = append(machineInfos[int32(i)], machineInfo)
 		}
 	})
 
@@ -420,11 +420,13 @@ var _ = Describe("ensureOwnerRefrences", func() {
 	Context("when the machines already have an existing owner references", func() {
 		BeforeEach(func() {
 			By("Setting up the appropriate MachineInfos")
-			machineInfos = []machineproviders.MachineInfo{}
+			machineInfos = map[int32][]machineproviders.MachineInfo{}
 
 			for i := range machineInfos {
-				Expect(machineInfos[i].MachineRef).ToNot(BeNil())
-				machineInfos[i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+				for j := range machineInfos[i] {
+					Expect(machineInfos[i][j].MachineRef).ToNot(BeNil())
+					machineInfos[i][j].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+				}
 			}
 
 			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
@@ -455,10 +457,18 @@ var _ = Describe("ensureOwnerRefrences", func() {
 	Context("when some machines already have an existing owner reference", func() {
 		BeforeEach(func() {
 			By("Adding an owner reference to some of the machine infos")
+			skippedOne := false
 			Expect(machineInfos).To(HaveLen(3))
-			for i := range machineInfos[1:] {
-				Expect(machineInfos[i].MachineRef).ToNot(BeNil())
-				machineInfos[i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+			for i := range machineInfos {
+				if !skippedOne {
+					skippedOne = true
+					continue
+				}
+
+				for j := range machineInfos[i] {
+					Expect(machineInfos[i][j].MachineRef).ToNot(BeNil())
+					machineInfos[i][j].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+				}
 			}
 
 			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
@@ -474,7 +484,10 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		PIt("should log the update that was needed", func() {
 			expectedEntries := []test.LogEntry{}
 
-			machineInfo := machineInfos[0]
+			machineInfos0 := machineInfos[0]
+			Expect(machineInfos0).To(HaveLen(1))
+
+			machineInfo := machineInfos0[0]
 			Expect(machineInfo.MachineRef).ToNot(BeNil())
 			expectedEntries = append(expectedEntries, test.LogEntry{
 				KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
@@ -482,13 +495,21 @@ var _ = Describe("ensureOwnerRefrences", func() {
 				Message:       "Added owner reference to machine",
 			})
 
-			for _, machineInfo := range machineInfos[1:] {
-				Expect(machineInfo.MachineRef).ToNot(BeNil())
-				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
-					Level:         4,
-					Message:       "Owner reference already present on machine",
-				})
+			skippedOne := false
+			for _, machineInfo := range machineInfos {
+				if !skippedOne {
+					skippedOne = true
+					continue
+				}
+
+				for i := range machineInfo {
+					Expect(machineInfo[i].MachineRef).ToNot(BeNil())
+					expectedEntries = append(expectedEntries, test.LogEntry{
+						KeysAndValues: []interface{}{"machineNamespace", machineInfo[i].MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo[i].MachineRef.ObjectMeta.GetName()},
+						Level:         4,
+						Message:       "Owner reference already present on machine",
+					})
+				}
 			}
 
 			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
@@ -499,9 +520,10 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		var skipMachine string
 
 		BeforeEach(func() {
-			Expect(machineInfos[0].MachineRef).ToNot(BeNil())
-			skipMachine = machineInfos[0].MachineRef.ObjectMeta.GetName()
-			machineInfos[0].MachineRef = nil
+			Expect(machineInfos).To(HaveKeyWithValue(int32(0), HaveLen(1)))
+			Expect(machineInfos[0][0].MachineRef).ToNot(BeNil())
+			skipMachine = machineInfos[0][0].MachineRef.ObjectMeta.GetName()
+			machineInfos[0][0].MachineRef = nil
 
 			err := reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
 			Expect(err).ToNot(HaveOccurred())
@@ -542,17 +564,25 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		BeforeEach(func() {
 			By("Adding an owner reference to some of the machine infos")
 			Expect(machineInfos).To(HaveLen(3))
-			for i := range machineInfos[1:] {
-				Expect(machineInfos[i].MachineRef).ToNot(BeNil())
-				machineInfos[i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+
+			skippedOne := false
+			for i := range machineInfos {
+				if !skippedOne {
+					skippedOne = true
+					continue
+				}
+				for j := range machineInfos[i] {
+					Expect(machineInfos[i][j].MachineRef).ToNot(BeNil())
+					machineInfos[i][j].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{expectedOwnerReference}
+				}
 			}
 
 			By("Adding an owner reference for an alternative controller owner")
 			badOwnerReference := expectedOwnerReference
 			badOwnerReference.Name = "different-owner"
 
-			Expect(machineInfos[0].MachineRef).ToNot(BeNil())
-			machineInfos[0].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{badOwnerReference}
+			Expect(machineInfos[0][0].MachineRef).ToNot(BeNil())
+			machineInfos[0][0].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{badOwnerReference}
 
 			By("Formulating the expected error")
 			machine := resourcebuilder.Machine().WithNamespace(namespaceName).Build()
@@ -572,7 +602,10 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		PIt("should add an error log", func() {
 			expectedEntries := []test.LogEntry{}
 
-			machineInfo := machineInfos[0]
+			machineInfo0 := machineInfos[0]
+			Expect(machineInfo0).To(HaveLen(1))
+
+			machineInfo := machineInfo0[0]
 			Expect(machineInfo.MachineRef).ToNot(BeNil())
 			expectedEntries = append(expectedEntries, test.LogEntry{
 				Error:         expectedError,
@@ -580,13 +613,15 @@ var _ = Describe("ensureOwnerRefrences", func() {
 				Message:       "Cannot add owner reference to machine",
 			})
 
-			for _, machineInfo := range machineInfos[1:] {
-				Expect(machineInfo.MachineRef).ToNot(BeNil())
-				expectedEntries = append(expectedEntries, test.LogEntry{
-					KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
-					Level:         4,
-					Message:       "Owner reference already present on machine",
-				})
+			for _, machineInfo := range machineInfos {
+				for i := range machineInfo {
+					Expect(machineInfo[i].MachineRef).ToNot(BeNil())
+					expectedEntries = append(expectedEntries, test.LogEntry{
+						KeysAndValues: []interface{}{"machineNamespace", machineInfo[i].MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo[i].MachineRef.ObjectMeta.GetName()},
+						Level:         4,
+						Message:       "Owner reference already present on machine",
+					})
+				}
 			}
 
 			Expect(logger.Entries()).To(ConsistOf(expectedEntries))
@@ -604,4 +639,84 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			)))
 		})
 	})
+})
+
+var _ = Describe("machineInfosByIndex", func() {
+	i0m0 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-0").Build()
+	i0m1 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-1").Build()
+	i0m2 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-2").Build()
+	i1m0 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-1-0").Build()
+	i1m1 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-1-1").Build()
+	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-2-0").Build()
+
+	type tableInput struct {
+		cpms          *machinev1.ControlPlaneMachineSet
+		machineInfos  []machineproviders.MachineInfo
+		expected      map[int32][]machineproviders.MachineInfo
+		expectedError error
+	}
+
+	DescribeTable("should sort Machine Infos by index", func(in tableInput) {
+		out, err := machineInfosByIndex(in.cpms, in.machineInfos)
+		if in.expectedError != nil {
+			Expect(err).To(MatchError(in.expectedError))
+			return
+		}
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(out).To(HaveLen(len(in.expected)))
+		// Check each key and its values separately to avoid ordering within the lists
+		// from causing issues.
+		for key, values := range in.expected {
+			Expect(out).To(HaveKeyWithValue(key, ConsistOf(values)))
+		}
+	},
+		Entry("with no replicas in the ControlPlaneMachineSet", tableInput{
+			cpms:          &machinev1.ControlPlaneMachineSet{},
+			expectedError: errReplicasRequired,
+		}),
+		Entry("no machine infos with 3 replicas", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {},
+				1: {},
+				2: {},
+			},
+		}),
+		Entry("separately indexed machines", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0},
+				1: {i1m0},
+				2: {i2m0},
+			},
+		}),
+		Entry("a mixture of indexed machines", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0, i0m1, i1m1, i0m2},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0, i0m1, i0m2},
+				1: {i1m0, i1m1},
+				2: {i2m0},
+			},
+		}),
+		Entry("all machines in the same index with 1 replica", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(1).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0, i0m1, i0m2},
+			},
+		}),
+		Entry("all machines in the same index with 3 replicas", tableInput{
+			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0, i0m1, i0m2},
+				1: {},
+				2: {},
+			},
+		}),
+	)
 })
