@@ -18,6 +18,7 @@ package controlplanemachineset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -718,6 +719,228 @@ var _ = Describe("machineInfosByIndex", func() {
 				0: {i0m0, i0m1, i0m2},
 				1: {},
 				2: {},
+			},
+		}),
+	)
+})
+
+var _ = Describe("validateClusterState", func() {
+	var namespaceName string
+
+	cpmsBuilder := resourcebuilder.ControlPlaneMachineSet()
+	masterNodeBuilder := resourcebuilder.Node().AsMaster()
+	workerNodeBuilder := resourcebuilder.Node().AsWorker()
+	degradedConditionBuilder := resourcebuilder.StatusCondition().WithType(conditionDegraded)
+	progressingConditionBuilder := resourcebuilder.StatusCondition().WithType(conditionProgressing)
+
+	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
+	nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
+
+	healthyMachineBuilder := resourcebuilder.MachineInfo().
+		WithMachineGVR(machineGVR).
+		WithNodeGVR(nodeGVR).
+		WithReady(true).
+		WithNeedsUpdate(false)
+
+	pendingMachineBuilder := resourcebuilder.MachineInfo().
+		WithMachineGVR(machineGVR).
+		WithReady(false).
+		WithNeedsUpdate(false)
+
+	BeforeEach(func() {
+		By("Setting up a namespace for the test")
+		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		namespaceName = ns.GetName()
+	})
+
+	AfterEach(func() {
+		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			&corev1.Node{},
+			&machinev1beta1.Machine{},
+		)
+	})
+
+	type validateClusterTableInput struct {
+		cpms               *machinev1.ControlPlaneMachineSet
+		machineInfos       map[int32][]machineproviders.MachineInfo
+		nodes              []*corev1.Node
+		expectedError      error
+		expectedConditions []metav1.Condition
+		expectedLogs       []test.LogEntry
+	}
+
+	DescribeTable("should validate the cluster state", func(in validateClusterTableInput) {
+		logger := test.NewTestLogger()
+
+		for _, node := range in.nodes {
+			Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		}
+
+		reconciler := &ControlPlaneMachineSetReconciler{
+			Client:    k8sClient,
+			Namespace: namespaceName,
+		}
+
+		err := reconciler.validateClusterState(ctx, logger.Logger(), in.cpms, in.machineInfos)
+
+		if in.expectedError != nil {
+			Expect(err).To(MatchError(in.expectedError))
+		} else {
+			Expect(err).ToNot(HaveOccurred())
+		}
+
+		Expect(in.cpms.Status.Conditions).To(test.MatchConditions(in.expectedConditions))
+		Expect(in.expectedLogs).To(ConsistOf(in.expectedLogs))
+	},
+		PEntry("with a valid cluster state", validateClusterTableInput{
+			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}).Build(),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			},
+			expectedLogs: []test.LogEntry{},
+		}),
+		PEntry("with a valid cluster state and pre-existing conditions", validateClusterTableInput{
+			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonMachinesAlreadyOwned).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			}).Build(),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonMachinesAlreadyOwned).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+			expectedLogs: []test.LogEntry{},
+		}),
+		PEntry("with no machines are ready", validateClusterTableInput{
+			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
+			}).Build(),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {pendingMachineBuilder.WithIndex(0).WithMachineName("machine-0").Build()},
+				1: {pendingMachineBuilder.WithIndex(1).WithMachineName("machine-1").Build()},
+				2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonNoReadyMachines).WithMessage("No ready control plane machines found").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+			expectedLogs: []test.LogEntry{
+				{
+					Error: errors.New("no ready control plane machines"),
+					KeysAndValues: []interface{}{
+						"unreadyMachines", "machine-0,machine-1,machine-2",
+					},
+					Message: "No ready control plane machines found",
+				},
+			},
+		}),
+		PEntry("with only 1 machine is ready", validateClusterTableInput{
+			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
+			}).Build(),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {pendingMachineBuilder.WithIndex(0).WithMachineName("machine-0").Build()},
+				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 2 unmanaged node(s)").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+			expectedLogs: []test.LogEntry{
+				{
+					Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: master-0, master-2"),
+					KeysAndValues: []interface{}{
+						"unmanagedNodes", "master-0,master-2",
+					},
+					Message: "Observed unmanaged control plane nodes",
+				},
+			},
+		}),
+		PEntry("with an additional unowned master node", validateClusterTableInput{
+			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
+			}).Build(),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				masterNodeBuilder.WithName("master-3").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 1 unmanaged node(s)").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+			expectedLogs: []test.LogEntry{
+				{
+					Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: master-3"),
+					KeysAndValues: []interface{}{
+						"unmanagedNodes", "master-3",
+					},
+					Message: "Observed unmanaged control plane nodes",
+				},
 			},
 		}),
 	)

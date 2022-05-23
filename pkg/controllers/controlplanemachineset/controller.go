@@ -185,7 +185,8 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 }
 
 // reconcileMachines uses the gathered machine info to set the status of the ControlPlaneMachineSet and then,
-// uses the machine provider to take appropriate actions to perform any requied roll outs.
+// after validating that the cluster state is as expected, uses the machine provider to take appropriate actions
+// to perform any requied roll outs.
 func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, machineInfos map[int32][]machineproviders.MachineInfo) (ctrl.Result, error) {
 	if err := reconcileStatusWithMachineInfo(logger, cpms, machineInfos); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling machine info with status: %w", err)
@@ -193,6 +194,10 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context
 
 	if err := r.ensureOwnerReferences(ctx, logger, cpms, machineInfos); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error ensuring owner references: %w", err)
+	}
+
+	if err := r.validateClusterState(ctx, logger, cpms, machineInfos); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error validating cluster state: %w", err)
 	}
 
 	if isControlPlaneMachineSetDegraded(cpms) {
@@ -233,6 +238,14 @@ func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Con
 	// If required, look up the GVK using the rest mapper from the GVR, then uses metav1.PartialObjectMetadata to Patch
 	// the owner references. This should mean we can update the metadata of any type given we know the GVR and existing
 	// ObjectMeta.
+	return nil
+}
+
+// validateClusterState uses the machineInfos to validate that:
+// - All Nodes in the cluster claiming to be control plane nodes have a valid machine
+// - At least 1 of the control plane machines is in the ready state (if there are no ready Machines then the cluster
+//   is likely misconfigured)
+func (r *ControlPlaneMachineSetReconciler) validateClusterState(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos map[int32][]machineproviders.MachineInfo) error {
 	return nil
 }
 
