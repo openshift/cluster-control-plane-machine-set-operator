@@ -49,6 +49,10 @@ const (
 	// controlPlaneMachineSetFinalizer is the finalizer used by the ControlPlaneMachineSet operator
 	// to prevent deletion until the operator has cleaned up owner references on the Control Plane Machines.
 	controlPlaneMachineSetFinalizer = "controlplanemachineset.machine.openshift.io"
+
+	// degradedClusterState is used to denote that the control plane machine set has detected a degraded cluster.
+	// In this case, the controller will not perform any further actions.
+	degradedClusterState = "Cluster state is degraded. The control plane machine set will not take any action until issues have been resolved."
 )
 
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
@@ -191,6 +195,11 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context
 		return ctrl.Result{}, fmt.Errorf("error ensuring owner references: %w", err)
 	}
 
+	if isControlPlaneMachineSetDegraded(cpms) {
+		logger.V(1).Info(degradedClusterState)
+		return ctrl.Result{}, nil
+	}
+
 	result, err := r.reconcileMachineUpdates(ctx, logger, cpms, machineProvider, machineInfos)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling machine updates: %w", err)
@@ -248,4 +257,10 @@ func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []
 	}
 
 	return out, nil
+}
+
+// isControlPlaneMachineSetDegraded determines whether or not the ControlPlaneMachineSet
+// has a true, degraded condition.
+func isControlPlaneMachineSetDegraded(cpms *machinev1.ControlPlaneMachineSet) bool {
+	return false
 }

@@ -595,8 +595,10 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			err = reconciler.ensureOwnerReferences(ctx, logger.Logger(), cpms, machineInfos)
 		})
 
-		PIt("should return an error", func() {
-			Expect(err).To(MatchError(expectedError))
+		PIt("should not return an error", func() {
+			// Do not return an error as this would cause the controller to requeue.
+			// The degraded conditions check will ensure we do not take any further action.
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		PIt("should add an error log", func() {
@@ -718,5 +720,27 @@ var _ = Describe("machineInfosByIndex", func() {
 				2: {},
 			},
 		}),
+	)
+})
+
+var _ = Describe("isControlPlaneMachineSetDegraded", func() {
+	cpmsBuilder := resourcebuilder.ControlPlaneMachineSet()
+	degradedConditionBuilder := resourcebuilder.StatusCondition().WithType(conditionDegraded)
+
+	DescribeTable("should determine if the ControlPlaneMachineSet is degraded", func(cpms *machinev1.ControlPlaneMachineSet, expectDegraded bool) {
+		Expect(isControlPlaneMachineSetDegraded(cpms)).To(Equal(expectDegraded), "Degraded state of ControlPlaneMachineSet was not as expected")
+	},
+		PEntry("with a CPMS without a degraded condition",
+			cpmsBuilder.WithConditions([]metav1.Condition{}).Build(),
+			false,
+		),
+		PEntry("with a CPMS with a degraded condition with status false",
+			cpmsBuilder.WithConditions([]metav1.Condition{degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build()}).Build(),
+			false,
+		),
+		PEntry("with a CPMS with a degraded condition with status true",
+			cpmsBuilder.WithConditions([]metav1.Condition{degradedConditionBuilder.WithStatus(metav1.ConditionTrue).Build()}).Build(),
+			true,
+		),
 	)
 })
