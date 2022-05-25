@@ -18,6 +18,7 @@ package resourcebuilder
 
 import (
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,8 +37,9 @@ func ControlPlaneMachineSet() ControlPlaneMachineSetBuilder {
 		replicas:               3,
 		selector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
-				machineRoleLabelName: "master",
-				machineTypeLabelName: "master",
+				machineRoleLabelName:                 "master",
+				machineTypeLabelName:                 "master",
+				machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
 			},
 		},
 		strategyType: machinev1.RollingUpdate,

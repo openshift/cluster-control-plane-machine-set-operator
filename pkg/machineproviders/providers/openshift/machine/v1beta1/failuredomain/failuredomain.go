@@ -17,11 +17,15 @@ limitations under the License.
 package failuredomain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -34,6 +38,13 @@ var (
 	// errUnsupportedPlatformType is an error used when an unknown platform
 	// type is configured within the failure domain config.
 	errUnsupportedPlatformType = errors.New("unsupported platform type")
+
+	// errMissingFailureDomain is an error used when failure domain platform is set
+	// but the failure domain list is nil.
+	errMissingFailureDomain = errors.New("missing failure domain configuration")
+
+	// errMachineMissingProviderSpec is an error when a machine object does not have providerSpec.
+	errMachineMissingProviderSpec = errors.New("machine is missing provider spec")
 )
 
 // FailureDomain is an interface that allows external code to interact with
@@ -47,13 +58,28 @@ type FailureDomain interface {
 
 	// AWS returns the AWSFailureDomain if the platform type is AWS.
 	AWS() machinev1.AWSFailureDomain
+
+	// AWS returns the AzureFailureDomain if the platform type is Azure.
+	Azure() machinev1.AzureFailureDomain
+
+	// GCP returns the GCPFailureDomain if the platform type is GCP.
+	GCP() machinev1.GCPFailureDomain
+
+	// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
+	OpenStack() machinev1.OpenStackFailureDomain
+
+	// Equal compares the underlying failure domain.
+	Equal(other FailureDomain) bool
 }
 
 // failureDomain holds an implementation of the FailureDomain interface.
 type failureDomain struct {
 	platformType configv1.PlatformType
 
-	aws machinev1.AWSFailureDomain
+	aws       machinev1.AWSFailureDomain
+	azure     machinev1.AzureFailureDomain
+	gcp       machinev1.GCPFailureDomain
+	openStack machinev1.OpenStackFailureDomain
 }
 
 // String returns a string representation of the failure domain.
@@ -76,12 +102,53 @@ func (f failureDomain) AWS() machinev1.AWSFailureDomain {
 	return f.aws
 }
 
+// Azure returns the AzureFailureDomain if the platform type is Azure.
+func (f failureDomain) Azure() machinev1.AzureFailureDomain {
+	return f.azure
+}
+
+// GCP returns the GCPFailureDomain if the platform type is GCP.
+func (f failureDomain) GCP() machinev1.GCPFailureDomain {
+	return f.gcp
+}
+
+// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
+func (f failureDomain) OpenStack() machinev1.OpenStackFailureDomain {
+	return f.openStack
+}
+
+// Equal compares the underlying failure domain.
+func (f failureDomain) Equal(other FailureDomain) bool {
+	if f.platformType != other.Type() {
+		return false
+	}
+
+	switch f.platformType {
+	case configv1.AWSPlatformType:
+		return reflect.DeepEqual(f.AWS(), other.AWS())
+	case configv1.AzurePlatformType:
+		return f.azure == other.Azure()
+	case configv1.GCPPlatformType:
+		return f.gcp == other.GCP()
+	case configv1.OpenStackPlatformType:
+		return f.openStack == other.OpenStack()
+	}
+
+	return false
+}
+
 // NewFailureDomains creates a set of FailureDomains representing the input failure
 // domains held within the ControlPlaneMachineSet.
 func NewFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
 	switch failureDomains.Platform {
 	case configv1.AWSPlatformType:
 		return newAWSFailureDomains(failureDomains)
+	case configv1.AzurePlatformType:
+		return newAzureFailureDomains(failureDomains)
+	case configv1.GCPPlatformType:
+		return newGCPFailureDomains(failureDomains)
+	case configv1.OpenStackPlatformType:
+		return newOpenStackFailureDomains(failureDomains)
 	case configv1.PlatformType(""):
 		// An empty failure domains definition is allowed.
 		return nil, nil
@@ -90,16 +157,189 @@ func NewFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain
 	}
 }
 
-// newAWSFailureDomains constructs a list of AWSFailureDomains from the provided
-// failure domains configuration.
+// newAWSFailureDomains constructs a slice of AWS FailureDomain from machinev1.FailureDomains.
 func newAWSFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
-	// TODO: replace this with actual logic to create failure domains from the failure domains.
-	// This is here as a dummy to keep the linter happy.
-	dummyFailureDomains := failureDomain{
-		platformType: failureDomains.Platform,
+	foundFailureDomains := []FailureDomain{}
+	if failureDomains.AWS == nil {
+		return foundFailureDomains, errMissingFailureDomain
 	}
 
-	return []FailureDomain{dummyFailureDomains}, nil
+	for _, failureDomain := range *failureDomains.AWS {
+		foundFailureDomains = append(foundFailureDomains, NewAWSFailureDomain(failureDomain))
+	}
+
+	return foundFailureDomains, nil
+}
+
+// newAzureFailureDomains constructs a slice of Azure FailureDomain from machinev1.FailureDomains.
+func newAzureFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
+	foundFailureDomains := []FailureDomain{}
+	if failureDomains.Azure == nil {
+		return foundFailureDomains, errMissingFailureDomain
+	}
+
+	for _, failureDomain := range *failureDomains.Azure {
+		foundFailureDomains = append(foundFailureDomains, NewAzureFailureDomain(failureDomain))
+	}
+
+	return foundFailureDomains, nil
+}
+
+// newGCPFailureDomains constructs a slice of GCP FailureDomain from machinev1.FailureDomains.
+func newGCPFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
+	foundFailureDomains := []FailureDomain{}
+	if failureDomains.GCP == nil {
+		return foundFailureDomains, errMissingFailureDomain
+	}
+
+	for _, failureDomain := range *failureDomains.GCP {
+		foundFailureDomains = append(foundFailureDomains, NewGCPFailureDomain(failureDomain))
+	}
+
+	return foundFailureDomains, nil
+}
+
+// newOpenStackFailureDomains constructs a slice of OpenStack FailureDomain from machinev1.FailureDomains.
+func newOpenStackFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
+	foundFailureDomains := []FailureDomain{}
+	if failureDomains.OpenStack == nil {
+		return foundFailureDomains, errMissingFailureDomain
+	}
+
+	for _, failureDomain := range *failureDomains.OpenStack {
+		foundFailureDomains = append(foundFailureDomains, NewOpenStackFailureDomain(failureDomain))
+	}
+
+	return foundFailureDomains, nil
+}
+
+// NewFailureDomainsFromMachines creates a slice of FailureDomains representing the failure domains of the provided machines.
+func NewFailureDomainsFromMachines(machines []machinev1beta1.Machine, platform configv1.PlatformType) ([]FailureDomain, error) {
+	failureDomains := []FailureDomain{}
+
+	for _, machine := range machines {
+		failureDomain, err := newFailureDomainFromProviderSpec(machine.Spec.ProviderSpec.Value, platform)
+		if err != nil {
+			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
+		}
+
+		failureDomains = append(failureDomains, failureDomain)
+	}
+
+	return failureDomains, nil
+}
+
+// newFailureDomainFromProviderSpec creates a FailureDomain from machine providerSpec.
+func newFailureDomainFromProviderSpec(rawProviderSpec *runtime.RawExtension, platform configv1.PlatformType) (FailureDomain, error) {
+	var (
+		fd  FailureDomain
+		err error
+	)
+
+	if rawProviderSpec == nil {
+		return nil, errMachineMissingProviderSpec
+	}
+
+	switch platform {
+	case configv1.AWSPlatformType:
+		fd, err = newFailureDomainFromProviderSpecAWS(rawProviderSpec)
+	case configv1.AzurePlatformType:
+		fd, err = newFailureDomainFromProviderSpecAzure(rawProviderSpec)
+	case configv1.GCPPlatformType:
+		fd, err = newFailureDomainFromProviderSpecGCP(rawProviderSpec)
+	case configv1.OpenStackPlatformType:
+		fd, err = newFailureDomainFromProviderSpecOpenStack(rawProviderSpec)
+	default:
+		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platform)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error getting failure domain from provider spec: %w", err)
+	}
+
+	return fd, nil
+}
+
+// newFailureDomainFromProviderSpecAWS creates a FailureDomain from AWS providerSpec.
+func newFailureDomainFromProviderSpecAWS(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
+	providerSpec := machinev1beta1.AWSMachineProviderConfig{}
+	if err := json.Unmarshal(rawProviderSpec.Raw, &providerSpec); err != nil {
+		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+	}
+
+	awsFailureDomain := machinev1.AWSFailureDomain{
+		Placement: machinev1.AWSFailureDomainPlacement{
+			AvailabilityZone: providerSpec.Placement.AvailabilityZone,
+		},
+		Subnet: convertAWSResourceReference(providerSpec.Subnet),
+	}
+
+	return NewAWSFailureDomain(awsFailureDomain), nil
+}
+
+// newFailureDomainFromProviderSpecAzure creates a FailureDomain from Azure providerSpec.
+func newFailureDomainFromProviderSpecAzure(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
+	azureFailureDomain := machinev1.AzureFailureDomain{}
+	if err := json.Unmarshal(rawProviderSpec.Raw, &azureFailureDomain); err != nil {
+		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+	}
+
+	return NewAzureFailureDomain(azureFailureDomain), nil
+}
+
+// newFailureDomainFromProviderSpecGCP creates a FailureDomain from GCP providerSpec.
+func newFailureDomainFromProviderSpecGCP(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
+	gcpFailureDomain := machinev1.GCPFailureDomain{}
+	if err := json.Unmarshal(rawProviderSpec.Raw, &gcpFailureDomain); err != nil {
+		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+	}
+
+	return NewGCPFailureDomain(gcpFailureDomain), nil
+}
+
+// newFailureDomainFromProviderSpecOpenStack creates a FailureDomain from OpenStack providerSpec.
+func newFailureDomainFromProviderSpecOpenStack(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
+	openStackFailureDomain := machinev1.OpenStackFailureDomain{}
+	if err := json.Unmarshal(rawProviderSpec.Raw, &openStackFailureDomain); err != nil {
+		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+	}
+
+	return NewOpenStackFailureDomain(openStackFailureDomain), nil
+}
+
+// convertAWSResourceReference creates machinev1.awsResourceReference from machinev1beta1.awsResourceReference.
+func convertAWSResourceReference(subnet machinev1beta1.AWSResourceReference) *machinev1.AWSResourceReference {
+	subnetv1 := &machinev1.AWSResourceReference{}
+
+	if subnet.ID != nil {
+		subnetv1.Type = machinev1.AWSIDReferenceType
+		subnetv1.ID = subnet.ID
+
+		return subnetv1
+	}
+
+	if subnet.Filters != nil {
+		subnetv1.Type = machinev1.AWSFiltersReferenceType
+
+		subnetv1.Filters = &[]machinev1.AWSResourceFilter{}
+		for _, filter := range subnet.Filters {
+			*subnetv1.Filters = append(*subnetv1.Filters, machinev1.AWSResourceFilter{
+				Name:   filter.Name,
+				Values: filter.Values,
+			})
+		}
+
+		return subnetv1
+	}
+
+	if subnet.ARN != nil {
+		subnetv1.Type = machinev1.AWSARNReferenceType
+		subnetv1.ARN = subnet.ARN
+
+		return subnetv1
+	}
+
+	return subnetv1
 }
 
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
@@ -112,28 +352,61 @@ func NewAWSFailureDomain(fd machinev1.AWSFailureDomain) FailureDomain {
 	}
 }
 
-// awsFailureDomainToString converts the AWSFailureDomain into a string.
-// Typically most failure domains are represented by their availability zone,
-// so we return the AWS AvailabilityZone if it is set.
-// Else return the Subnet which should be set if the AvailabilityZone is not.
-func awsFailureDomainToString(fd machinev1.AWSFailureDomain) string {
-	if fd.Placement.AvailabilityZone != "" {
-		return fd.Placement.AvailabilityZone
+// NewAzureFailureDomain creates an Azure failure domain from the machinev1.AzureFailureDomain.
+func NewAzureFailureDomain(fd machinev1.AzureFailureDomain) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.AzurePlatformType,
+		azure:        fd,
+	}
+}
+
+// NewGCPFailureDomain creates a GCP failure domain from the machinev1.GCPFailureDomain.
+func NewGCPFailureDomain(fd machinev1.GCPFailureDomain) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.GCPPlatformType,
+		gcp:          fd,
+	}
+}
+
+// NewOpenStackFailureDomain creates an OpenStack failure domain from the machinev1.OpenStackFailureDomain.
+func NewOpenStackFailureDomain(fd machinev1.OpenStackFailureDomain) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.OpenStackPlatformType,
+		openStack:    fd,
+	}
+}
+
+// azString formats AvailabilityZone for awsFailureDomainToString function.
+func azString(az string) string {
+	if az == "" {
+		return ""
 	}
 
+	return fmt.Sprintf("AvailabilityZone:%s, ", az)
+}
+
+// awsFailureDomainToString converts the AWSFailureDomain into a string.
+// The types are slightly changed to be more human readable and nil values are omitted.
+func awsFailureDomainToString(fd machinev1.AWSFailureDomain) string {
+	// Availability zone only
+	if fd.Placement.AvailabilityZone != "" && fd.Subnet == nil {
+		return fmt.Sprintf("AWSFailureDomain{AvailabilityZone:%s}", fd.Placement.AvailabilityZone)
+	}
+
+	// Only subnet or both
 	if fd.Subnet != nil {
 		switch fd.Subnet.Type {
 		case machinev1.AWSARNReferenceType:
 			if fd.Subnet.ARN != nil {
-				return *fd.Subnet.ARN
+				return fmt.Sprintf("AWSFailureDomain{%sSubnet:{Type:%s, Value:%s}}", azString(fd.Placement.AvailabilityZone), fd.Subnet.Type, *fd.Subnet.ARN)
 			}
 		case machinev1.AWSFiltersReferenceType:
 			if fd.Subnet.Filters != nil {
-				return fmt.Sprintf("%+v", *fd.Subnet.Filters)
+				return fmt.Sprintf("AWSFailureDomain{%sSubnet:{Type:%s, Value:%+v}}", azString(fd.Placement.AvailabilityZone), fd.Subnet.Type, fd.Subnet.Filters)
 			}
 		case machinev1.AWSIDReferenceType:
 			if fd.Subnet.ID != nil {
-				return *fd.Subnet.ID
+				return fmt.Sprintf("AWSFailureDomain{%sSubnet:{Type:%s, Value:%s}}", azString(fd.Placement.AvailabilityZone), fd.Subnet.Type, *fd.Subnet.ID)
 			}
 		}
 	}
