@@ -77,6 +77,12 @@ const (
 	// with the other controller.
 	reasonMachinesAlreadyOwned = "MachinesAlreadyOwned"
 
+	// reasonNoReadyMachines denotes that the ControlPlaneMachineSet has
+	// not found any Control Plane Machines that are ready. This normally means that the
+	// cluster is not functioning properly, likely due to some misconfiguration of the
+	// Control Plane Machines.
+	reasonNoReadyMachines = "NoReadyMachines"
+
 	// reasonUnmanagedNodes denotes that the ControlPlaneMachineSet has identified some
 	// Control Plane Node that is not currently managed by a Control Plane Machine.
 	// In this scenario, to prevent potential for degrading the cluster into an unsupported

@@ -49,6 +49,10 @@ const (
 	// controlPlaneMachineSetFinalizer is the finalizer used by the ControlPlaneMachineSet operator
 	// to prevent deletion until the operator has cleaned up owner references on the Control Plane Machines.
 	controlPlaneMachineSetFinalizer = "controlplanemachineset.machine.openshift.io"
+
+	// degradedClusterState is used to denote that the control plane machine set has detected a degraded cluster.
+	// In this case, the controller will not perform any further actions.
+	degradedClusterState = "Cluster state is degraded. The control plane machine set will not take any action until issues have been resolved."
 )
 
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
@@ -167,12 +171,38 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{}, fmt.Errorf("error fetching machine info: %w", err)
 	}
 
+	indexedMachineInfos, err := machineInfosByIndex(cpms, machineInfos)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("could not sort machine info by index: %w", err)
+	}
+
+	result, err := r.reconcileMachines(ctx, logger, cpms, machineProvider, indexedMachineInfos)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error reconciling machines: %w", err)
+	}
+
+	return result, nil
+}
+
+// reconcileMachines uses the gathered machine info to set the status of the ControlPlaneMachineSet and then,
+// after validating that the cluster state is as expected, uses the machine provider to take appropriate actions
+// to perform any requied roll outs.
+func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, machineInfos map[int32][]machineproviders.MachineInfo) (ctrl.Result, error) {
 	if err := reconcileStatusWithMachineInfo(logger, cpms, machineInfos); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling machine info with status: %w", err)
 	}
 
 	if err := r.ensureOwnerReferences(ctx, logger, cpms, machineInfos); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error ensuring owner references: %w", err)
+	}
+
+	if err := r.validateClusterState(ctx, logger, cpms, machineInfos); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error validating cluster state: %w", err)
+	}
+
+	if isControlPlaneMachineSetDegraded(cpms) {
+		logger.V(1).Info(degradedClusterState)
+		return ctrl.Result{}, nil
 	}
 
 	result, err := r.reconcileMachineUpdates(ctx, logger, cpms, machineProvider, machineInfos)
@@ -202,11 +232,48 @@ func (r *ControlPlaneMachineSetReconciler) ensureFinalizer(ctx context.Context, 
 
 // ensureOwnerReferences determines if any of the Machines within the machineInfos require a new controller owner
 // reference to be added, and then uses PartialObjectMetadata to ensure that the owner reference is added.
-func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos []machineproviders.MachineInfo) error {
+func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos map[int32][]machineproviders.MachineInfo) error {
 	// TODO: Iterate over the MachineInfos, for each Machine, check the owner references for an owner reference matching
 	// that of the current CPMS (it should be the controller so should be easy to find).
 	// If required, look up the GVK using the rest mapper from the GVR, then uses metav1.PartialObjectMetadata to Patch
 	// the owner references. This should mean we can update the metadata of any type given we know the GVR and existing
 	// ObjectMeta.
 	return nil
+}
+
+// validateClusterState uses the machineInfos to validate that:
+// - All Nodes in the cluster claiming to be control plane nodes have a valid machine
+// - At least 1 of the control plane machines is in the ready state (if there are no ready Machines then the cluster
+//   is likely misconfigured)
+func (r *ControlPlaneMachineSetReconciler) validateClusterState(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos map[int32][]machineproviders.MachineInfo) error {
+	return nil
+}
+
+// machineInfosByIndex groups MachineInfo entries by index inside a map of index to MachineInfo.
+// This allows the update strategies to process each index in turn.
+// It is expected to add an entry for each expected index (0-(replicas-1)) so that later logic of updates can process
+// indexes that do not have any associated Machines.
+func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []machineproviders.MachineInfo) (map[int32][]machineproviders.MachineInfo, error) {
+	out := make(map[int32][]machineproviders.MachineInfo)
+
+	if cpms.Spec.Replicas == nil {
+		return nil, errReplicasRequired
+	}
+
+	// Make sure that every expected index is accounted for.
+	for i := int32(0); i < *cpms.Spec.Replicas; i++ {
+		out[i] = []machineproviders.MachineInfo{}
+	}
+
+	for _, machineInfo := range machineInfos {
+		out[machineInfo.Index] = append(out[machineInfo.Index], machineInfo)
+	}
+
+	return out, nil
+}
+
+// isControlPlaneMachineSetDegraded determines whether or not the ControlPlaneMachineSet
+// has a true, degraded condition.
+func isControlPlaneMachineSetDegraded(cpms *machinev1.ControlPlaneMachineSet) bool {
+	return false
 }

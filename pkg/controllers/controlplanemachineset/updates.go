@@ -90,17 +90,12 @@ var (
 // reconcileMachineUpdates determines if any Machines are in need of an update and then handles those updates as per the
 // update strategy within the ControlPlaneMachineSet.
 // When a Machine needs an update, this function should create a replacement where appropriate.
-func (r *ControlPlaneMachineSetReconciler) reconcileMachineUpdates(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, machineInfos []machineproviders.MachineInfo) (ctrl.Result, error) {
-	indexedMachineInfos, err := machineInfosByIndex(cpms, machineInfos)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("could not sort machine info by index: %w", err)
-	}
-
+func (r *ControlPlaneMachineSetReconciler) reconcileMachineUpdates(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, machineInfos map[int32][]machineproviders.MachineInfo) (ctrl.Result, error) {
 	switch cpms.Spec.Strategy.Type {
 	case machinev1.RollingUpdate:
-		return r.reconcileMachineRollingUpdate(ctx, logger, cpms, machineProvider, indexedMachineInfos)
+		return r.reconcileMachineRollingUpdate(ctx, logger, cpms, machineProvider, machineInfos)
 	case machinev1.OnDelete:
-		return r.reconcileMachineOnDeleteUpdate(ctx, logger, cpms, machineProvider, indexedMachineInfos)
+		return r.reconcileMachineOnDeleteUpdate(ctx, logger, cpms, machineProvider, machineInfos)
 	case machinev1.Recreate:
 		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
 			Type:    conditionDegraded,
@@ -156,27 +151,4 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineRollingUpdate(ctx con
 // to create a new Machine to fulfil the requirement of that index.
 func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, indexedMachineInfos map[int32][]machineproviders.MachineInfo) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
-}
-
-// machineInfosByIndex groups MachineInfo entries by index inside a map of index to MachineInfo.
-// This allows the update strategies to process each index in turn.
-// It is expected to add an entry for each expected index (0-(replicas-1)) so that later logic of updates can process
-// indexes that do not have any associated Machines.
-func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []machineproviders.MachineInfo) (map[int32][]machineproviders.MachineInfo, error) {
-	out := make(map[int32][]machineproviders.MachineInfo)
-
-	if cpms.Spec.Replicas == nil {
-		return nil, errReplicasRequired
-	}
-
-	// Make sure that every expected index is accounted for.
-	for i := int32(0); i < *cpms.Spec.Replicas; i++ {
-		out[i] = []machineproviders.MachineInfo{}
-	}
-
-	for _, machineInfo := range machineInfos {
-		out[machineInfo.Index] = append(out[machineInfo.Index], machineInfo)
-	}
-
-	return out, nil
 }

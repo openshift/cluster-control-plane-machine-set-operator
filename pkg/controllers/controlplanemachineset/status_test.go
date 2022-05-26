@@ -17,8 +17,6 @@ limitations under the License.
 package controlplanemachineset
 
 import (
-	"errors"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -148,7 +146,7 @@ var _ = Describe("Status", func() {
 	Context("reconcileStatusWithMachineInfo", func() {
 		type reconcileStatusTableInput struct {
 			cpms           *machinev1.ControlPlaneMachineSet
-			machineInfos   []machineproviders.MachineInfo
+			machineInfos   map[int32][]machineproviders.MachineInfo
 			expectedError  error
 			expectedStatus machinev1.ControlPlaneMachineSetStatus
 			expectedLogs   []test.LogEntry
@@ -165,11 +163,6 @@ var _ = Describe("Status", func() {
 
 		pendingMachineBuilder := resourcebuilder.MachineInfo().
 			WithMachineGVR(machineGVR).
-			WithReady(false).
-			WithNeedsUpdate(false)
-
-		missingMachineBuilder := resourcebuilder.MachineInfo().
-			WithNodeGVR(nodeGVR).
 			WithReady(false).
 			WithNeedsUpdate(false)
 
@@ -200,10 +193,10 @@ var _ = Describe("Status", func() {
 		},
 			PEntry("with up to date Machines", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(1).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
-					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
@@ -249,10 +242,10 @@ var _ = Describe("Status", func() {
 			}),
 			PEntry("when Machines need updates", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(2).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
-					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build()},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
@@ -299,12 +292,16 @@ var _ = Describe("Status", func() {
 			}),
 			PEntry("with pending replacement replicas", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(3).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
-					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build(),
-					pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
-					pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {
+						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+						pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
+					},
+					2: {
+						healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build(),
+						pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
+					},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
@@ -351,12 +348,16 @@ var _ = Describe("Status", func() {
 			}),
 			PEntry("with ready replacement replicas", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(4).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
-					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
-					healthyMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").WithNodeName("node-replacement-2").Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {
+						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+					},
+					2: {
+						healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build(),
+						healthyMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").WithNodeName("node-replacement-2").Build(),
+					},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
@@ -401,14 +402,14 @@ var _ = Describe("Status", func() {
 					},
 				},
 			}),
-			PEntry("with no managed Nodes", &reconcileStatusTableInput{
+			PEntry("with no MachineInfos", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(5).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					missingMachineBuilder.WithIndex(0).WithNodeName("node-0").Build(),
-					missingMachineBuilder.WithIndex(1).WithNodeName("node-1").Build(),
-					missingMachineBuilder.WithIndex(2).WithNodeName("node-2").Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {},
+					1: {},
+					2: {},
 				},
-				expectedError: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-0, node-1, node-2"),
+				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -420,16 +421,16 @@ var _ = Describe("Status", func() {
 						},
 						{
 							Type:               conditionDegraded,
-							Status:             metav1.ConditionTrue,
-							Reason:             reasonUnmanagedNodes,
+							Status:             metav1.ConditionFalse,
+							Reason:             reasonAsExpected,
 							ObservedGeneration: 5,
-							Message:            "Found 3 unmanaged node(s)",
 						},
 						{
 							Type:               conditionProgressing,
-							Status:             metav1.ConditionFalse,
-							Reason:             reasonOperatorDegraded,
+							Status:             metav1.ConditionTrue,
+							Reason:             reasonNeedsUpdateReplicas,
 							ObservedGeneration: 5,
+							Message:            "Observed 3 replica(s) in need of update",
 						},
 					},
 					ObservedGeneration:  5,
@@ -440,67 +441,24 @@ var _ = Describe("Status", func() {
 				},
 				expectedLogs: []test.LogEntry{
 					{
-						Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-0, node-1, node-2"),
+						Level: 4,
 						KeysAndValues: []interface{}{
-							"unmanagedNodes", "node-0,node-1,node-2",
+							"observedGeneration", "5",
+							"replicas", "0",
+							"readyReplicas", "0",
+							"updatedReplicas", "0",
+							"unavailableReplicas", "3",
 						},
-						Message: "Observed unmanaged control plane nodes",
-					},
-				},
-			}),
-			PEntry("with an unmanaged Node", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(6).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
-					missingMachineBuilder.WithIndex(2).WithNodeName("node-2").Build(),
-				},
-				expectedError: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-2"),
-				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:               conditionAvailable,
-							Status:             metav1.ConditionFalse,
-							Reason:             reasonUnavailableReplicas,
-							ObservedGeneration: 6,
-							Message:            "Missing 1 available replica(s)",
-						},
-						{
-							Type:               conditionDegraded,
-							Status:             metav1.ConditionTrue,
-							Reason:             reasonUnmanagedNodes,
-							ObservedGeneration: 6,
-							Message:            "Found 1 unmanaged node(s)",
-						},
-						{
-							Type:               conditionProgressing,
-							Status:             metav1.ConditionFalse,
-							Reason:             reasonOperatorDegraded,
-							ObservedGeneration: 6,
-						},
-					},
-					ObservedGeneration:  6,
-					Replicas:            2,
-					ReadyReplicas:       2,
-					UpdatedReplicas:     2,
-					UnavailableReplicas: 1,
-				},
-				expectedLogs: []test.LogEntry{
-					{
-						Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: node-2"),
-						KeysAndValues: []interface{}{
-							"unmanagedNodes", "node-2",
-						},
-						Message: "Observed unmanaged control plane nodes",
+						Message: "Observed Machine Configuration",
 					},
 				},
 			}),
 			PEntry("with an unhealthy Machine", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(7).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
-					missingNodeBuilder.WithIndex(2).WithMachineName("machine-2").Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {missingNodeBuilder.WithIndex(2).WithMachineName("machine-2").Build()},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
@@ -548,12 +506,16 @@ var _ = Describe("Status", func() {
 			}),
 			PEntry("with an unhealthy index (failure domain)", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(8).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
-					missingNodeBuilder.WithIndex(2).WithMachineName("machine-2").WithNeedsUpdate(true).Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
-					missingNodeBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {
+						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+					},
+					2: {
+						missingNodeBuilder.WithIndex(2).WithMachineName("machine-2").WithNeedsUpdate(true).Build(),
+						missingNodeBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build(),
+					},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
@@ -599,12 +561,12 @@ var _ = Describe("Status", func() {
 					},
 				},
 			}),
-			PEntry("with a missing index", &reconcileStatusTableInput{
+			PEntry("with an empty index", &reconcileStatusTableInput{
 				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(9).Build(),
-				machineInfos: []machineproviders.MachineInfo{
-					healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
-					healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
-					resourcebuilder.MachineInfo().WithIndex(2).Build(),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {},
 				},
 				expectedError: nil,
 				expectedStatus: machinev1.ControlPlaneMachineSetStatus{
