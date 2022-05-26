@@ -12,6 +12,7 @@ require (
 	k8s.io/api v0.23.5
 	k8s.io/apimachinery v0.23.5
 	k8s.io/client-go v0.23.4
+	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/controller-runtime v0.11.1-0.20220304125252-9ee63fc65a97
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220222144948-ce8bdd3d81ab
 	sigs.k8s.io/controller-tools v0.8.0
@@ -211,6 +212,5 @@ require (
 	github.com/openshift/library-go v0.0.0-20220419144511-5b7d3d77b85e
 	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
-	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 )
