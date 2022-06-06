@@ -17,8 +17,13 @@ limitations under the License.
 package providerconfig
 
 import (
+	"encoding/json"
+	"fmt"
+
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -32,13 +37,23 @@ type AWSProviderConfig struct {
 // InjectFailureDomain returns a new AWSProviderConfig configured with the failure domain
 // information provided.
 func (a AWSProviderConfig) InjectFailureDomain(fd machinev1.AWSFailureDomain) AWSProviderConfig {
-	return a
+	newAWSProviderConfig := a
+
+	newAWSProviderConfig.providerConfig.Placement.AvailabilityZone = fd.Placement.AvailabilityZone
+	newAWSProviderConfig.providerConfig.Subnet = failuredomain.ConvertAWSResourceReferenceToBeta1(fd.Subnet)
+
+	return newAWSProviderConfig
 }
 
 // ExtractFailureDomain returns an AWSFailureDomain based on the failure domain
 // information stored within the AWSProviderConfig.
 func (a AWSProviderConfig) ExtractFailureDomain() machinev1.AWSFailureDomain {
-	return machinev1.AWSFailureDomain{}
+	return machinev1.AWSFailureDomain{
+		Placement: machinev1.AWSFailureDomainPlacement{
+			AvailabilityZone: a.providerConfig.Placement.AvailabilityZone,
+		},
+		Subnet: failuredomain.ConvertAWSResourceReferenceToV1(a.providerConfig.Subnet),
+	}
 }
 
 // Config returns the stored AWSMachineProviderConfig.
@@ -46,11 +61,23 @@ func (a AWSProviderConfig) Config() machinev1beta1.AWSMachineProviderConfig {
 	return a.providerConfig
 }
 
-// newAWSProviderConfig creates an AWSProviderConfig from the raw extension.
+// newAWSProviderConfig creates an AWS type ProviderConfig from the raw extension.
 // It should return an error if the provided RawExtension does not represent
 // an AWSMachineProviderConfig.
 func newAWSProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
-	// TODO: replace this with actual logic to create the provider config from the raw extension.
-	// This is here as a dummy to keep the linter happy.
-	return providerConfig{}, nil
+	awsMachineProviderConfig := machinev1beta1.AWSMachineProviderConfig{}
+	if err := json.Unmarshal(raw.Raw, &awsMachineProviderConfig); err != nil {
+		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+	}
+
+	awsProviderConfig := AWSProviderConfig{
+		providerConfig: awsMachineProviderConfig,
+	}
+
+	config := providerConfig{
+		platformType: configv1.AWSPlatformType,
+		aws:          awsProviderConfig,
+	}
+
+	return config, nil
 }

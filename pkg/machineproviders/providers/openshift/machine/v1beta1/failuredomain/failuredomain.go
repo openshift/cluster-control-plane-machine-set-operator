@@ -271,7 +271,7 @@ func newFailureDomainFromProviderSpecAWS(rawProviderSpec *runtime.RawExtension) 
 		Placement: machinev1.AWSFailureDomainPlacement{
 			AvailabilityZone: providerSpec.Placement.AvailabilityZone,
 		},
-		Subnet: convertAWSResourceReference(providerSpec.Subnet),
+		Subnet: ConvertAWSResourceReferenceToV1(providerSpec.Subnet),
 	}
 
 	return NewAWSFailureDomain(awsFailureDomain), nil
@@ -307,8 +307,8 @@ func newFailureDomainFromProviderSpecOpenStack(rawProviderSpec *runtime.RawExten
 	return NewOpenStackFailureDomain(openStackFailureDomain), nil
 }
 
-// convertAWSResourceReference creates machinev1.awsResourceReference from machinev1beta1.awsResourceReference.
-func convertAWSResourceReference(subnet machinev1beta1.AWSResourceReference) *machinev1.AWSResourceReference {
+// ConvertAWSResourceReferenceToV1 creates machinev1.awsResourceReference from machinev1beta1.awsResourceReference.
+func ConvertAWSResourceReferenceToV1(subnet machinev1beta1.AWSResourceReference) *machinev1.AWSResourceReference {
 	subnetv1 := &machinev1.AWSResourceReference{}
 
 	if subnet.ID != nil {
@@ -339,7 +339,42 @@ func convertAWSResourceReference(subnet machinev1beta1.AWSResourceReference) *ma
 		return subnetv1
 	}
 
-	return subnetv1
+	return nil
+}
+
+// ConvertAWSResourceReferenceToBeta1 creates machinev1beta1.awsResourceReference from machinev1.awsResourceReference.
+func ConvertAWSResourceReferenceToBeta1(subnet *machinev1.AWSResourceReference) machinev1beta1.AWSResourceReference {
+	subnetv1beta1 := machinev1beta1.AWSResourceReference{}
+
+	if subnet == nil {
+		return machinev1beta1.AWSResourceReference{}
+	}
+
+	if subnet.ID != nil {
+		subnetv1beta1.ID = subnet.ID
+
+		return subnetv1beta1
+	}
+
+	if subnet.Filters != nil {
+		subnetv1beta1.Filters = []machinev1beta1.Filter{}
+		for _, filter := range *subnet.Filters {
+			subnetv1beta1.Filters = append(subnetv1beta1.Filters, machinev1beta1.Filter{
+				Name:   filter.Name,
+				Values: filter.Values,
+			})
+		}
+
+		return subnetv1beta1
+	}
+
+	if subnet.ARN != nil {
+		subnetv1beta1.ARN = subnet.ARN
+
+		return subnetv1beta1
+	}
+
+	return subnetv1beta1
 }
 
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
