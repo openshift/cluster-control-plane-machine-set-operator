@@ -89,6 +89,8 @@ func (f failureDomain) String() string {
 		return awsFailureDomainToString(f.aws)
 	case configv1.AzurePlatformType:
 		return azureFailureDomainToString(f.azure)
+	case configv1.GCPPlatformType:
+		return gcpFailureDomainToString(f.gcp)
 	default:
 		return unknownFailureDomain
 	}
@@ -457,6 +459,15 @@ func awsFailureDomainToString(fd machinev1.AWSFailureDomain) string {
 func azureFailureDomainToString(fd machinev1.AzureFailureDomain) string {
 	if fd.Zone != "" {
 		return fmt.Sprintf("AzureFailureDomain{Zone:%s}", fd.Zone)
+	}
+
+	return unknownFailureDomain
+}
+
+// gcpFailureDomainToString converts the GCPFailureDomain into a string.
+func gcpFailureDomainToString(fd machinev1.GCPFailureDomain) string {
+	if fd.Zone != "" {
+		return fmt.Sprintf("GCPFailureDomain{Zone:%s}", fd.Zone)
 	}
 
 	return unknownFailureDomain

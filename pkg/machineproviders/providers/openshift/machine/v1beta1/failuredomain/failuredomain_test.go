@@ -131,6 +131,49 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With GCP failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := resourcebuilder.GCPFailureDomains().BuildFailureDomains()
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "GCPFailureDomain{Zone:us-central1-a}"),
+					HaveField("String()", "GCPFailureDomain{Zone:us-central1-b}"),
+					HaveField("String()", "GCPFailureDomain{Zone:us-central1-c}"),
+				))
+			})
+		})
+
+		Context("With invalid GCP failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := resourcebuilder.GCPFailureDomains().BuildFailureDomains()
+				config.GCP = nil
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("returns an error", func() {
+				Expect(err).To(MatchError("missing failure domain configuration"))
+			})
+
+			It("returns an empty list of failure domains", func() {
+				Expect(failureDomains).To(BeEmpty())
+			})
+		})
+
 		Context("With an unsupported platform type", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -242,6 +285,53 @@ var _ = Describe("FailureDomains", func() {
 						HaveField("String()", "AzureFailureDomain{Zone:1}"),
 						HaveField("String()", "AzureFailureDomain{Zone:2}"),
 						HaveField("String()", "AzureFailureDomain{Zone:3}"),
+					))
+				})
+			})
+		})
+
+		Context("On GCP", func() {
+
+			Context("With zero GCP machines", func() {
+				var failureDomains []FailureDomain
+				var err error
+
+				BeforeEach(func() {
+					failureDomains, err = NewFailureDomainsFromMachines([]machinev1beta1.Machine{}, configv1.GCPPlatformType)
+				})
+
+				It("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should return a empty list", func() {
+					Expect(failureDomains).To(BeEmpty())
+				})
+			})
+
+			Context("With GCP machines", func() {
+				var failureDomains []FailureDomain
+				var err error
+
+				BeforeEach(func() {
+					providerSpec := resourcebuilder.GCPProviderSpec()
+					machines := []machinev1beta1.Machine{}
+					for _, az := range []string{"us-central1-a", "us-central1-b", "us-central1-c"} {
+						ps := providerSpec.WithZone(az)
+						machines = append(machines, *resourcebuilder.Machine().WithProviderSpecBuilder(ps).Build())
+					}
+					failureDomains, err = NewFailureDomainsFromMachines(machines, configv1.GCPPlatformType)
+				})
+
+				It("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should construct a list of failure domains", func() {
+					Expect(failureDomains).To(ConsistOf(
+						HaveField("String()", "GCPFailureDomain{Zone:us-central1-a}"),
+						HaveField("String()", "GCPFailureDomain{Zone:us-central1-b}"),
+						HaveField("String()", "GCPFailureDomain{Zone:us-central1-c}"),
 					))
 				})
 			})
@@ -435,6 +525,40 @@ var _ = Describe("FailureDomains", func() {
 				fd2 = failureDomain{
 					platformType: configv1.AzurePlatformType,
 					azure:        resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(fd2)).To(BeFalse())
+			})
+		})
+
+		Context("With two identical GCP failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.GCPPlatformType,
+					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.GCPPlatformType,
+					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+				}
+			})
+
+			It("returns true", func() {
+				Expect(fd1.Equal(fd2)).To(BeTrue())
+			})
+		})
+
+		Context("With two different Azure failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.GCPPlatformType,
+					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.GCPPlatformType,
+					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
 				}
 			})
 
