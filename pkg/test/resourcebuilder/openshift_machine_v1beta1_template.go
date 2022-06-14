@@ -24,7 +24,6 @@ import (
 // OpenShiftMachineV1Beta1Template creates a new OpenShift machine template builder.
 func OpenShiftMachineV1Beta1Template() OpenShiftMachineV1Beta1TemplateBuilder {
 	return OpenShiftMachineV1Beta1TemplateBuilder{
-		failureDomainsBuilder: AWSFailureDomains(),
 		labels: map[string]string{
 			machineRoleLabelName:                 "master",
 			machineTypeLabelName:                 "master",
