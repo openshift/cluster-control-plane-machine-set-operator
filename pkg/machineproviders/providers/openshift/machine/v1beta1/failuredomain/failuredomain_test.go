@@ -88,6 +88,49 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With Azure failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := resourcebuilder.AzureFailureDomains().BuildFailureDomains()
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "AzureFailureDomain{Zone:1}"),
+					HaveField("String()", "AzureFailureDomain{Zone:2}"),
+					HaveField("String()", "AzureFailureDomain{Zone:3}"),
+				))
+			})
+		})
+
+		Context("With invalid Azure failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := resourcebuilder.AzureFailureDomains().BuildFailureDomains()
+				config.Azure = nil
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("returns an error", func() {
+				Expect(err).To(MatchError("missing failure domain configuration"))
+			})
+
+			It("returns an empty list of failure domains", func() {
+				Expect(failureDomains).To(BeEmpty())
+			})
+		})
+
 		Context("With an unsupported platform type", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -111,47 +154,96 @@ var _ = Describe("FailureDomains", func() {
 	})
 
 	Context("NewFailureDomainsFromMachines", func() {
-		Context("With zero AWS machines", func() {
-			var failureDomains []FailureDomain
-			var err error
+		Context("On AWS", func() {
+			Context("With zero AWS machines", func() {
+				var failureDomains []FailureDomain
+				var err error
 
-			BeforeEach(func() {
-				failureDomains, err = NewFailureDomainsFromMachines([]machinev1beta1.Machine{}, configv1.AWSPlatformType)
+				BeforeEach(func() {
+					failureDomains, err = NewFailureDomainsFromMachines([]machinev1beta1.Machine{}, configv1.AWSPlatformType)
+				})
+
+				It("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should return a empty list", func() {
+					Expect(failureDomains).To(BeEmpty())
+				})
 			})
 
-			It("should not error", func() {
-				Expect(err).ToNot(HaveOccurred())
-			})
+			Context("With AWS machines", func() {
+				var failureDomains []FailureDomain
+				var err error
 
-			It("should return a empty list", func() {
-				Expect(failureDomains).To(BeEmpty())
+				BeforeEach(func() {
+					providerSpec := resourcebuilder.AWSProviderSpec()
+					machines := []machinev1beta1.Machine{}
+					for _, az := range []string{"us-east-1a", "us-east-1b", "us-east-1c"} {
+						ps := providerSpec.WithAvailabilityZone(az)
+						machines = append(machines, *resourcebuilder.Machine().WithProviderSpecBuilder(ps).Build())
+					}
+					failureDomains, err = NewFailureDomainsFromMachines(machines, configv1.AWSPlatformType)
+				})
+
+				It("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should construct a list of failure domains", func() {
+					Expect(failureDomains).To(ConsistOf(
+						HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+						HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+						HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					))
+				})
 			})
 		})
 
-		Context("With AWS machines", func() {
-			var failureDomains []FailureDomain
-			var err error
+		Context("On Azure", func() {
 
-			BeforeEach(func() {
-				providerSpec := resourcebuilder.AWSProviderSpec()
-				machines := []machinev1beta1.Machine{}
-				for _, az := range []string{"us-east-1a", "us-east-1b", "us-east-1c"} {
-					ps := providerSpec.WithAvailabilityZone(az)
-					machines = append(machines, *resourcebuilder.Machine().WithProviderSpecBuilder(ps).Build())
-				}
-				failureDomains, err = NewFailureDomainsFromMachines(machines, configv1.AWSPlatformType)
+			Context("With zero Azure machines", func() {
+				var failureDomains []FailureDomain
+				var err error
+
+				BeforeEach(func() {
+					failureDomains, err = NewFailureDomainsFromMachines([]machinev1beta1.Machine{}, configv1.AzurePlatformType)
+				})
+
+				It("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should return a empty list", func() {
+					Expect(failureDomains).To(BeEmpty())
+				})
 			})
 
-			It("should not error", func() {
-				Expect(err).ToNot(HaveOccurred())
-			})
+			Context("With Azure machines", func() {
+				var failureDomains []FailureDomain
+				var err error
 
-			It("should construct a list of failure domains", func() {
-				Expect(failureDomains).To(ConsistOf(
-					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-				))
+				BeforeEach(func() {
+					providerSpec := resourcebuilder.AzureProviderSpec()
+					machines := []machinev1beta1.Machine{}
+					for _, az := range []string{"1", "2", "3"} {
+						ps := providerSpec.WithZone(az)
+						machines = append(machines, *resourcebuilder.Machine().WithProviderSpecBuilder(ps).Build())
+					}
+					failureDomains, err = NewFailureDomainsFromMachines(machines, configv1.AzurePlatformType)
+				})
+
+				It("should not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should construct a list of failure domains", func() {
+					Expect(failureDomains).To(ConsistOf(
+						HaveField("String()", "AzureFailureDomain{Zone:1}"),
+						HaveField("String()", "AzureFailureDomain{Zone:2}"),
+						HaveField("String()", "AzureFailureDomain{Zone:3}"),
+					))
+				})
 			})
 		})
 
@@ -263,5 +355,110 @@ var _ = Describe("FailureDomains", func() {
 				})
 			})
 		})
+	})
+
+	Context("an Azure failure domain", func() {
+		var fd failureDomain
+
+		BeforeEach(func() {
+			fd = failureDomain{
+				platformType: configv1.AzurePlatformType,
+			}
+		})
+
+		Context("with an availability zone", func() {
+			BeforeEach(func() {
+				fd.azure = resourcebuilder.AzureFailureDomain().WithZone("1").Build()
+			})
+
+			It("returns the availability zone for String()", func() {
+				Expect(fd.String()).To(Equal("AzureFailureDomain{Zone:1}"))
+			})
+		})
+
+		Context("with no availability zone", func() {
+			BeforeEach(func() {
+				fd.azure = resourcebuilder.AzureFailureDomain().Build()
+				fd.azure.Zone = ""
+			})
+
+			It("returns <unknown> for String()", func() {
+				Expect(fd.String()).To(Equal("<unknown>"))
+			})
+		})
+	})
+
+	Context("Equal", func() {
+		var fd1 failureDomain
+		var fd2 failureDomain
+
+		Context("With two identical AWS failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.AWSPlatformType,
+					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.AWSPlatformType,
+					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+				}
+			})
+
+			It("returns true", func() {
+				Expect(fd1.Equal(fd2)).To(BeTrue())
+			})
+		})
+
+		Context("With two identical Azure failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.AzurePlatformType,
+					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.AzurePlatformType,
+					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+				}
+			})
+
+			It("returns true", func() {
+				Expect(fd1.Equal(fd2)).To(BeTrue())
+			})
+		})
+
+		Context("With two different Azure failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.AzurePlatformType,
+					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.AzurePlatformType,
+					azure:        resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(fd2)).To(BeFalse())
+			})
+		})
+
+		Context("With different failure domains platform", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.AWSPlatformType,
+					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.AzurePlatformType,
+					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(fd2)).To(BeFalse())
+			})
+		})
+
 	})
 })

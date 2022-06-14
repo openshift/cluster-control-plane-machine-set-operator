@@ -87,6 +87,8 @@ func (f failureDomain) String() string {
 	switch f.platformType {
 	case configv1.AWSPlatformType:
 		return awsFailureDomainToString(f.aws)
+	case configv1.AzurePlatformType:
+		return azureFailureDomainToString(f.azure)
 	default:
 		return unknownFailureDomain
 	}
@@ -448,5 +450,14 @@ func awsFailureDomainToString(fd machinev1.AWSFailureDomain) string {
 
 	// If the previous attempts to find a suitable string do not work,
 	// this should catch the fallthrough.
+	return unknownFailureDomain
+}
+
+// azureFailureDomainToString converts the AzureFailureDomain into a string.
+func azureFailureDomainToString(fd machinev1.AzureFailureDomain) string {
+	if fd.Zone != "" {
+		return fmt.Sprintf("AzureFailureDomain{Zone:%s}", fd.Zone)
+	}
+
 	return unknownFailureDomain
 }
