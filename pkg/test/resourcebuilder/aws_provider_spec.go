@@ -132,7 +132,7 @@ func (m AWSProviderSpecBuilder) WithAvailabilityZone(az string) AWSProviderSpecB
 	return m
 }
 
-// WithInstanceType sets the isntanceType for the AWS machine config builder.
+// WithInstanceType sets the instanceType for the AWS machine config builder.
 func (m AWSProviderSpecBuilder) WithInstanceType(instanceType string) AWSProviderSpecBuilder {
 	m.instanceType = instanceType
 	return m

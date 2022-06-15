@@ -17,15 +17,12 @@ limitations under the License.
 package failuredomain
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -42,9 +39,6 @@ var (
 	// errMissingFailureDomain is an error used when failure domain platform is set
 	// but the failure domain list is nil.
 	errMissingFailureDomain = errors.New("missing failure domain configuration")
-
-	// errMachineMissingProviderSpec is an error when a machine object does not have providerSpec.
-	errMachineMissingProviderSpec = errors.New("machine is missing provider spec")
 )
 
 // FailureDomain is an interface that allows external code to interact with
@@ -217,170 +211,6 @@ func newOpenStackFailureDomains(failureDomains machinev1.FailureDomains) ([]Fail
 	}
 
 	return foundFailureDomains, nil
-}
-
-// NewFailureDomainsFromMachines creates a slice of FailureDomains representing the failure domains of the provided machines.
-func NewFailureDomainsFromMachines(machines []machinev1beta1.Machine, platform configv1.PlatformType) ([]FailureDomain, error) {
-	failureDomains := []FailureDomain{}
-
-	for _, machine := range machines {
-		failureDomain, err := newFailureDomainFromProviderSpec(machine.Spec.ProviderSpec.Value, platform)
-		if err != nil {
-			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
-		}
-
-		failureDomains = append(failureDomains, failureDomain)
-	}
-
-	return failureDomains, nil
-}
-
-// newFailureDomainFromProviderSpec creates a FailureDomain from machine providerSpec.
-func newFailureDomainFromProviderSpec(rawProviderSpec *runtime.RawExtension, platform configv1.PlatformType) (FailureDomain, error) {
-	var (
-		fd  FailureDomain
-		err error
-	)
-
-	if rawProviderSpec == nil {
-		return nil, errMachineMissingProviderSpec
-	}
-
-	switch platform {
-	case configv1.AWSPlatformType:
-		fd, err = newFailureDomainFromProviderSpecAWS(rawProviderSpec)
-	case configv1.AzurePlatformType:
-		fd, err = newFailureDomainFromProviderSpecAzure(rawProviderSpec)
-	case configv1.GCPPlatformType:
-		fd, err = newFailureDomainFromProviderSpecGCP(rawProviderSpec)
-	case configv1.OpenStackPlatformType:
-		fd, err = newFailureDomainFromProviderSpecOpenStack(rawProviderSpec)
-	default:
-		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platform)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error getting failure domain from provider spec: %w", err)
-	}
-
-	return fd, nil
-}
-
-// newFailureDomainFromProviderSpecAWS creates a FailureDomain from AWS providerSpec.
-func newFailureDomainFromProviderSpecAWS(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
-	providerSpec := machinev1beta1.AWSMachineProviderConfig{}
-	if err := json.Unmarshal(rawProviderSpec.Raw, &providerSpec); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
-	}
-
-	awsFailureDomain := machinev1.AWSFailureDomain{
-		Placement: machinev1.AWSFailureDomainPlacement{
-			AvailabilityZone: providerSpec.Placement.AvailabilityZone,
-		},
-		Subnet: ConvertAWSResourceReferenceToV1(providerSpec.Subnet),
-	}
-
-	return NewAWSFailureDomain(awsFailureDomain), nil
-}
-
-// newFailureDomainFromProviderSpecAzure creates a FailureDomain from Azure providerSpec.
-func newFailureDomainFromProviderSpecAzure(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
-	azureFailureDomain := machinev1.AzureFailureDomain{}
-	if err := json.Unmarshal(rawProviderSpec.Raw, &azureFailureDomain); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
-	}
-
-	return NewAzureFailureDomain(azureFailureDomain), nil
-}
-
-// newFailureDomainFromProviderSpecGCP creates a FailureDomain from GCP providerSpec.
-func newFailureDomainFromProviderSpecGCP(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
-	gcpFailureDomain := machinev1.GCPFailureDomain{}
-	if err := json.Unmarshal(rawProviderSpec.Raw, &gcpFailureDomain); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
-	}
-
-	return NewGCPFailureDomain(gcpFailureDomain), nil
-}
-
-// newFailureDomainFromProviderSpecOpenStack creates a FailureDomain from OpenStack providerSpec.
-func newFailureDomainFromProviderSpecOpenStack(rawProviderSpec *runtime.RawExtension) (FailureDomain, error) {
-	openStackFailureDomain := machinev1.OpenStackFailureDomain{}
-	if err := json.Unmarshal(rawProviderSpec.Raw, &openStackFailureDomain); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
-	}
-
-	return NewOpenStackFailureDomain(openStackFailureDomain), nil
-}
-
-// ConvertAWSResourceReferenceToV1 creates machinev1.awsResourceReference from machinev1beta1.awsResourceReference.
-func ConvertAWSResourceReferenceToV1(subnet machinev1beta1.AWSResourceReference) *machinev1.AWSResourceReference {
-	subnetv1 := &machinev1.AWSResourceReference{}
-
-	if subnet.ID != nil {
-		subnetv1.Type = machinev1.AWSIDReferenceType
-		subnetv1.ID = subnet.ID
-
-		return subnetv1
-	}
-
-	if subnet.Filters != nil {
-		subnetv1.Type = machinev1.AWSFiltersReferenceType
-
-		subnetv1.Filters = &[]machinev1.AWSResourceFilter{}
-		for _, filter := range subnet.Filters {
-			*subnetv1.Filters = append(*subnetv1.Filters, machinev1.AWSResourceFilter{
-				Name:   filter.Name,
-				Values: filter.Values,
-			})
-		}
-
-		return subnetv1
-	}
-
-	if subnet.ARN != nil {
-		subnetv1.Type = machinev1.AWSARNReferenceType
-		subnetv1.ARN = subnet.ARN
-
-		return subnetv1
-	}
-
-	return nil
-}
-
-// ConvertAWSResourceReferenceToBeta1 creates machinev1beta1.awsResourceReference from machinev1.awsResourceReference.
-func ConvertAWSResourceReferenceToBeta1(subnet *machinev1.AWSResourceReference) machinev1beta1.AWSResourceReference {
-	subnetv1beta1 := machinev1beta1.AWSResourceReference{}
-
-	if subnet == nil {
-		return machinev1beta1.AWSResourceReference{}
-	}
-
-	if subnet.ID != nil {
-		subnetv1beta1.ID = subnet.ID
-
-		return subnetv1beta1
-	}
-
-	if subnet.Filters != nil {
-		subnetv1beta1.Filters = []machinev1beta1.Filter{}
-		for _, filter := range *subnet.Filters {
-			subnetv1beta1.Filters = append(subnetv1beta1.Filters, machinev1beta1.Filter{
-				Name:   filter.Name,
-				Values: filter.Values,
-			})
-		}
-
-		return subnetv1beta1
-	}
-
-	if subnet.ARN != nil {
-		subnetv1beta1.ARN = subnet.ARN
-
-		return subnetv1beta1
-	}
-
-	return subnetv1beta1
 }
 
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.

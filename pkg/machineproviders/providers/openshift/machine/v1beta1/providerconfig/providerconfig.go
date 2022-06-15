@@ -24,6 +24,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -66,16 +67,30 @@ type ProviderConfig interface {
 	AWS() AWSProviderConfig
 }
 
-// NewProviderConfig creates a new ProviderConfig from the provided machine template.
-func NewProviderConfig(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (ProviderConfig, error) {
-	platformType, err := getPlatformType(tmpl)
+// NewProviderConfigFromMachineTemplate creates a new ProviderConfig from the provided machine template.
+func NewProviderConfigFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (ProviderConfig, error) {
+	platformType, err := getPlatformTypeFromMachineTemplate(tmpl)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine platform type: %w", err)
 	}
 
+	return newProviderConfigFromProviderSpec(tmpl.Spec.ProviderSpec, platformType)
+}
+
+// NewProviderConfigFromMachine creates a new ProviderConfig from the provided machine object.
+func NewProviderConfigFromMachine(machine machinev1beta1.Machine) (ProviderConfig, error) {
+	platformType, err := getPlatformTypeFromProviderSpec(machine.Spec.ProviderSpec)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine platform type: %w", err)
+	}
+
+	return newProviderConfigFromProviderSpec(machine.Spec.ProviderSpec, platformType)
+}
+
+func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType) (ProviderConfig, error) {
 	switch platformType {
 	case configv1.AWSPlatformType:
-		return newAWSProviderConfig(tmpl.Spec.ProviderSpec.Value)
+		return newAWSProviderConfig(providerSpec.Value)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platformType)
 	}
@@ -172,30 +187,53 @@ func getPlatformTypeFromProviderSpecKind(kind string) (configv1.PlatformType, bo
 	return platformType, ok
 }
 
-// getPlatformType extracts the platform type from the Machine template.
+// getPlatformTypeFromMachineTemplate extracts the platform type from the Machine template.
 // This can either be gathered from the platform type within the template failure domains,
 // or if that isn't present, by inspecting the providerSpec kind and inferring from there
 // what the configured platform type is.
-func getPlatformType(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (configv1.PlatformType, error) {
+func getPlatformTypeFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (configv1.PlatformType, error) {
 	platformType := tmpl.FailureDomains.Platform
 	if platformType != "" {
 		return platformType, nil
 	}
 
+	return getPlatformTypeFromProviderSpec(tmpl.Spec.ProviderSpec)
+}
+
+// getPlatformTypeFromProviderSpec determines machine platform from the providerSpec.
+// The providerSpec object's kind field is unmarshalled and the platform type is inferred from it.
+func getPlatformTypeFromProviderSpec(providerSpec machinev1beta1.ProviderSpec) (configv1.PlatformType, error) {
+	var platformType configv1.PlatformType
 	// Simple type for unmarshalling providerSpec kind.
 	type providerSpecKind struct {
 		metav1.TypeMeta `json:",inline"`
 	}
 
-	providerSpec := providerSpecKind{}
-	if err := json.Unmarshal(tmpl.Spec.ProviderSpec.Value.Raw, &providerSpec); err != nil {
+	providerKind := providerSpecKind{}
+	if err := json.Unmarshal(providerSpec.Value.Raw, &providerKind); err != nil {
 		return "", fmt.Errorf("could not unmarshal provider spec: %w", err)
 	}
 
 	var ok bool
-	if platformType, ok = getPlatformTypeFromProviderSpecKind(providerSpec.Kind); !ok {
-		return "", fmt.Errorf("%w: %s", errUnknownProviderConfigType, providerSpec.Kind)
+	if platformType, ok = getPlatformTypeFromProviderSpecKind(providerKind.Kind); !ok {
+		return "", fmt.Errorf("%w: %s", errUnknownProviderConfigType, providerKind.Kind)
 	}
 
 	return platformType, nil
+}
+
+// ExtractFailureDomainsFromMachines creates list of FailureDomains extracted from the provided list of machines.
+func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]failuredomain.FailureDomain, error) {
+	machineFailureDomains := []failuredomain.FailureDomain{}
+
+	for _, machine := range machines {
+		providerconfig, err := NewProviderConfigFromMachine(machine)
+		if err != nil {
+			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
+		}
+
+		machineFailureDomains = append(machineFailureDomains, providerconfig.ExtractFailureDomain())
+	}
+
+	return machineFailureDomains, nil
 }

@@ -121,7 +121,7 @@ var _ = Describe("MachineProvider", func() {
 				BuildTemplate().OpenShiftMachineV1Beta1Machine
 			Expect(template).ToNot(BeNil())
 
-			providerConfig, err := providerconfig.NewProviderConfig(*template)
+			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template)
 			Expect(err).ToNot(HaveOccurred())
 
 			provider := &openshiftMachineProvider{
@@ -865,7 +865,7 @@ var _ = Describe("MachineProvider", func() {
 				BuildTemplate()
 
 			BeforeEach(OncePerOrdered, func() {
-				providerConfig, err := providerconfig.NewProviderConfig(*template.OpenShiftMachineV1Beta1Machine)
+				providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template.OpenShiftMachineV1Beta1Machine)
 				Expect(err).ToNot(HaveOccurred())
 
 				provider = &openshiftMachineProvider{
@@ -927,7 +927,7 @@ var _ = Describe("MachineProvider", func() {
 				BuildTemplate().OpenShiftMachineV1Beta1Machine
 			Expect(template).ToNot(BeNil())
 
-			providerConfig, err := providerconfig.NewProviderConfig(*template)
+			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template)
 			Expect(err).ToNot(HaveOccurred())
 
 			machineProvider = &openshiftMachineProvider{

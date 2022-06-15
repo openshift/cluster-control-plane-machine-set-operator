@@ -68,7 +68,7 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, errEmptyConfig
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfig(*cpms.Spec.Template.OpenShiftMachineV1Beta1Machine)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*cpms.Spec.Template.OpenShiftMachineV1Beta1Machine)
 	if err != nil {
 		return nil, fmt.Errorf("error constructing provider config: %w", err)
 	}

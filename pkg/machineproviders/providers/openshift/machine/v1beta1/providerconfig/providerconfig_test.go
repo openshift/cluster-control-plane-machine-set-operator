@@ -17,6 +17,7 @@ limitations under the License.
 package providerconfig
 
 import (
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -25,12 +26,18 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
+// stringPtr returns a pointer to the string.
+func stringPtr(s string) *string {
+	return &s
+}
+
 var _ = Describe("Provider Config", func() {
-	Context("NewProviderConfig", func() {
+	Context("NewProviderConfigFromMachineTemplate", func() {
 		type providerConfigTableInput struct {
 			failureDomainsBuilder resourcebuilder.OpenShiftMachineV1Beta1FailureDomainsBuilder
 			modifyTemplate        func(tmpl *machinev1.ControlPlaneMachineSetTemplate)
@@ -51,7 +58,7 @@ var _ = Describe("Provider Config", func() {
 				in.modifyTemplate(&tmpl)
 			}
 
-			providerConfig, err := NewProviderConfig(*tmpl.OpenShiftMachineV1Beta1Machine)
+			providerConfig, err := NewProviderConfigFromMachineTemplate(*tmpl.OpenShiftMachineV1Beta1Machine)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return
@@ -132,6 +139,103 @@ var _ = Describe("Provider Config", func() {
 		)
 	})
 
+	Context("NewProviderConfigFromMachine", func() {
+		type providerConfigTableInput struct {
+			modifyMachine         func(tmpl *machinev1beta1.Machine)
+			providerSpecBuilder   resourcebuilder.RawExtensionBuilder
+			providerConfigMatcher types.GomegaMatcher
+			expectedPlatformType  configv1.PlatformType
+			expectedError         error
+		}
+
+		DescribeTable("should extract the config", func(in providerConfigTableInput) {
+			machine := resourcebuilder.Machine().WithProviderSpecBuilder(in.providerSpecBuilder).Build()
+
+			if in.modifyMachine != nil {
+				in.modifyMachine(machine)
+			}
+
+			providerConfig, err := NewProviderConfigFromMachine(*machine)
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+				return
+			}
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(providerConfig.Type()).To(Equal(in.expectedPlatformType))
+			Expect(providerConfig).To(in.providerConfigMatcher)
+		},
+			Entry("with an invalid platform type", providerConfigTableInput{
+				modifyMachine: func(in *machinev1beta1.Machine) {
+					var awsProviderConfig machinev1beta1.AWSMachineProviderConfig
+					err := json.Unmarshal(in.Spec.ProviderSpec.Value.Raw, &awsProviderConfig)
+					Expect(err).To(BeNil())
+
+					awsProviderConfig.TypeMeta.Kind = "InvalidProviderSpecKind"
+					in.Spec.ProviderSpec.Value.Raw, err = json.Marshal(awsProviderConfig)
+					Expect(err).To(BeNil())
+				},
+				providerSpecBuilder: resourcebuilder.AWSProviderSpec(),
+				expectedError:       fmt.Errorf("could not determine platform type: %w", fmt.Errorf("%w: %s", errUnknownProviderConfigType, "InvalidProviderSpecKind")),
+			}),
+			Entry("with an AWS config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.AWSPlatformType,
+				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
+				providerConfigMatcher: HaveField("AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
+			}),
+		)
+	})
+
+	Context("ExtractFailureDomainsFromMachines", func() {
+
+		type extractFailureDomainsFromMachinesTableInput struct {
+			machines               []machinev1beta1.Machine
+			expectedError          error
+			expectedFailureDomains []failuredomain.FailureDomain
+		}
+
+		awsSubnet := machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name: "tag:Name",
+					Values: []string{
+						"aws-subnet-12345678",
+					},
+				},
+			},
+		}
+
+		DescribeTable("should correctly extract the failure domains", func(in extractFailureDomainsFromMachinesTableInput) {
+			failureDomains, err := ExtractFailureDomainsFromMachines(in.machines)
+
+			if in.expectedError != nil {
+				Expect(err).To(Equal(MatchError(in.expectedError)))
+			}
+
+			Expect(failureDomains).To(Equal(in.expectedFailureDomains))
+		},
+			Entry("when there are no machines", extractFailureDomainsFromMachinesTableInput{
+				machines:               []machinev1beta1.Machine{},
+				expectedError:          nil,
+				expectedFailureDomains: []failuredomain.FailureDomain{},
+			}),
+			Entry("with machines", extractFailureDomainsFromMachinesTableInput{
+				machines: []machinev1beta1.Machine{
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
+				},
+				expectedError: nil,
+				expectedFailureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
+				},
+			}),
+		)
+
+	})
 	Context("ExtractFailureDomain", func() {
 		type extractFailureDomainTableInput struct {
 			providerConfig        ProviderConfig
@@ -154,7 +258,7 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").WithSubnet(failuredomain.ConvertAWSResourceReferenceToBeta1(&filterSubnet)).Build(),
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").WithSubnet(convertAWSResourceReferenceV1ToV1Beta1(&filterSubnet)).Build(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAWSFailureDomain(
@@ -165,7 +269,7 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").WithSubnet(failuredomain.ConvertAWSResourceReferenceToBeta1(&filterSubnet)).Build(),
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").WithSubnet(convertAWSResourceReferenceV1ToV1Beta1(&filterSubnet)).Build(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAWSFailureDomain(
@@ -265,5 +369,92 @@ var _ = Describe("Provider Config", func() {
 				expectedOut: resourcebuilder.AWSProviderSpec().BuildRawExtension().Raw,
 			}),
 		)
+	})
+
+	Context("ConvertAWSResourceReference", func() {
+		type convertAWSResourceReferenceInput struct {
+			awsResourceV1    *machinev1.AWSResourceReference
+			awsResourceBeta1 machinev1beta1.AWSResourceReference
+		}
+
+		idInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{
+				ID: stringPtr("test-id"),
+			},
+			awsResourceV1: &machinev1.AWSResourceReference{
+				Type: machinev1.AWSIDReferenceType,
+				ID:   stringPtr("test-id"),
+			},
+		}
+
+		arnInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{
+				ARN: stringPtr("test-arn"),
+			},
+			awsResourceV1: &machinev1.AWSResourceReference{
+				Type: machinev1.AWSARNReferenceType,
+				ARN:  stringPtr("test-arn"),
+			},
+		}
+
+		filterInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{
+				Filters: []machinev1beta1.Filter{{
+					Name:   "tag:Name",
+					Values: []string{"aws-subnet-12345678"},
+				}},
+			},
+			awsResourceV1: &machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{{
+					Name:   "tag:Name",
+					Values: []string{"aws-subnet-12345678"},
+				}},
+			},
+		}
+
+		nilInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{},
+			awsResourceV1:    nil,
+		}
+
+		DescribeTable("converts correctly to V1", func(in convertAWSResourceReferenceInput) {
+			Expect(in.awsResourceV1).To(Equal(convertAWSResourceReferenceV1Beta1ToV1(in.awsResourceBeta1)))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+		DescribeTable("converts correctly to Beta1", func(in convertAWSResourceReferenceInput) {
+			Expect(in.awsResourceBeta1).To(Equal(convertAWSResourceReferenceV1ToV1Beta1(in.awsResourceV1)))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+		DescribeTable("is the same after back and forth conversion - V1", func(in convertAWSResourceReferenceInput) {
+			converted := convertAWSResourceReferenceV1Beta1ToV1(convertAWSResourceReferenceV1ToV1Beta1(in.awsResourceV1))
+			Expect(in.awsResourceV1).To(Equal(converted))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+		DescribeTable("is the same after back and forth conversion - Beta1", func(in convertAWSResourceReferenceInput) {
+			converted := convertAWSResourceReferenceV1ToV1Beta1(convertAWSResourceReferenceV1Beta1ToV1(in.awsResourceBeta1))
+			Expect(in.awsResourceBeta1).To(Equal(converted))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
 	})
 })

@@ -25,6 +25,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -231,7 +232,7 @@ func checkFailureDomains(cpms *machinev1.ControlPlaneMachineSet, controlPlaneMac
 		return nil
 	}
 
-	machineFailureDomains, err := failuredomain.NewFailureDomainsFromMachines(controlPlaneMachines, cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform)
+	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(controlPlaneMachines)
 	if err != nil {
 		return append(errs, field.InternalError(machineTemplatePath.Child("failureDomains", "platform"),
 			fmt.Errorf("could not get failure domains from cluster machines on platform %s: %w", cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform, err)))
