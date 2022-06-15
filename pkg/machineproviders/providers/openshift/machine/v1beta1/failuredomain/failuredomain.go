@@ -91,6 +91,8 @@ func (f failureDomain) String() string {
 		return azureFailureDomainToString(f.azure)
 	case configv1.GCPPlatformType:
 		return gcpFailureDomainToString(f.gcp)
+	case configv1.OpenStackPlatformType:
+		return openStackFailureDomainToString(f.openStack)
 	default:
 		return unknownFailureDomain
 	}
@@ -468,6 +470,15 @@ func azureFailureDomainToString(fd machinev1.AzureFailureDomain) string {
 func gcpFailureDomainToString(fd machinev1.GCPFailureDomain) string {
 	if fd.Zone != "" {
 		return fmt.Sprintf("GCPFailureDomain{Zone:%s}", fd.Zone)
+	}
+
+	return unknownFailureDomain
+}
+
+// openStackFailureDomainToString converts the OpenStackFailureDomain into a string.
+func openStackFailureDomainToString(fd machinev1.OpenStackFailureDomain) string {
+	if fd.AvailabilityZone != "" {
+		return fmt.Sprintf("OpenStackFailureDomain{AvailabilityZone:%s}", fd.AvailabilityZone)
 	}
 
 	return unknownFailureDomain
