@@ -220,6 +220,6 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/openshift/library-go v0.0.0-20220419144511-5b7d3d77b85e
 	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
-	k8s.io/klog/v2 v2.60.1 // indirect
+	k8s.io/klog/v2 v2.60.1
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 )

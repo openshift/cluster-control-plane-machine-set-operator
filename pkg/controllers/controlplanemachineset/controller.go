@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -81,6 +82,12 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 			handler.EnqueueRequestsFromMapFunc(clusterOperatorToControlPlaneMachineSet(r.Namespace)),
 			builder.WithPredicates(filterClusterOperator(r.OperatorName)),
 		).
+		// Override the default log constructor as it makes the logs very chatty.
+		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
+			return mgr.GetLogger().WithValues(
+				"controller", "controlplanemachineset",
+			)
+		}).
 		Complete(r); err != nil {
 		return fmt.Errorf("could not set up controller for control plane machine set: %w", err)
 	}
