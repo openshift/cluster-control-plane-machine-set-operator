@@ -35,6 +35,9 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
+        ports:
+        - name: https
+          containerPort: 9443
         resources:
           requests:
             cpu: 10m
@@ -53,4 +56,4 @@ spec:
       - name: control-plane-machine-set-operator-tls
         secret:
           defaultMode: 420
-          secretName: machine-api-operator-tls
+          secretName: control-plane-machine-set-operator-tls
