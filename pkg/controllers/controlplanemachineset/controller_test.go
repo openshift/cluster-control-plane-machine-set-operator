@@ -65,6 +65,7 @@ var _ = Describe("With a running controller", func() {
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		reconciler := &ControlPlaneMachineSetReconciler{
+			Client:       mgr.GetClient(),
 			Namespace:    namespaceName,
 			OperatorName: operatorName,
 		}

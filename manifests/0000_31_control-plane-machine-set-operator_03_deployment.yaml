@@ -27,6 +27,8 @@ spec:
         image: quay.io/origin/origin-control-plane-machine-set-operator
         command:
         - "/manager"
+        args:
+        - "-v=2"
         env:
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
@@ -35,6 +37,9 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
+        ports:
+        - name: https
+          containerPort: 9443
         resources:
           requests:
             cpu: 10m
@@ -53,4 +58,4 @@ spec:
       - name: control-plane-machine-set-operator-tls
         secret:
           defaultMode: 420
-          secretName: machine-api-operator-tls
+          secretName: control-plane-machine-set-operator-tls

@@ -133,10 +133,10 @@ func (r *ControlPlaneMachineSetReconciler) patchClusterOperatorConditions(ctx co
 
 	logger.V(4).Info(
 		"Syncing cluster operator status",
-		"available", string(v1helpers.FindStatusCondition(conds, configv1.OperatorAvailable).Status),
-		"progressing", string(v1helpers.FindStatusCondition(conds, configv1.OperatorProgressing).Status),
-		"degraded", string(v1helpers.FindStatusCondition(conds, configv1.OperatorDegraded).Status),
-		"upgradable", string(v1helpers.FindStatusCondition(conds, configv1.OperatorUpgradeable).Status),
+		"available", getStatusForConditionType(co.Status.Conditions, configv1.OperatorAvailable),
+		"progressing", getStatusForConditionType(co.Status.Conditions, configv1.OperatorProgressing),
+		"degraded", getStatusForConditionType(co.Status.Conditions, configv1.OperatorDegraded),
+		"upgradable", getStatusForConditionType(co.Status.Conditions, configv1.OperatorUpgradeable),
 	)
 
 	return nil
@@ -151,4 +151,14 @@ func isStatusConditionPresentAndEqual(conditions []configv1.ClusterOperatorStatu
 	}
 
 	return false
+}
+
+// getStatusForConditionType returns as a string the status of the condition of the given type if present.
+// If no condition of that type exists, it returns unknown for the status.
+func getStatusForConditionType(conds []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) string {
+	if status := v1helpers.FindStatusCondition(conds, conditionType); status != nil {
+		return string(status.Status)
+	}
+
+	return string(configv1.ConditionUnknown)
 }
