@@ -79,7 +79,7 @@ var _ = Describe("AWS Provider Config", func() {
 	})
 
 	Context("ExtractFailureDomain", func() {
-		PIt("returns the configured failure domain", func() {
+		It("returns the configured failure domain", func() {
 			expected := resourcebuilder.AWSFailureDomain().
 				WithAvailabilityZone(azUSEast1a).
 				WithSubnet(machinev1SubnetUSEast1a).
@@ -101,16 +101,16 @@ var _ = Describe("AWS Provider Config", func() {
 			changedProviderConfig = providerConfig.InjectFailureDomain(changedFailureDomain)
 		})
 
-		PIt("stores the new subnet in the provider config", func() {
+		It("stores the new subnet in the provider config", func() {
 			Expect(changedProviderConfig.Config().Subnet).To(Equal(machinev1beta1SubnetUSEast1b))
 		})
 
-		PIt("does not modify the original provider config", func() {
+		It("does not modify the original provider config", func() {
 			Expect(providerConfig.Config().Subnet).To(Equal(machinev1beta1SubnetUSEast1a))
 		})
 
 		Context("ExtractFailureDomain", func() {
-			PIt("returns the changed failure domain from the changed config", func() {
+			It("returns the changed failure domain from the changed config", func() {
 				expected := resourcebuilder.AWSFailureDomain().
 					WithAvailabilityZone(azUSEast1b).
 					WithSubnet(machinev1SubnetUSEast1b).
@@ -119,10 +119,10 @@ var _ = Describe("AWS Provider Config", func() {
 				Expect(changedProviderConfig.ExtractFailureDomain()).To(Equal(expected))
 			})
 
-			PIt("returns the original failure domain from the original config", func() {
+			It("returns the original failure domain from the original config", func() {
 				expected := resourcebuilder.AWSFailureDomain().
-					WithAvailabilityZone(azUSEast1b).
-					WithSubnet(machinev1SubnetUSEast1b).
+					WithAvailabilityZone(azUSEast1a).
+					WithSubnet(machinev1SubnetUSEast1a).
 					Build()
 
 				Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
@@ -144,11 +144,11 @@ var _ = Describe("AWS Provider Config", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		PIt("sets the type to AWS", func() {
+		It("sets the type to AWS", func() {
 			Expect(providerConfig.Type()).To(Equal(configv1.AWSPlatformType))
 		})
 
-		PIt("returns the correct AWS config", func() {
+		It("returns the correct AWS config", func() {
 			Expect(providerConfig.AWS()).ToNot(BeNil())
 			Expect(providerConfig.AWS().Config()).To(Equal(expectedAWSConfig))
 		})
