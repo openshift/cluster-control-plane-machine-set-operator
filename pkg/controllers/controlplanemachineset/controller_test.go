@@ -654,14 +654,15 @@ var _ = Describe("machineInfosByIndex", func() {
 	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-2-0").Build()
 
 	type tableInput struct {
-		cpms          *machinev1.ControlPlaneMachineSet
+		cpmsBuilder   resourcebuilder.ControlPlaneMachineSetBuilder
 		machineInfos  []machineproviders.MachineInfo
 		expected      map[int32][]machineproviders.MachineInfo
 		expectedError error
 	}
 
 	DescribeTable("should sort Machine Infos by index", func(in tableInput) {
-		out, err := machineInfosByIndex(in.cpms, in.machineInfos)
+		cpms := in.cpmsBuilder.Build()
+		out, err := machineInfosByIndex(cpms, in.machineInfos)
 		if in.expectedError != nil {
 			Expect(err).To(MatchError(in.expectedError))
 			return
@@ -676,11 +677,11 @@ var _ = Describe("machineInfosByIndex", func() {
 		}
 	},
 		Entry("with no replicas in the ControlPlaneMachineSet", tableInput{
-			cpms:          &machinev1.ControlPlaneMachineSet{},
+			cpmsBuilder:   resourcebuilder.ControlPlaneMachineSet().WithReplicas(0),
 			expectedError: errReplicasRequired,
 		}),
 		Entry("no machine infos with 3 replicas", tableInput{
-			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {},
@@ -689,7 +690,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("separately indexed machines", tableInput{
-			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0},
@@ -698,7 +699,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("a mixture of indexed machines", tableInput{
-			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0, i0m1, i1m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
@@ -707,14 +708,14 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("all machines in the same index with 1 replica", tableInput{
-			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(1).Build(),
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(1),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
 			},
 		}),
 		Entry("all machines in the same index with 3 replicas", tableInput{
-			cpms:         resourcebuilder.ControlPlaneMachineSet().WithReplicas(3).Build(),
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
@@ -763,7 +764,7 @@ var _ = Describe("validateClusterState", func() {
 	})
 
 	type validateClusterTableInput struct {
-		cpms               *machinev1.ControlPlaneMachineSet
+		cpmsBuilder        resourcebuilder.ControlPlaneMachineSetBuilder
 		machineInfos       map[int32][]machineproviders.MachineInfo
 		nodes              []*corev1.Node
 		expectedError      error
@@ -783,7 +784,9 @@ var _ = Describe("validateClusterState", func() {
 			Namespace: namespaceName,
 		}
 
-		err := reconciler.validateClusterState(ctx, logger.Logger(), in.cpms, in.machineInfos)
+		cpms := cpmsBuilder.Build()
+
+		err := reconciler.validateClusterState(ctx, logger.Logger(), cpms, in.machineInfos)
 
 		if in.expectedError != nil {
 			Expect(err).To(MatchError(in.expectedError))
@@ -791,14 +794,14 @@ var _ = Describe("validateClusterState", func() {
 			Expect(err).ToNot(HaveOccurred())
 		}
 
-		Expect(in.cpms.Status.Conditions).To(test.MatchConditions(in.expectedConditions))
+		Expect(cpms.Status.Conditions).To(test.MatchConditions(in.expectedConditions))
 		Expect(in.expectedLogs).To(ConsistOf(in.expectedLogs))
 	},
 		PEntry("with a valid cluster state", validateClusterTableInput{
-			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
-			}).Build(),
+			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
 				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
@@ -820,10 +823,10 @@ var _ = Describe("validateClusterState", func() {
 			expectedLogs: []test.LogEntry{},
 		}),
 		PEntry("with a valid cluster state and pre-existing conditions", validateClusterTableInput{
-			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonMachinesAlreadyOwned).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
-			}).Build(),
+			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
 				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
@@ -845,10 +848,10 @@ var _ = Describe("validateClusterState", func() {
 			expectedLogs: []test.LogEntry{},
 		}),
 		PEntry("with no machines are ready", validateClusterTableInput{
-			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
-			}).Build(),
+			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {pendingMachineBuilder.WithIndex(0).WithMachineName("machine-0").Build()},
 				1: {pendingMachineBuilder.WithIndex(1).WithMachineName("machine-1").Build()},
@@ -878,10 +881,10 @@ var _ = Describe("validateClusterState", func() {
 			},
 		}),
 		PEntry("with only 1 machine is ready", validateClusterTableInput{
-			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
-			}).Build(),
+			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {pendingMachineBuilder.WithIndex(0).WithMachineName("machine-0").Build()},
 				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
@@ -911,10 +914,10 @@ var _ = Describe("validateClusterState", func() {
 			},
 		}),
 		PEntry("with an additional unowned master node", validateClusterTableInput{
-			cpms: cpmsBuilder.WithConditions([]metav1.Condition{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
-			}).Build(),
+			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
 				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},

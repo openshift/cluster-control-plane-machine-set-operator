@@ -145,7 +145,7 @@ var _ = Describe("Status", func() {
 
 	Context("reconcileStatusWithMachineInfo", func() {
 		type reconcileStatusTableInput struct {
-			cpms           *machinev1.ControlPlaneMachineSet
+			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetBuilder
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			expectedError  error
 			expectedStatus machinev1.ControlPlaneMachineSetStatus
@@ -174,7 +174,7 @@ var _ = Describe("Status", func() {
 
 		DescribeTable("correctly sets the status based on the machine info", func(in *reconcileStatusTableInput) {
 			logger := test.NewTestLogger()
-			cpms := in.cpms.DeepCopy()
+			cpms := in.cpmsBuilder.Build()
 
 			err := reconcileStatusWithMachineInfo(logger.Logger(), cpms, in.machineInfos)
 			if in.expectedError != nil {
@@ -192,7 +192,7 @@ var _ = Describe("Status", func() {
 			Expect(cpms.Status.UnavailableReplicas).To(Equal(in.expectedStatus.UnavailableReplicas))
 		},
 			PEntry("with up to date Machines", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(1).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(1),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -241,7 +241,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("when Machines need updates", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(2).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(2),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -291,7 +291,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("with pending replacement replicas", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(3).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -347,7 +347,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("with ready replacement replicas", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(4).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(4),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -403,7 +403,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("with no MachineInfos", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(5).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(5),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {},
 					1: {},
@@ -454,7 +454,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("with an unhealthy Machine", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(7).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(7),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -505,7 +505,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("with an unhealthy index (failure domain)", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(8).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(8),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -562,7 +562,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			PEntry("with an empty index", &reconcileStatusTableInput{
-				cpms: resourcebuilder.ControlPlaneMachineSet().WithGeneration(9).Build(),
+				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(9),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
