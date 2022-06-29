@@ -224,7 +224,6 @@ var _ = Describe("Cluster Operator Status", func() {
 		}
 
 		DescribeTable("should update the cluster operator status based on the ControlPlaneMachineSet conditions", func(in updateClusterOperatorStatusTableInput) {
-			// originalCPMS := in.cpms.DeepCopy()
 			cpms := in.cpmsBuilder.Build()
 			originalCPMS := cpms.DeepCopy()
 
