@@ -169,7 +169,25 @@ var _ = Describe("Webhooks", func() {
 					}),
 				).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Required value: machine.openshift.io/cluster-api-machine-role label is required"))
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("[spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Required value: machine.openshift.io/cluster-api-machine-role label is required, spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"\": machine.openshift.io/cluster-api-machine-role label must have value: master]"))
+			})
+
+			It("with an incorrect role label on the template", func() {
+				cpms := builder.WithSelector(metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						openshiftMachineRoleLabel:            "worker",
+						openshiftMachineTypeLabel:            masterMachineRole,
+						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+					},
+				}).WithMachineTemplateBuilder(
+					machineTemplate.WithLabels(map[string]string{
+						openshiftMachineRoleLabel:            "worker",
+						openshiftMachineTypeLabel:            masterMachineRole,
+						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+					}),
+				).Build()
+
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"worker\": machine.openshift.io/cluster-api-machine-role label must have value: master"))
 			})
 
 			It("with no master type label on the template", func() {
@@ -185,7 +203,25 @@ var _ = Describe("Webhooks", func() {
 					}),
 				).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Required value: machine.openshift.io/cluster-api-machine-type label is required"))
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("[spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Required value: machine.openshift.io/cluster-api-machine-type label is required, spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"\": machine.openshift.io/cluster-api-machine-type label must have value: master]"))
+			})
+
+			It("with an incorrect type label on the template", func() {
+				cpms := builder.WithSelector(metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						openshiftMachineRoleLabel:            masterMachineRole,
+						openshiftMachineTypeLabel:            "worker",
+						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+					},
+				}).WithMachineTemplateBuilder(
+					machineTemplate.WithLabels(map[string]string{
+						openshiftMachineRoleLabel:            masterMachineRole,
+						openshiftMachineTypeLabel:            "worker",
+						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+					}),
+				).Build()
+
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"worker\": machine.openshift.io/cluster-api-machine-type label must have value: master"))
 			})
 
 			It("with no machine template", func() {
