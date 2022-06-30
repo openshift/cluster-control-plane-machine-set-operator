@@ -92,7 +92,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type rollingUpdateTableInput struct {
-			cpms           *machinev1.ControlPlaneMachineSet
+			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			setupMock      func()
 			expectedError  error
@@ -104,9 +104,10 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			// We setup the mock machine provider on each test with the expected assertions.
 			in.setupMock()
 
-			originalCPMS := in.cpms.DeepCopy()
+			cpms := cpmsBuilder.Build()
+			originalCPMS := cpms.DeepCopy()
 
-			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), in.cpms, mockMachineProvider, in.machineInfos)
+			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), cpms, mockMachineProvider, in.machineInfos)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 			} else {
@@ -114,10 +115,10 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}
 			Expect(result).To(Equal(in.expectedResult))
 			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
-			Expect(in.cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
+			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
 		},
 			PEntry("with no updates required", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -138,7 +139,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -162,7 +163,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and an error occurs", rollingUpdateTableInput{
-				cpms:          cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder:   cpmsBuilder.WithReplicas(3),
 				expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
@@ -187,7 +188,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, but the replacement machine is pending", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -215,7 +216,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and the replacement machine is ready", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -245,7 +246,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and the replacement machine is ready, and an error occurs", rollingUpdateTableInput{
-				cpms:          cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder:   cpmsBuilder.WithReplicas(3),
 				expectedError: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
@@ -276,7 +277,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and the replacement machine is ready, and the old machine is already deleted", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -303,7 +304,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates are required in multiple indexes", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -328,7 +329,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates are required in multiple indexes, but the replacement machine is pending", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
 						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
@@ -357,7 +358,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates are required in multiple indexes, and the replacement machine is ready", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
 						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
@@ -389,7 +390,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and the replacement machine is ready, and the old machine is already deleted", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
 						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
@@ -416,7 +417,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with an empty index", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -440,7 +441,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with a pending machine in an index", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -464,7 +465,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with a missing index, and other indexes needing updates", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -489,7 +490,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with a pending machine in an index, and other indexes needing updates", rollingUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -521,7 +522,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type onDeleteUpdateTableInput struct {
-			cpms           *machinev1.ControlPlaneMachineSet
+			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			setupMock      func()
 			expectedError  error
@@ -533,9 +534,10 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			// We setup the mock machine provider on each test with the expected assertions.
 			in.setupMock()
 
-			originalCPMS := in.cpms.DeepCopy()
+			cpms := cpmsBuilder.Build()
+			originalCPMS := cpms.DeepCopy()
 
-			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), in.cpms, mockMachineProvider, in.machineInfos)
+			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), cpms, mockMachineProvider, in.machineInfos)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 			} else {
@@ -544,10 +546,10 @@ var _ = Describe("reconcileMachineUpdates", func() {
 
 			Expect(result).To(Equal(in.expectedResult))
 			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
-			Expect(in.cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
+			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
 		},
 			PEntry("with no updates required", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -568,7 +570,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and the machine is not yet deleted", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -592,7 +594,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and the machine has been deleted", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -616,7 +618,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and the machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(), expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3), expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -640,7 +642,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and replacement machine is pending", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -668,7 +670,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a single index, and replacement machine is ready", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -695,7 +697,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and the machines are not yet deleted", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -729,7 +731,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in a multiple indexes, and machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(), expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3), expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -763,7 +765,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and a machine has been deleted", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -797,7 +799,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -832,7 +834,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is pending", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {
@@ -870,7 +872,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and the replacement machines are pending", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
 						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
@@ -912,7 +914,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is ready", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {
@@ -949,7 +951,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and a replacement machine is ready, and a replacement machine is pending", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
 						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
@@ -990,7 +992,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and all replacement machines are ready", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
 						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
@@ -1030,7 +1032,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with an empty index", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -1054,7 +1056,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with a pending machine in an index", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -1078,7 +1080,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with a missing index, and other indexes need updating", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -1112,7 +1114,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 			}),
 			PEntry("with a pending machine in an index, and other indexes need updating", onDeleteUpdateTableInput{
-				cpms: cpmsBuilder.WithReplicas(3).Build(),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},

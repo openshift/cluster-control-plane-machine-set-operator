@@ -23,17 +23,32 @@ import (
 )
 
 const (
-	// controlPlaneMachineSetName is the only valid name allowed.
+	// ControlPlaneMachineSetName is the only valid name allowed.
 	// A ControlPlaneMachineSet is a singleton within the cluster, this matches other singletons such as Infrastructure.
-	controlPlaneMachineSetName = "cluster"
+	ControlPlaneMachineSetName = "cluster"
 )
+
+// ControlPlaneMachineSetInterface is the interface to controlplanemachineset builder.
+type ControlPlaneMachineSetInterface interface {
+	Build() *machinev1.ControlPlaneMachineSet
+}
+
+// ControlPlaneMachineSetFuncs defines a set of functions for manipulating controlplanemachinesets.
+type ControlPlaneMachineSetFuncs struct {
+	BuildFunc func() *machinev1.ControlPlaneMachineSet
+}
+
+// Build builds a new controlplanemachineset based on the configuration provided.
+func (c *ControlPlaneMachineSetFuncs) Build() *machinev1.ControlPlaneMachineSet {
+	return c.BuildFunc()
+}
 
 // ControlPlaneMachineSet creates a new controlplanemachineset builder.
 func ControlPlaneMachineSet() ControlPlaneMachineSetBuilder {
 	return ControlPlaneMachineSetBuilder{
 		machineTemplateBuilder: OpenShiftMachineV1Beta1Template(),
-		name:                   controlPlaneMachineSetName,
-		namespace:              openshiftMachineAPINamespaceName,
+		name:                   ControlPlaneMachineSetName,
+		namespace:              OpenshiftMachineAPINamespaceName,
 		replicas:               3,
 		selector: metav1.LabelSelector{
 			MatchLabels: map[string]string{

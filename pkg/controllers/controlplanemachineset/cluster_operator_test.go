@@ -217,16 +217,17 @@ var _ = Describe("Cluster Operator Status", func() {
 
 	Context("updateClusterOperatorStatus", func() {
 		type updateClusterOperatorStatusTableInput struct {
-			cpms               *machinev1.ControlPlaneMachineSet
+			cpmsBuilder        resourcebuilder.ControlPlaneMachineSetInterface
 			expectedConditions []configv1.ClusterOperatorStatusCondition
 			expectedError      error
 			expectedLogs       []test.LogEntry
 		}
 
 		DescribeTable("should update the cluster operator status based on the ControlPlaneMachineSet conditions", func(in updateClusterOperatorStatusTableInput) {
-			originalCPMS := in.cpms.DeepCopy()
+			cpms := in.cpmsBuilder.Build()
+			originalCPMS := cpms.DeepCopy()
 
-			err := reconciler.updateClusterOperatorStatus(ctx, logger.Logger(), in.cpms)
+			err := reconciler.updateClusterOperatorStatus(ctx, logger.Logger(), cpms)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return
@@ -236,10 +237,10 @@ var _ = Describe("Cluster Operator Status", func() {
 
 			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions(in.expectedConditions)))
 			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
-			Expect(in.cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
+			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
 		},
 			Entry("with an available control plane machine set", updateClusterOperatorStatusTableInput{
-				cpms: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionAvailable, statusConditionNotProgressing, statusConditionNotDegraded}).Build(),
+				cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionAvailable, statusConditionNotProgressing, statusConditionNotDegraded}),
 				expectedConditions: []configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,
@@ -278,7 +279,7 @@ var _ = Describe("Cluster Operator Status", func() {
 				},
 			}),
 			Entry("with a degraded control plane machine set", updateClusterOperatorStatusTableInput{
-				cpms: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionNotAvailable, statusConditionNotProgressing, statusConditionDegraded}).Build(),
+				cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionNotAvailable, statusConditionNotProgressing, statusConditionDegraded}),
 				expectedConditions: []configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,
@@ -318,7 +319,7 @@ var _ = Describe("Cluster Operator Status", func() {
 				},
 			}),
 			Entry("with a progressing control plane machine set", updateClusterOperatorStatusTableInput{
-				cpms: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionNotAvailable, statusConditionProgressing, statusConditionNotDegraded}).Build(),
+				cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{statusConditionNotAvailable, statusConditionProgressing, statusConditionNotDegraded}),
 				expectedConditions: []configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,

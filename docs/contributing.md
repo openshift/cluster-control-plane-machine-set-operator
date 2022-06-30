@@ -53,10 +53,10 @@ consistent and follow the following guidelines:
     messages
 * Loggers are scoped to a particular action and should not be embedded in an object, pass them as a variable
   * This allows you to add context which can be added to future log lines
-  * Eg. When logs refer to an update strategy, we expect all logs to contain a key `UpdateStrategy` and the value set to
+  * Eg. When logs refer to an update strategy, we expect all logs to contain a key `updateStrategy` and the value set to
     the update strategy type. This can be achieved by creating a child logger when the update strategy is determined
     ```golang
-    logger = logger.WithValues("UpdateStrategy", cpms.Spec.Strategy.Type)
+    logger = logger.WithValues("updateStrategy", cpms.Spec.Strategy.Type)
     ```
 * Logger keys and values should be lowerCamelCase (as per [Kubernetes Guidelines](https://github.com/kubernetes/community/blob/HEAD/contributors/devel/sig-instrumentation/migration-to-structured-logging.md#name-arguments))
 
