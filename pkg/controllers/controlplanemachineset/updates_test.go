@@ -92,7 +92,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type rollingUpdateTableInput struct {
-			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			setupMock      func()
 			expectedError  error
@@ -522,7 +522,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type onDeleteUpdateTableInput struct {
-			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			setupMock      func()
 			expectedError  error

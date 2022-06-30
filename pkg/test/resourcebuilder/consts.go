@@ -17,7 +17,7 @@ limitations under the License.
 package resourcebuilder
 
 const (
-	// openshiftMachineAPINamespaceName is the name of the OpenShift
+	// OpenshiftMachineAPINamespaceName is the name of the OpenShift
 	// Machine API namespace.
-	openshiftMachineAPINamespaceName = "openshift-machine-api"
+	OpenshiftMachineAPINamespaceName = "openshift-machine-api"
 )

@@ -217,7 +217,7 @@ var _ = Describe("Cluster Operator Status", func() {
 
 	Context("updateClusterOperatorStatus", func() {
 		type updateClusterOperatorStatusTableInput struct {
-			cpmsBuilder        resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder        resourcebuilder.ControlPlaneMachineSetInterface
 			expectedConditions []configv1.ClusterOperatorStatusCondition
 			expectedError      error
 			expectedLogs       []test.LogEntry

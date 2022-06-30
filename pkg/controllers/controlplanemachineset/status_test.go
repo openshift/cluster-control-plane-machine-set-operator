@@ -145,7 +145,7 @@ var _ = Describe("Status", func() {
 
 	Context("reconcileStatusWithMachineInfo", func() {
 		type reconcileStatusTableInput struct {
-			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			expectedError  error
 			expectedStatus machinev1.ControlPlaneMachineSetStatus

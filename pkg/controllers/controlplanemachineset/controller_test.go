@@ -654,7 +654,7 @@ var _ = Describe("machineInfosByIndex", func() {
 	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-2-0").Build()
 
 	type tableInput struct {
-		cpmsBuilder   resourcebuilder.ControlPlaneMachineSetBuilder
+		cpmsBuilder   resourcebuilder.ControlPlaneMachineSetInterface
 		machineInfos  []machineproviders.MachineInfo
 		expected      map[int32][]machineproviders.MachineInfo
 		expectedError error
@@ -677,7 +677,17 @@ var _ = Describe("machineInfosByIndex", func() {
 		}
 	},
 		Entry("with no replicas in the ControlPlaneMachineSet", tableInput{
-			cpmsBuilder:   resourcebuilder.ControlPlaneMachineSet().WithReplicas(0),
+			// Use a custom BuildFunc to set Spec.Replicas to nil,
+			// as that's not possbile with the standard Builder.
+			cpmsBuilder: &resourcebuilder.ControlPlaneMachineSetFuncs{
+				BuildFunc: func() *machinev1.ControlPlaneMachineSet {
+					cpmsBuilder := resourcebuilder.ControlPlaneMachineSet()
+					cpms := cpmsBuilder.Build()
+					cpms.Spec.Replicas = nil
+
+					return cpms
+				},
+			},
 			expectedError: errReplicasRequired,
 		}),
 		Entry("no machine infos with 3 replicas", tableInput{
@@ -764,7 +774,7 @@ var _ = Describe("validateClusterState", func() {
 	})
 
 	type validateClusterTableInput struct {
-		cpmsBuilder        resourcebuilder.ControlPlaneMachineSetBuilder
+		cpmsBuilder        resourcebuilder.ControlPlaneMachineSetInterface
 		machineInfos       map[int32][]machineproviders.MachineInfo
 		nodes              []*corev1.Node
 		expectedError      error

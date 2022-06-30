@@ -123,7 +123,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 
 	Context("mappingMachineIndexesToFailureDomains", func() {
 		type mappingMachineIndexesTableInput struct {
-			cpmsBuilder     resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder     resourcebuilder.ControlPlaneMachineSetInterface
 			failureDomains  machinev1.FailureDomains
 			machines        []*machinev1beta1.Machine
 			expectedError   error
@@ -567,7 +567,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 
 	Context("createBaseFailureDomainMapping", func() {
 		type createBaseMappingTableInput struct {
-			cpmsBuilder     resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder     resourcebuilder.ControlPlaneMachineSetInterface
 			failureDomains  machinev1.FailureDomains
 			expectedMapping map[int32]failuredomain.FailureDomain
 			expectedError   error
@@ -733,7 +733,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 
 	Context("createMachineMapping", func() {
 		type machineMappingTableInput struct {
-			cpmsBuilder     resourcebuilder.ControlPlaneMachineSetBuilder
+			cpmsBuilder     resourcebuilder.ControlPlaneMachineSetInterface
 			machines        []*machinev1beta1.Machine
 			expectedError   error
 			expectedMapping map[int32]failuredomain.FailureDomain
