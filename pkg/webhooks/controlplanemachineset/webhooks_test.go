@@ -113,7 +113,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with a disallowed name", func() {
 				cpms := builder.WithName("disallowed").Build()
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("name: Invalid value: \"disallowed\": control plane machine set name must be cluster"))
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("metadata.name: Invalid value: \"disallowed\": control plane machine set name must be cluster"))
 			})
 
 			It("with 4 replicas", func() {
@@ -331,9 +331,10 @@ var _ = Describe("Webhooks", func() {
 					),
 				)).Build()
 
-				err := k8sClient.Create(ctx, cpms)
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-different]}]}}")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-different]}]}}"),
+				)))
 			})
 
 			It("with a invalid subnet type - different type", func() {
@@ -345,9 +346,10 @@ var _ = Describe("Webhooks", func() {
 					),
 				)).Build()
 
-				err := k8sClient.Create(ctx, cpms)
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]")))
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:id, Value:subnet-us-east-1c}}]")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:id, Value:subnet-us-east-1c}}]"),
+				)))
 			})
 
 			It("when reducing the availability", func() {
@@ -357,10 +359,11 @@ var _ = Describe("Webhooks", func() {
 					),
 				)).Build()
 
-				err := k8sClient.Create(ctx, cpms) // Multiple expects because failure domain ordering is random
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+				)))
 			})
 
 			It("when increasing the availability", func() {
@@ -385,15 +388,16 @@ var _ = Describe("Webhooks", func() {
 					),
 				)).Build()
 
-				err := k8sClient.Create(ctx, cpms) // Multiple expects because failure domain ordering is random
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s)")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1e, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
-				Expect(err).To(MatchError(ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1f, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s)"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1e, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1f, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+				)))
 			})
 		})
 	})
@@ -423,54 +427,54 @@ var _ = Describe("Webhooks", func() {
 			// Change the providerSpec, expect the update to be successful
 			rawProviderSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-2").BuildRawExtension()
 
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
-			})).Should(Succeed())
+			})()).Should(Succeed())
 		})
 
 		It("with 4 replicas", func() {
 			// This is an openapi validation but it makes sense to include it here as well
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				four := int32(4)
 				cpms.Spec.Replicas = &four
-			})).Should(MatchError(ContainSubstring("Unsupported value: 4: supported values: \"3\", \"5\"")))
+			})()).Should(MatchError(ContainSubstring("Unsupported value: 4: supported values: \"3\", \"5\"")))
 		})
 
 		It("with 5 replicas", func() {
 			// Five replicas is a valid value but the existing CPMS has three replicas
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				five := int32(5)
 				cpms.Spec.Replicas = &five
-			})).Should(MatchError(ContainSubstring(`spec.replicas: Forbidden: control plane machine set replicas cannot be changed`)), "Replicas should be immutable")
+			})()).Should(MatchError(ContainSubstring(`spec.replicas: Forbidden: control plane machine set replicas cannot be changed`)), "Replicas should be immutable")
 		})
 
 		It("when modifying the machine labels and the selector still matches", func() {
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels["new"] = "value"
-			})).Should(Succeed(), "Machine label updates are allowed provided the selector still matches")
+			})()).Should(Succeed(), "Machine label updates are allowed provided the selector still matches")
 		})
 
 		It("when modifying the machine labels so that the selector no longer matches", func() {
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels = map[string]string{
 					"different":                          "labels",
 					machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
 					openshiftMachineRoleLabel:            "not-matching-label",
 					openshiftMachineTypeLabel:            masterMachineRole,
 				}
-			})).Should(MatchError(ContainSubstring("selector does not match template labels")), "The selector must always match the machine labels")
+			})()).Should(MatchError(ContainSubstring("selector does not match template labels")), "The selector must always match the machine labels")
 		})
 
 		It("when modifying the machine labels to remove the cluster ID label", func() {
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
-			})).Should(MatchError(ContainSubstring("Required value: machine.openshift.io/cluster-api-cluster label is required")), "The labels must always contain a cluster ID label")
+			})()).Should(MatchError(ContainSubstring("Required value: machine.openshift.io/cluster-api-cluster label is required")), "The labels must always contain a cluster ID label")
 		})
 
 		It("when mutating the selector", func() {
-			Eventually(komega.Update(cpms, func() {
+			Expect(komega.Update(cpms, func() {
 				cpms.Spec.Selector.MatchLabels["new"] = "value"
-			})).Should(MatchError(ContainSubstring("Forbidden: control plane machine set selector is immutable")), "The selector should be immutable")
+			})()).Should(MatchError(ContainSubstring("Forbidden: control plane machine set selector is immutable")), "The selector should be immutable")
 		})
 	})
 })

@@ -48,6 +48,10 @@ const (
 	// masterMachineRole is the master role/type that is required to be set on
 	// all OpenShift Machine API Machine templates.
 	masterMachineRole = "master"
+
+	// clusterSingletonName is the OpenShift standard name, "cluster", for singleton
+	// resources. All ControlPlaneMachineSet resources must use this name.
+	clusterSingletonName = "cluster"
 )
 
 var (
@@ -90,35 +94,9 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 		return errObjNotCPMS
 	}
 
-	controlPlaneMachines, err := r.fetchControlPlaneMachines(ctx)
-	if err != nil {
-		return fmt.Errorf("could not fetch existing control plane machines: %w", err)
-	}
-
-	// Ensure Control Plane Machine count matches the ControlPlaneMachineSet replicas
-	if cpms.Spec.Replicas == nil {
-		errs = append(errs, field.Required(field.NewPath("spec", "replicas"), "replicas field is required"))
-	} else if int(*cpms.Spec.Replicas) != len(controlPlaneMachines) {
-		errs = append(errs, field.Forbidden(field.NewPath("spec", "replicas"),
-			fmt.Sprintf("control plane machine set replicas (%d) does not match the current number of control plane machines (%d)", *cpms.Spec.Replicas, len(controlPlaneMachines))))
-	}
-
-	// Ensure CPMS created with invalid name is not allowed
-	if cpms.Name != "cluster" {
-		errs = append(errs, field.Invalid(field.NewPath("name"), cpms.Name, "control plane machine set name must be cluster"))
-	}
-
-	// Ensure required labels are set and all machines are matching the label selector
-	errs = append(errs, checkMachineLabels(cpms)...)
-
-	// Ensure failure domains of Control Plane Machines match the ControlPlaneMachineSet on create
-	switch cpms.Spec.Template.MachineType {
-	case machinev1.OpenShiftMachineV1Beta1MachineType:
-		errs = append(errs, checkFailureDomains(cpms, controlPlaneMachines)...)
-	default:
-		errs = append(errs, field.NotSupported(field.NewPath("spec", "template", "machineType"), cpms.Spec.Template.MachineType,
-			[]string{string(machinev1.OpenShiftMachineV1Beta1MachineType)}))
-	}
+	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
+	errs = append(errs, validateSpec(field.NewPath("spec"), nil, cpms)...)
+	errs = append(errs, r.validateSpecOnCreate(ctx, field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
@@ -140,25 +118,13 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 		return errObjNotCPMS
 	}
 
-	newCPMS, ok := newObj.(*machinev1.ControlPlaneMachineSet)
+	cpms, ok := newObj.(*machinev1.ControlPlaneMachineSet)
 	if !ok {
 		return errObjNotCPMS
 	}
 
-	// Ensure spec.Replicas is immutable on update
-	if oldCPMS.Spec.Replicas == nil || newCPMS.Spec.Replicas == nil {
-		errs = append(errs, field.Required(field.NewPath("spec", "replicas"), "replicas field is required"))
-	} else if *oldCPMS.Spec.Replicas != *newCPMS.Spec.Replicas {
-		errs = append(errs, field.Forbidden(field.NewPath("spec", "replicas"), "control plane machine set replicas cannot be changed"))
-	}
-
-	// Ensure selector is immutable on update
-	if !reflect.DeepEqual(oldCPMS.Spec.Selector, newCPMS.Spec.Selector) {
-		errs = append(errs, field.Forbidden(field.NewPath("spec", "selector"), "control plane machine set selector is immutable"))
-	}
-
-	// Ensure required labels are set and all machines are matching the label selector
-	errs = append(errs, checkMachineLabels(newCPMS)...)
+	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
+	errs = append(errs, validateSpec(field.NewPath("spec"), oldCPMS, cpms)...)
 
 	if len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
@@ -170,6 +136,160 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) error {
 	return nil
+}
+
+// validateSpecOnCreate runs the create time validations on the ControlPlaneMachineSet spec.
+func (r *ControlPlaneMachineSetWebhook) validateSpecOnCreate(ctx context.Context, parentPath *field.Path, cpms *machinev1.ControlPlaneMachineSet) []error {
+	// TODO: This should be MachineInfos and should come from the MachineProvider.
+	// This is a blocker for adding Cluster API support right now.
+	controlPlaneMachines, err := r.fetchControlPlaneMachines(ctx)
+	if err != nil {
+		return []error{fmt.Errorf("could not fetch existing control plane machines: %w", err)}
+	}
+
+	errs := []error{}
+
+	// Ensure Control Plane Machine count matches the ControlPlaneMachineSet replicas
+	if cpms.Spec.Replicas == nil {
+		errs = append(errs, field.Required(parentPath.Child("replicas"), "replicas field is required"))
+	} else if int(*cpms.Spec.Replicas) != len(controlPlaneMachines) {
+		errs = append(errs, field.Forbidden(parentPath.Child("replicas"),
+			fmt.Sprintf("control plane machine set replicas (%d) does not match the current number of control plane machines (%d)", *cpms.Spec.Replicas, len(controlPlaneMachines))))
+	}
+
+	errs = append(errs, validateTemplateOnCreate(parentPath.Child("template"), cpms.Spec.Template, controlPlaneMachines)...)
+
+	return errs
+}
+
+// validateMetadata validates the metadata of the ControlPlaneMachineSet resource.
+func validateMetadata(parentPath *field.Path, metadata metav1.ObjectMeta) []error {
+	errs := []error{}
+
+	if metadata.Name != clusterSingletonName {
+		errs = append(errs, field.Invalid(parentPath.Child("name"), metadata.Name, "control plane machine set name must be cluster"))
+	}
+
+	return errs
+}
+
+// validateSpec validates that the spec of the ControlPlaneMachineSet resource is valid.
+func validateSpec(parentPath *field.Path, oldCPMS, cpms *machinev1.ControlPlaneMachineSet) []error {
+	errs := []error{}
+
+	errs = append(errs, validateTemplate(parentPath.Child("template"), cpms.Spec.Template, cpms.Spec.Selector)...)
+
+	// Validate immutability on update.
+	if oldCPMS != nil {
+		// Ensure spec.Replicas is immutable on update.
+		if oldCPMS.Spec.Replicas == nil || cpms.Spec.Replicas == nil {
+			errs = append(errs, field.Required(parentPath.Child("replicas"), "replicas field is required"))
+		} else if *oldCPMS.Spec.Replicas != *cpms.Spec.Replicas {
+			errs = append(errs, field.Forbidden(parentPath.Child("replicas"), "control plane machine set replicas cannot be changed"))
+		}
+
+		// Ensure selector is immutable on update.
+		if !reflect.DeepEqual(oldCPMS.Spec.Selector, cpms.Spec.Selector) {
+			errs = append(errs, field.Forbidden(parentPath.Child("selector"), "control plane machine set selector is immutable"))
+		}
+	}
+
+	return errs
+}
+
+// validateTemplate validates the common (on create and update) checks for the ControlPlaneMachineSet template.
+func validateTemplate(parentPath *field.Path, template machinev1.ControlPlaneMachineSetTemplate, selector metav1.LabelSelector) []error {
+	switch template.MachineType {
+	case machinev1.OpenShiftMachineV1Beta1MachineType:
+		openshiftMachineTemplatePath := parentPath.Child(string(machinev1.OpenShiftMachineV1Beta1MachineType))
+
+		if template.OpenShiftMachineV1Beta1Machine == nil {
+			// Note this is a rare exception to discriminated union rules for the naming of this field.
+			// It matches the discriminator exactly.
+			return []error{field.Required(openshiftMachineTemplatePath, fmt.Sprintf("%s is required when machine type is %s", machinev1.OpenShiftMachineV1Beta1MachineType, machinev1.OpenShiftMachineV1Beta1MachineType))}
+		}
+
+		return validateOpenShiftMachineV1BetaTemplate(openshiftMachineTemplatePath, *template.OpenShiftMachineV1Beta1Machine, selector)
+	default:
+		return []error{field.NotSupported(parentPath.Child("machineType"), template.MachineType, []string{string(machinev1.OpenShiftMachineV1Beta1MachineType)})}
+	}
+}
+
+// validateTemplateOnCreate validates the failure domains defined in the template match up with the Machines
+// that already exist within the cluster. This check is only performed on create.
+func validateTemplateOnCreate(parentPath *field.Path, template machinev1.ControlPlaneMachineSetTemplate, machines []machinev1beta1.Machine) []error {
+	switch template.MachineType {
+	case machinev1.OpenShiftMachineV1Beta1MachineType:
+		openshiftMachineTemplatePath := parentPath.Child(string(machinev1.OpenShiftMachineV1Beta1MachineType))
+
+		if template.OpenShiftMachineV1Beta1Machine == nil {
+			// Note this is a rare exception to discriminated union rules for the naming of this field.
+			// It matches the discriminator exactly.
+			return []error{field.Required(openshiftMachineTemplatePath, fmt.Sprintf("%s is required when machine type is %s", machinev1.OpenShiftMachineV1Beta1MachineType, machinev1.OpenShiftMachineV1Beta1MachineType))}
+		}
+
+		return validateOpenShiftMachineV1BetaTemplateOnCreate(openshiftMachineTemplatePath, *template.OpenShiftMachineV1Beta1Machine, machines)
+	default:
+		return []error{field.NotSupported(parentPath.Child("machineType"), template.MachineType, []string{string(machinev1.OpenShiftMachineV1Beta1MachineType)})}
+	}
+}
+
+// validateOpenShiftMachineV1BetaTemplate validates the OpenShift Machine API v1beta1 template.
+func validateOpenShiftMachineV1BetaTemplate(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, selector metav1.LabelSelector) []error {
+	errs := []error{}
+
+	errs = append(errs, validateTemplateLabels(parentPath.Child("metadata", "labels"), template.ObjectMeta.Labels, selector)...)
+
+	return errs
+}
+
+// validateOpenShiftMachineV1BetaTemplateOnCreate validates the failure domains in the provided template match up with those
+// present in the Machines provided.
+func validateOpenShiftMachineV1BetaTemplateOnCreate(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, machines []machinev1beta1.Machine) []error {
+	errs := []error{}
+
+	errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(parentPath.Child("failureDomains"), template.FailureDomains, machines)...)
+
+	return errs
+}
+
+// validateTemplateLabels validates that the labels passed from the template match the expectations required.
+// It checks the role and type labels and ensures that the cluster ID label is also present.
+func validateTemplateLabels(labelsPath *field.Path, templateLabels map[string]string, labelSelector metav1.LabelSelector) []error {
+	errs := []error{}
+
+	// Ensure machine template has all required labels, and where required, required values
+	requiredLabels := []struct {
+		label string
+		value string
+	}{
+		{label: machinev1beta1.MachineClusterIDLabel},
+		{label: openshiftMachineRoleLabel, value: masterMachineRole},
+		{label: openshiftMachineTypeLabel, value: masterMachineRole},
+	}
+
+	for _, required := range requiredLabels {
+		value, ok := templateLabels[required.label]
+		if !ok || value == "" {
+			errs = append(errs, field.Required(labelsPath, fmt.Sprintf("%s label is required", required.label)))
+		}
+
+		if required.value != "" && required.value != value {
+			errs = append(errs, field.Invalid(labelsPath, value, fmt.Sprintf("%s label must have value: %s", required.label, required.value)))
+		}
+	}
+
+	// Ensure labels are matched by the selector.
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		errs = append(errs, field.Invalid(field.NewPath("spec", "selector"), selector, fmt.Errorf("could not convert label selector to selector: %w", err).Error()))
+	}
+
+	if selector != nil && !selector.Matches(labels.Set(templateLabels)) {
+		errs = append(errs, field.Invalid(labelsPath, templateLabels, "selector does not match template labels"))
+	}
+
+	return errs
 }
 
 // fetchControlPlaneMachines returns all control plane machines in the cluster.
@@ -190,81 +310,33 @@ func (r *ControlPlaneMachineSetWebhook) fetchControlPlaneMachines(ctx context.Co
 	return controlPlaneMachines, nil
 }
 
-// checkMachineLabels ensures that required labels are set and all machines are matching the label selector.
-func checkMachineLabels(cpms *machinev1.ControlPlaneMachineSet) []error {
-	machineTemplatePath := field.NewPath("spec", "template", "machines_v1beta1_machine_openshift_io")
+// checkOpenShiftFailureDomainsMatchMachines ensures that failure domains of the Control Plane Machines match the
+// failure domains defined on the OpenShift Machine template on the ControlPlaneMachineSet.
+func checkOpenShiftFailureDomainsMatchMachines(parentPath *field.Path, failureDomains machinev1.FailureDomains, machines []machinev1beta1.Machine) []error {
 	errs := []error{}
 
-	// Ensure machine template has all required labels, and where required, required values
-	requiredLabels := []struct {
-		label string
-		value string
-	}{
-		{label: machinev1beta1.MachineClusterIDLabel},
-		{label: openshiftMachineRoleLabel, value: masterMachineRole},
-		{label: openshiftMachineTypeLabel, value: masterMachineRole},
-	}
-
-	for _, required := range requiredLabels {
-		value, ok := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels[required.label]
-		if !ok || value == "" {
-			errs = append(errs, field.Required(machineTemplatePath.Child("metadata", "labels"), fmt.Sprintf("%s label is required", required.label)))
-		}
-
-		if required.value != "" && required.value != value {
-			errs = append(errs, field.Invalid(machineTemplatePath.Child("metadata", "labels"), value, fmt.Sprintf("%s label must have value: %s", required.label, required.value)))
-		}
-	}
-
-	// Ensure machines are matched by selectors
-	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
-	if err != nil {
-		errs = append(errs, field.Invalid(field.NewPath("spec", "selector"), cpms.Spec.Selector, fmt.Errorf("could not convert label selector to selector: %w", err).Error()))
-	}
-
-	if selector != nil && !selector.Matches(labels.Set(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels)) {
-		errs = append(errs, field.Invalid(machineTemplatePath.Child("metadata", "labels"),
-			cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, "selector does not match template labels"))
-	}
-
-	return errs
-}
-
-// checkFailureDomains ensures that failure domains of Control Plane Machines match the ControlPlaneMachineSet.
-func checkFailureDomains(cpms *machinev1.ControlPlaneMachineSet, controlPlaneMachines []machinev1beta1.Machine) []error {
-	machineTemplatePath := field.NewPath("spec", "template", "machines_v1beta1_machine_openshift_io")
-	errs := []error{}
-
-	if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine == nil {
-		return append(errs, field.Required(machineTemplatePath,
-			fmt.Sprintf("Specified template type %s has nil value", machinev1.OpenShiftMachineV1Beta1MachineType)))
-	}
-
-	if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform == "" {
+	if failureDomains.Platform == "" {
 		return nil
 	}
 
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(controlPlaneMachines)
+	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
 	if err != nil {
-		return append(errs, field.InternalError(machineTemplatePath.Child("failureDomains", "platform"),
-			fmt.Errorf("could not get failure domains from cluster machines on platform %s: %w", cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform, err)))
+		return append(errs, field.InternalError(parentPath.Child("platform"), fmt.Errorf("could not get failure domains from cluster machines on platform %s: %w", failureDomains.Platform, err)))
 	}
 
-	specifiedFailureDomains, err := failuredomain.NewFailureDomains(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains)
+	specifiedFailureDomains, err := failuredomain.NewFailureDomains(failureDomains)
 	if err != nil {
-		return append(errs, field.Invalid(machineTemplatePath.Child("failureDomains"),
-			cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains,
-			fmt.Sprintf("error getting failure domains from control plane machine set machine template: %v", err)))
+		return append(errs, field.Invalid(parentPath, failureDomains, fmt.Sprintf("error getting failure domains from control plane machine set machine template: %v", err)))
 	}
 
 	// Failure domains used by control plane machines but not specified in the control plane machine set
 	if missingFailureDomains := missingFailureDomains(machineFailureDomains, specifiedFailureDomains); len(missingFailureDomains) > 0 {
-		errs = append(errs, field.Forbidden(machineTemplatePath.Child("failureDomains"), fmt.Sprintf("control plane machines are using unspecified failure domain(s) %s", missingFailureDomains)))
+		errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("control plane machines are using unspecified failure domain(s) %s", missingFailureDomains)))
 	}
 
 	// Failure domains specified in the control plane machine set but not used by control plane machines
 	if missingFailureDomains := missingFailureDomains(specifiedFailureDomains, machineFailureDomains); len(missingFailureDomains) > 0 {
-		errs = append(errs, field.Forbidden(machineTemplatePath.Child("failureDomains"), fmt.Sprintf("no control plane machine is using specified failure domain(s) %s", missingFailureDomains)))
+		errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("no control plane machine is using specified failure domain(s) %s", missingFailureDomains)))
 	}
 
 	return errs
