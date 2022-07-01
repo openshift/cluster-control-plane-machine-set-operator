@@ -195,12 +195,24 @@ func checkMachineLabels(cpms *machinev1.ControlPlaneMachineSet) []error {
 	machineTemplatePath := field.NewPath("spec", "template", "machines_v1beta1_machine_openshift_io")
 	errs := []error{}
 
-	// Ensure machine template has all required labels
-	requiredLabels := []string{machinev1beta1.MachineClusterIDLabel, openshiftMachineRoleLabel, openshiftMachineTypeLabel}
-	for _, label := range requiredLabels {
-		value, ok := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels[label]
+	// Ensure machine template has all required labels, and where required, required values
+	requiredLabels := []struct {
+		label string
+		value string
+	}{
+		{label: machinev1beta1.MachineClusterIDLabel},
+		{label: openshiftMachineRoleLabel, value: masterMachineRole},
+		{label: openshiftMachineTypeLabel, value: masterMachineRole},
+	}
+
+	for _, required := range requiredLabels {
+		value, ok := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels[required.label]
 		if !ok || value == "" {
-			errs = append(errs, field.Required(machineTemplatePath.Child("metadata", "labels"), fmt.Sprintf("%s label is required", label)))
+			errs = append(errs, field.Required(machineTemplatePath.Child("metadata", "labels"), fmt.Sprintf("%s label is required", required.label)))
+		}
+
+		if required.value != "" && required.value != value {
+			errs = append(errs, field.Invalid(machineTemplatePath.Child("metadata", "labels"), value, fmt.Sprintf("%s label must have value: %s", required.label, required.value)))
 		}
 	}
 
