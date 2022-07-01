@@ -18,15 +18,20 @@ package controlplanemachineset
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -236,6 +241,41 @@ var _ = Describe("Webhooks", func() {
 				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine = nil
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io: Required value")))
+			})
+
+			It("with invalid failure domain information", func() {
+				cpms := builder.Build()
+
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &[]machinev1.AzureFailureDomain{
+					{
+						Zone: "us-central-1",
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws: Required value: value required when platform is \"AWS\""),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.azure: Forbidden: value not allowed when platform is \"AWS\""),
+				)))
+			})
+
+			It("when adding invalid subnets in the faliure domains", func() {
+				cpms := builder.Build()
+
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &[]machinev1.AWSFailureDomain{
+					{
+						Subnet: &machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ID:   pointer.String("id-123"),
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"arn\""),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"arn\""),
+				)))
 			})
 		})
 
@@ -476,5 +516,141 @@ var _ = Describe("Webhooks", func() {
 				cpms.Spec.Selector.MatchLabels["new"] = "value"
 			})()).Should(MatchError(ContainSubstring("Forbidden: control plane machine set selector is immutable")), "The selector should be immutable")
 		})
+
+		It("when adding invalid failure domain information", func() {
+			Expect(komega.Update(cpms, func() {
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &[]machinev1.AzureFailureDomain{
+					{
+						Zone: "us-central-1",
+					},
+				}
+			})()).To(MatchError(SatisfyAll(
+				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws: Required value: value required when platform is \"AWS\""),
+				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.azure: Forbidden: value not allowed when platform is \"AWS\""),
+			)))
+		})
+
+		It("when adding invalid subnets in the faliure domains", func() {
+			Expect(komega.Update(cpms, func() {
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &[]machinev1.AWSFailureDomain{
+					{
+						Subnet: &machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ID:   pointer.String("id-123"),
+						},
+					},
+				}
+			})()).To(MatchError(SatisfyAll(
+				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"arn\""),
+				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"arn\""),
+			)))
+		})
+	})
+})
+
+var _ = Describe("Webhook utils", func() {
+	Context("when validating discriminated unions", func() {
+		type checkUnionsTableInput struct {
+			parentPath     *field.Path
+			union          interface{}
+			discriminant   string
+			expectedErrors []error
+		}
+
+		DescribeTable("validateDiscriminatedUnion returns the expected errors", func(in checkUnionsTableInput) {
+			errs := validateDiscriminatedUnion(in.parentPath, in.union, in.discriminant)
+
+			Expect(errs).To(ConsistOf(in.expectedErrors))
+		},
+			Entry("with a nil union, should not report errors", checkUnionsTableInput{
+				parentPath:     field.NewPath("nil"),
+				union:          nil,
+				discriminant:   "none",
+				expectedErrors: []error{},
+			}),
+			Entry("with an empty union, should not report errors", checkUnionsTableInput{
+				parentPath:     field.NewPath("empty"),
+				union:          machinev1.FailureDomains{},
+				discriminant:   "Platform",
+				expectedErrors: []error{},
+			}),
+			Entry("with an valid union, should not report errors", checkUnionsTableInput{
+				parentPath: field.NewPath("valid"),
+				union: machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					AWS:      &[]machinev1.AWSFailureDomain{},
+				},
+				discriminant:   "Platform",
+				expectedErrors: []error{},
+			}),
+			Entry("with an valid pointer to a union, should not report errors", checkUnionsTableInput{
+				parentPath: field.NewPath("valid"),
+				union: &machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					AWS:      &[]machinev1.AWSFailureDomain{},
+				},
+				discriminant:   "Platform",
+				expectedErrors: []error{},
+			}),
+			Entry("with an invalid discriminant", checkUnionsTableInput{
+				parentPath: field.NewPath("invalidDiscriminant"),
+				union: machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					AWS:      &[]machinev1.AWSFailureDomain{},
+				},
+				discriminant: "Invalid",
+				expectedErrors: []error{
+					fmt.Errorf("%w: union does not contain a field \"Invalid\"", errInvalidDiscriminant),
+				},
+			}),
+			Entry("when missing the configuration", checkUnionsTableInput{
+				parentPath: field.NewPath("missing"),
+				union: machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+				},
+				discriminant: "Platform",
+				expectedErrors: []error{
+					field.Required(field.NewPath("missing", "aws"), "value required when platform is \"AWS\""),
+				},
+			}),
+			Entry("with the wrong configuration", checkUnionsTableInput{
+				parentPath: field.NewPath("wrong"),
+				union: machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					Azure:    &[]machinev1.AzureFailureDomain{},
+				},
+				discriminant: "Platform",
+				expectedErrors: []error{
+					field.Required(field.NewPath("wrong", "aws"), "value required when platform is \"AWS\""),
+					field.Forbidden(field.NewPath("wrong", "azure"), "value not allowed when platform is \"AWS\""),
+				},
+			}),
+			Entry("with extra configuration", checkUnionsTableInput{
+				parentPath: field.NewPath("extra"),
+				union: machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					AWS:      &[]machinev1.AWSFailureDomain{},
+					Azure:    &[]machinev1.AzureFailureDomain{},
+				},
+				discriminant: "Platform",
+				expectedErrors: []error{
+					field.Forbidden(field.NewPath("extra", "azure"), "value not allowed when platform is \"AWS\""),
+				},
+			}),
+			Entry("with extra configuration in a pointer union", checkUnionsTableInput{
+				parentPath: field.NewPath("extra"),
+				union: &machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					AWS:      &[]machinev1.AWSFailureDomain{},
+					Azure:    &[]machinev1.AzureFailureDomain{},
+				},
+				discriminant: "Platform",
+				expectedErrors: []error{
+					field.Forbidden(field.NewPath("extra", "azure"), "value not allowed when platform is \"AWS\""),
+				},
+			}),
+		)
 	})
 })

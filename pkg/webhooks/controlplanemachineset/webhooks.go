@@ -21,7 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
@@ -60,6 +62,10 @@ var (
 
 	// errUpdateNilCPMS is an error when update is called with nil ControlPlaneMachineSet.
 	errUpdateNilCPMS = errors.New("cannot update nil control plane machine set")
+
+	// errInvalidDiscriminant is an error used when the discriminated union check cannot
+	// find the field named as the discriminant.
+	errInvalidDiscriminant = errors.New("invalid discriminant name")
 )
 
 // ControlPlaneMachineSetWebhook acts as a webhook validator for the
@@ -239,6 +245,7 @@ func validateOpenShiftMachineV1BetaTemplate(parentPath *field.Path, template mac
 	errs := []error{}
 
 	errs = append(errs, validateTemplateLabels(parentPath.Child("metadata", "labels"), template.ObjectMeta.Labels, selector)...)
+	errs = append(errs, validateOpenShiftFailureDomains(parentPath.Child("failureDomains"), template.FailureDomains)...)
 
 	return errs
 }
@@ -287,6 +294,40 @@ func validateTemplateLabels(labelsPath *field.Path, templateLabels map[string]st
 
 	if selector != nil && !selector.Matches(labels.Set(templateLabels)) {
 		errs = append(errs, field.Invalid(labelsPath, templateLabels, "selector does not match template labels"))
+	}
+
+	return errs
+}
+
+// validateOpenShiftFailureDomains checks that the configuration of the failure domains is correct.
+// In particular, it checks the discriminated unions are valid and that the platform type is one of the supported
+// platform types.
+func validateOpenShiftFailureDomains(parentPath *field.Path, failureDomains machinev1.FailureDomains) []error {
+	errs := []error{}
+
+	// Check that the union is a valid discriminated union.
+	errs = append(errs, validateDiscriminatedUnion(parentPath, failureDomains, "Platform")...)
+
+	// AWS failure domains have extra validation.
+	if failureDomains.Platform == configv1.AWSPlatformType {
+		errs = append(errs, validateOpenShiftAWSFailureDomains(parentPath.Child("aws"), failureDomains.AWS)...)
+	}
+
+	return errs
+}
+
+// validateOpenShiftAWSFailureDomains checks that the subnet discriminated union of each AWS failure domain is valid.
+func validateOpenShiftAWSFailureDomains(parentPath *field.Path, failureDomains *[]machinev1.AWSFailureDomain) []error {
+	errs := []error{}
+
+	if failureDomains == nil {
+		// The validation of the discriminanted union should pick up this error.
+		// Don't duplicate the error here.
+		return []error{}
+	}
+
+	for i, failureDomain := range *failureDomains {
+		errs = append(errs, validateDiscriminatedUnion(parentPath.Index(i).Child("subnet"), failureDomain.Subnet, "Type")...)
 	}
 
 	return errs
@@ -362,4 +403,67 @@ func missingFailureDomains(list1 []failuredomain.FailureDomain, list2 []failured
 	}
 
 	return missing
+}
+
+// validateDiscriminatedUnion checks that the discriminated union is valid.
+// That is, the the discriminant, if set, matches with the field that is configured, and no extra fields
+// are configured.
+func validateDiscriminatedUnion(parentPath *field.Path, union interface{}, discriminant string) []error {
+	errs := []error{}
+
+	if union == nil {
+		// The union is nil so nothing to check.
+		return []error{}
+	}
+
+	unionValue := reflect.ValueOf(union)
+
+	// If it's a pointer, dereference it before we continue.
+	if unionValue.Kind() == reflect.Pointer {
+		unionValue = unionValue.Elem()
+	}
+
+	discriminantStructField, ok := unionValue.Type().FieldByName(discriminant)
+	if !ok {
+		return []error{fmt.Errorf("%w: union does not contain a field %q", errInvalidDiscriminant, discriminant)}
+	}
+
+	discriminantJSONName := getJSONName(discriminantStructField)
+	discriminantValue := unionValue.FieldByName(discriminant).String()
+
+	// Check each field in the struct.
+	// Ignore the discriminant.
+	// Check only the field matching the discriminant value is non-nil.
+	for i := 0; i < unionValue.NumField(); i++ {
+		fieldValue := unionValue.Field(i)
+		fieldType := unionValue.Type().Field(i)
+
+		fieldJSONName := getJSONName(fieldType)
+
+		if fieldType.Name == discriminant {
+			continue
+		}
+
+		// TODO: Once the AWSResourceReference is updated, remove the second clause here.
+		// The names _should_ match on the field name, not on the json name.
+		if fieldType.Name == discriminantValue || fieldJSONName == discriminantValue {
+			if fieldValue.IsNil() {
+				errs = append(errs, field.Required(parentPath.Child(fieldJSONName), fmt.Sprintf("value required when %s is %q", discriminantJSONName, discriminantValue)))
+			}
+
+			continue
+		}
+
+		if !fieldValue.IsNil() {
+			errs = append(errs, field.Forbidden(parentPath.Child(fieldJSONName), fmt.Sprintf("value not allowed when %s is %q", discriminantJSONName, discriminantValue)))
+		}
+	}
+
+	return errs
+}
+
+// getJSONName gets the JSON name of the field from the struct tag.
+// This is used so that errors show the name as the end user would use.
+func getJSONName(structField reflect.StructField) string {
+	return strings.Split(structField.Tag.Get("json"), ",")[0]
 }
