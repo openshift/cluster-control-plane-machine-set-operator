@@ -134,37 +134,39 @@ spec:
                         - spec
                       properties:
                         failureDomains:
-                          description: FailureDomains is the list of failure domains (sometimes called availability zones) in which the ControlPlaneMachineSet should balance the Control Plane Machines. This will be merged into the ProviderSpec given in the template. This field is optional on platforms that do not require placement information, eg OpenStack.
+                          description: FailureDomains is the list of failure domains (sometimes called availability zones) in which the ControlPlaneMachineSet should balance the Control Plane Machines. This will be merged into the ProviderSpec given in the template. This field is optional on platforms that do not require placement information.
                           type: object
+                          required:
+                            - platform
                           properties:
                             aws:
-                              description: AWS configures failure domain information for the AWS platform
+                              description: AWS configures failure domain information for the AWS platform.
                               type: array
                               items:
-                                description: AWSFailureDomain configures failure domain information for the AWS platform
+                                description: AWSFailureDomain configures failure domain information for the AWS platform.
                                 type: object
                                 minProperties: 1
                                 properties:
                                   placement:
-                                    description: Placement configures the placement information for this instance
+                                    description: Placement configures the placement information for this instance.
                                     type: object
                                     required:
                                       - availabilityZone
                                     properties:
                                       availabilityZone:
-                                        description: AvailabilityZone is the availability zone of the instance
+                                        description: AvailabilityZone is the availability zone of the instance.
                                         type: string
                                   subnet:
-                                    description: Subnet is a reference to the subnet to use for this instance
+                                    description: Subnet is a reference to the subnet to use for this instance.
                                     type: object
                                     required:
                                       - type
                                     properties:
                                       arn:
-                                        description: ARN of resource
+                                        description: ARN of resource.
                                         type: string
                                       filters:
-                                        description: Filters is a set of filters used to identify a resource
+                                        description: Filters is a set of filters used to identify a resource.
                                         type: array
                                         items:
                                           description: AWSResourceFilter is a filter used to identify an AWS resource
@@ -181,29 +183,29 @@ spec:
                                               items:
                                                 type: string
                                       id:
-                                        description: ID of resource
+                                        description: ID of resource.
                                         type: string
                                       type:
                                         description: Type determines how the reference will fetch the AWS resource.
                                         type: string
                                         enum:
-                                          - id
-                                          - arn
-                                          - filters
+                                          - ID
+                                          - ARN
+                                          - Filters
                             azure:
-                              description: Azure configures failure domain information for the Azure platform
+                              description: Azure configures failure domain information for the Azure platform.
                               type: array
                               items:
-                                description: AzureFailureDomain configures failure domain information for the Azure platform
+                                description: AzureFailureDomain configures failure domain information for the Azure platform.
                                 type: object
                                 required:
                                   - zone
                                 properties:
                                   zone:
-                                    description: Availability Zone for the virtual machine. If nil, the virtual machine should be deployed to no zone
+                                    description: Availability Zone for the virtual machine. If nil, the virtual machine should be deployed to no zone.
                                     type: string
                             gcp:
-                              description: GCP configures failure domain information for the GCP platform
+                              description: GCP configures failure domain information for the GCP platform.
                               type: array
                               items:
                                 description: GCPFailureDomain configures failure domain information for the GCP platform
@@ -215,7 +217,7 @@ spec:
                                     description: Zone is the zone in which the GCP machine provider will create the VM.
                                     type: string
                             openstack:
-                              description: OpenStack configures failure domain information for the OpenStack platform
+                              description: OpenStack configures failure domain information for the OpenStack platform.
                               type: array
                               items:
                                 description: OpenStackFailureDomain configures failure domain information for the OpenStack platform
@@ -227,7 +229,7 @@ spec:
                                     description: The availability zone from which to launch the server.
                                     type: string
                             platform:
-                              description: Platform identifies the platform for which the FailureDomain represents
+                              description: Platform identifies the platform for which the FailureDomain represents. Currently supported values are AWS, Azure, GCP and OpenStack.
                               type: string
                               enum:
                                 - ""
@@ -355,7 +357,7 @@ spec:
                                         description: API version of the referent.
                                         type: string
                                       blockOwnerDeletion:
-                                        description: If true, AND if the owner has the "foregroundDeletion" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. Defaults to false. To set this field, a user needs "delete" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.
+                                        description: If true, AND if the owner has the "foregroundDeletion" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. See https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion for how the garbage collector interacts with this field and enforces the foreground deletion. Defaults to false. To set this field, a user needs "delete" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.
                                         type: boolean
                                       controller:
                                         description: If true, this reference points to the managing controller.
@@ -408,7 +410,7 @@ spec:
               type: object
               properties:
                 conditions:
-                  description: 'Conditions represents the observations of the ControlPlaneMachineSet''s current state. Known .status.conditions.type are: (TODO) TODO: Identify different condition types/reasons that will be needed.'
+                  description: 'Conditions represents the observations of the ControlPlaneMachineSet''s current state. Known .status.conditions.type are: Available, Degraded and Progressing.'
                   type: array
                   items:
                     description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }"
@@ -459,7 +461,7 @@ spec:
                   type: integer
                   format: int64
                 readyReplicas:
-                  description: ReadyReplicas is the number of Control Plane Machines created by the ControlPlaneMachineSet controller which are ready.
+                  description: ReadyReplicas is the number of Control Plane Machines created by the ControlPlaneMachineSet controller which are ready. Note that this value may be higher than the desired number of replicas while rolling updates are in-progress.
                   type: integer
                   format: int32
                 replicas:
@@ -471,7 +473,7 @@ spec:
                   type: integer
                   format: int32
                 updatedReplicas:
-                  description: UpdatedReplicas is the number of non-terminated Control Plane Machines created by the ControlPlaneMachineSet controller that have the desired provider spec.
+                  description: UpdatedReplicas is the number of non-terminated Control Plane Machines created by the ControlPlaneMachineSet controller that have the desired provider spec and are ready. This value is set to 0 when a change is detected to the desired spec. When the update strategy is RollingUpdate, this will also coincide with starting the process of updating the Machines. When the update strategy is OnDelete, this value will remain at 0 until a user deletes an existing replica and its replacement has become ready.
                   type: integer
                   format: int32
       served: true
