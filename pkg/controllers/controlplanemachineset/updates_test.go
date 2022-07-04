@@ -73,7 +73,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 	nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
 
-	healthyMachineBuilder := resourcebuilder.MachineInfo().
+	updatedMachineBuilder := resourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithNodeGVR(nodeGVR).
 		WithReady(true).
@@ -124,9 +124,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with no updates required", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -147,9 +147,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(1)
@@ -174,9 +174,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
 				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(transientError).Times(1)
@@ -200,12 +200,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, but the replacement machine is pending", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
 						pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -229,18 +229,18 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, and the replacement machine is ready", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
-					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
+					machineInfo := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
 				expectedLogsBuilder: func() []test.LogEntry {
@@ -264,18 +264,18 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					return fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError)
 				},
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
-					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
+					machineInfo := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(transientError).Times(1)
 				},
 				expectedLogsBuilder: func() []test.LogEntry {
@@ -296,12 +296,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, and the replacement machine is ready, and the old machine is already deleted", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -324,9 +324,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates are required in multiple indexes", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					// Note, in this case it should only create a single machine.
@@ -351,11 +351,11 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
 						pendingMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build(),
 					},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					// Note, in this case it should not create anything new because we are at surge capacity.
@@ -381,18 +381,18 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
 					},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					// Note, in this case, it should wait for the old Machine to go away before starting a new update.
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
-					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
+					machineInfo := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
 
@@ -414,11 +414,11 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
 					},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -441,8 +441,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with an empty index", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {},
 				},
 				setupMock: func() {
@@ -466,8 +466,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with a pending machine in an index", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
 				setupMock: func() {
@@ -491,8 +491,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with a missing index, and other indexes needing updates", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {},
 				},
 				setupMock: func() {
@@ -517,8 +517,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with a pending machine in an index, and other indexes needing updates", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
 				setupMock: func() {
@@ -577,9 +577,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with no updates required", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -600,9 +600,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, and the machine is not yet deleted", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -625,9 +625,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, and the machine has been deleted", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
@@ -651,9 +651,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
 				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
@@ -676,12 +676,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, and replacement machine is pending", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
 						pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Times(0)
@@ -705,12 +705,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in a single index, and replacement machine is ready", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Times(0)
@@ -733,9 +733,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in multiple indexes, and the machines are not yet deleted", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -769,9 +769,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
 				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
@@ -804,9 +804,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in multiple indexes, and a machine has been deleted", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
@@ -839,9 +839,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Return(nil).Times(0)
@@ -875,12 +875,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is pending", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
 						pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -915,14 +915,14 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
 						pendingMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build(),
 					},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
 						pendingMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -957,12 +957,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is ready", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -996,14 +996,14 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
 						pendingMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build(),
 					},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1038,14 +1038,14 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("node-replacement-0").Build(),
 					},
 					1: {
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
-						healthyMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithNodeName("node-replacement-1").Build(),
 					},
-					2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1078,8 +1078,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with an empty index", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {},
 				},
 				setupMock: func() {
@@ -1103,8 +1103,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with a pending machine in an index", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
 				setupMock: func() {
@@ -1128,8 +1128,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with a missing index, and other indexes need updating", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {},
 				},
 				setupMock: func() {
@@ -1163,8 +1163,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			PEntry("with a pending machine in an index, and other indexes need updating", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
-					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
 				setupMock: func() {

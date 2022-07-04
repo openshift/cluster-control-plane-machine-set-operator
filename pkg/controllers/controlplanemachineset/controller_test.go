@@ -748,7 +748,7 @@ var _ = Describe("validateClusterState", func() {
 	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 	nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
 
-	healthyMachineBuilder := resourcebuilder.MachineInfo().
+	updatedMachineBuilder := resourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithNodeGVR(nodeGVR).
 		WithReady(true).
@@ -813,9 +813,9 @@ var _ = Describe("validateClusterState", func() {
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
-				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
-				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
-				2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
 			},
 			nodes: []*corev1.Node{
 				masterNodeBuilder.WithName("master-0").Build(),
@@ -838,9 +838,9 @@ var _ = Describe("validateClusterState", func() {
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
-				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
-				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
-				2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
 			},
 			nodes: []*corev1.Node{
 				masterNodeBuilder.WithName("master-0").Build(),
@@ -897,7 +897,7 @@ var _ = Describe("validateClusterState", func() {
 			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {pendingMachineBuilder.WithIndex(0).WithMachineName("machine-0").Build()},
-				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
 				2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-2").Build()},
 			},
 			nodes: []*corev1.Node{
@@ -929,9 +929,9 @@ var _ = Describe("validateClusterState", func() {
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
 			}),
 			machineInfos: map[int32][]machineproviders.MachineInfo{
-				0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
-				1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
-				2: {healthyMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
 			},
 			nodes: []*corev1.Node{
 				masterNodeBuilder.WithName("master-0").Build(),

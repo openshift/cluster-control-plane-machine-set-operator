@@ -444,9 +444,7 @@ func validateDiscriminatedUnion(parentPath *field.Path, union interface{}, discr
 			continue
 		}
 
-		// TODO: Once the AWSResourceReference is updated, remove the second clause here.
-		// The names _should_ match on the field name, not on the json name.
-		if fieldType.Name == discriminantValue || fieldJSONName == discriminantValue {
+		if fieldType.Name == discriminantValue {
 			if fieldValue.IsNil() {
 				errs = append(errs, field.Required(parentPath.Child(fieldJSONName), fmt.Sprintf("value required when %s is %q", discriminantJSONName, discriminantValue)))
 			}
