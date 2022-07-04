@@ -92,29 +92,33 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type rollingUpdateTableInput struct {
-			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
-			machineInfos   map[int32][]machineproviders.MachineInfo
-			setupMock      func()
-			expectedError  error
-			expectedResult ctrl.Result
-			expectedLogs   []test.LogEntry
+			cpmsBuilder          resourcebuilder.ControlPlaneMachineSetInterface
+			machineInfos         map[int32][]machineproviders.MachineInfo
+			setupMock            func()
+			expectedErrorBuilder func() error
+			expectedResult       ctrl.Result
+			expectedLogsBuilder  func() []test.LogEntry
 		}
 
 		DescribeTable("should implement the update strategy based on the MachineInfo", func(in rollingUpdateTableInput) {
 			// We setup the mock machine provider on each test with the expected assertions.
 			in.setupMock()
 
+			var errExpected error
 			cpms := cpmsBuilder.Build()
 			originalCPMS := cpms.DeepCopy()
+			if in.expectedErrorBuilder != nil {
+				errExpected = in.expectedErrorBuilder()
+			}
 
 			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), cpms, mockMachineProvider, in.machineInfos)
-			if in.expectedError != nil {
-				Expect(err).To(MatchError(in.expectedError))
+			if errExpected != nil {
+				Expect(err).To(MatchError(errExpected))
 			} else {
 				Expect(err).ToNot(HaveOccurred())
 			}
 			Expect(result).To(Equal(in.expectedResult))
-			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+			Expect(logger.Entries()).To(ConsistOf(in.expectedLogsBuilder()))
 			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
 		},
 			PEntry("with no updates required", rollingUpdateTableInput{
@@ -128,14 +132,16 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
-						Level: 4,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.RollingUpdate,
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 4,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+							},
+							Message: noUpdatesRequired,
 						},
-						Message: noUpdatesRequired,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index", rollingUpdateTableInput{
@@ -149,22 +155,24 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.RollingUpdate,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: createdReplacement,
 						},
-						Message: createdReplacement,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and an error occurs", rollingUpdateTableInput{
-				cpmsBuilder:   cpmsBuilder.WithReplicas(3),
-				expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
+				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -174,17 +182,19 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
-						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.RollingUpdate,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: errorCreatingMachine,
 						},
-						Message: errorCreatingMachine,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, but the replacement machine is pending", rollingUpdateTableInput{
@@ -201,8 +211,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -213,6 +223,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and the replacement machine is ready", rollingUpdateTableInput{
@@ -232,22 +243,26 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
-				expectedLogs: []test.LogEntry{
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.RollingUpdate,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: removingOldMachine,
 						},
-						Message: removingOldMachine,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and the replacement machine is ready, and an error occurs", rollingUpdateTableInput{
-				cpmsBuilder:   cpmsBuilder.WithReplicas(3),
-				expectedError: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				expectedErrorBuilder: func() error {
+					return fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError)
+				},
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -263,17 +278,19 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo := healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(transientError).Times(1)
 				},
-				expectedLogs: []test.LogEntry{
-					{
-						Error: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.RollingUpdate,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Error: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: errorDeletingMachine,
 						},
-						Message: errorDeletingMachine,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and the replacement machine is ready, and the old machine is already deleted", rollingUpdateTableInput{
@@ -290,8 +307,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -301,6 +318,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForRemoved,
 					},
+					}
 				},
 			}),
 			PEntry("with updates are required in multiple indexes", rollingUpdateTableInput{
@@ -315,8 +333,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -326,6 +344,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: createdReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with updates are required in multiple indexes, but the replacement machine is pending", rollingUpdateTableInput{
@@ -343,8 +362,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -355,6 +374,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with updates are required in multiple indexes, and the replacement machine is ready", rollingUpdateTableInput{
@@ -376,8 +396,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
 
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -387,6 +407,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: removingOldMachine,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and the replacement machine is ready, and the old machine is already deleted", rollingUpdateTableInput{
@@ -403,8 +424,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -414,6 +435,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForRemoved,
 					},
+					}
 				},
 			}),
 			PEntry("with an empty index", rollingUpdateTableInput{
@@ -427,8 +449,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -438,6 +460,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: createdReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with a pending machine in an index", rollingUpdateTableInput{
@@ -451,8 +474,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -462,6 +485,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReady,
 					},
+					}
 				},
 			}),
 			PEntry("with a missing index, and other indexes needing updates", rollingUpdateTableInput{
@@ -476,8 +500,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -487,6 +511,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: createdReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with a pending machine in an index, and other indexes needing updates", rollingUpdateTableInput{
@@ -500,8 +525,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -511,6 +536,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReady,
 					},
+					}
 				},
 			}),
 		)
@@ -522,12 +548,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type onDeleteUpdateTableInput struct {
-			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
-			machineInfos   map[int32][]machineproviders.MachineInfo
-			setupMock      func()
-			expectedError  error
-			expectedResult ctrl.Result
-			expectedLogs   []test.LogEntry
+			cpmsBuilder          resourcebuilder.ControlPlaneMachineSetInterface
+			machineInfos         map[int32][]machineproviders.MachineInfo
+			setupMock            func()
+			expectedErrorBuilder func() error
+			expectedResult       ctrl.Result
+			expectedLogsBuilder  func() []test.LogEntry
 		}
 
 		DescribeTable("should implement the update strategy based on the MachineInfo", func(in onDeleteUpdateTableInput) {
@@ -538,14 +564,14 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			originalCPMS := cpms.DeepCopy()
 
 			result, err := reconciler.reconcileMachineUpdates(ctx, logger.Logger(), cpms, mockMachineProvider, in.machineInfos)
-			if in.expectedError != nil {
-				Expect(err).To(MatchError(in.expectedError))
+			if in.expectedErrorBuilder != nil {
+				Expect(err).To(MatchError(in.expectedErrorBuilder()))
 			} else {
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			Expect(result).To(Equal(in.expectedResult))
-			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+			Expect(logger.Entries()).To(ConsistOf(in.expectedLogsBuilder()))
 			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
 		},
 			PEntry("with no updates required", onDeleteUpdateTableInput{
@@ -559,14 +585,16 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
-						Level: 4,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 4,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+							},
+							Message: noUpdatesRequired,
 						},
-						Message: noUpdatesRequired,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and the machine is not yet deleted", onDeleteUpdateTableInput{
@@ -580,8 +608,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -591,6 +619,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and the machine has been deleted", onDeleteUpdateTableInput{
@@ -604,8 +633,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -615,10 +644,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: createdReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and the machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
-				cpmsBuilder: cpmsBuilder.WithReplicas(3), expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
+				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -628,8 +659,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -639,6 +670,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: errorCreatingMachine,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and replacement machine is pending", onDeleteUpdateTableInput{
@@ -655,8 +687,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -667,6 +699,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in a single index, and replacement machine is ready", onDeleteUpdateTableInput{
@@ -683,8 +716,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 0).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -694,6 +727,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForRemoved,
 					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and the machines are not yet deleted", onDeleteUpdateTableInput{
@@ -707,8 +741,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -718,20 +752,22 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: machineRequiresUpdate,
 						},
-						Message: machineRequiresUpdate,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in a multiple indexes, and machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
-				cpmsBuilder: cpmsBuilder.WithReplicas(3), expectedError: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
+				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {healthyMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()},
 					1: {healthyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
@@ -741,8 +777,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -752,16 +788,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: errorCreatingMachine,
 						},
-						Message: errorCreatingMachine,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and a machine has been deleted", onDeleteUpdateTableInput{
@@ -775,8 +812,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -786,16 +823,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: createdReplacement,
 						},
-						Message: createdReplacement,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted", onDeleteUpdateTableInput{
@@ -810,8 +848,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 1).Return(nil).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -821,16 +859,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: createdReplacement,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: createdReplacement,
 						},
-						Message: createdReplacement,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is pending", onDeleteUpdateTableInput{
@@ -847,8 +886,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -858,17 +897,18 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
-							"replacementName", "machine-replacement-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+								"replacementName", "machine-replacement-1",
+							},
+							Message: waitingForReplacement,
 						},
-						Message: waitingForReplacement,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and the replacement machines are pending", onDeleteUpdateTableInput{
@@ -888,8 +928,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -900,17 +940,18 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReplacement,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
-							"replacementName", "machine-replacement-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+								"replacementName", "machine-replacement-1",
+							},
+							Message: waitingForReplacement,
 						},
-						Message: waitingForReplacement,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is ready", onDeleteUpdateTableInput{
@@ -927,8 +968,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -938,16 +979,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: waitingForRemoved,
 						},
-						Message: waitingForRemoved,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and a replacement machine is ready, and a replacement machine is pending", onDeleteUpdateTableInput{
@@ -967,8 +1009,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -979,16 +1021,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReplacement,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: waitingForRemoved,
 						},
-						Message: waitingForRemoved,
-					},
+					}
 				},
 			}),
 			PEntry("with updates required in multiple indexes, and multiple machines have been deleted, and all replacement machines are ready", onDeleteUpdateTableInput{
@@ -1008,8 +1051,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1019,16 +1062,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForRemoved,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
-							"namespace", namespaceName,
-							"name", "machine-1",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: waitingForRemoved,
 						},
-						Message: waitingForRemoved,
-					},
+					}
 				},
 			}),
 			PEntry("with an empty index", onDeleteUpdateTableInput{
@@ -1042,8 +1086,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1053,6 +1097,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: createdReplacement,
 					},
+					}
 				},
 			}),
 			PEntry("with a pending machine in an index", onDeleteUpdateTableInput{
@@ -1066,8 +1111,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1077,6 +1122,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: waitingForReady,
 					},
+					}
 				},
 			}),
 			PEntry("with a missing index, and other indexes need updating", onDeleteUpdateTableInput{
@@ -1090,8 +1136,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), 2).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1101,16 +1147,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 2,
-							"namespace", namespaceName,
-							"name", "<Unknown>",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 2,
+								"namespace", namespaceName,
+								"name", "<Unknown>",
+							},
+							Message: createdReplacement,
 						},
-						Message: createdReplacement,
-					},
+					}
 				},
 			}),
 			PEntry("with a pending machine in an index, and other indexes need updating", onDeleteUpdateTableInput{
@@ -1124,8 +1171,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogs: []test.LogEntry{
-					{
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1135,16 +1182,17 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
-					{
-						Level: 2,
-						KeysAndValues: []interface{}{
-							"updateStrategy", machinev1.OnDelete,
-							"index", 2,
-							"namespace", namespaceName,
-							"name", "machine-replacement-2",
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", 2,
+								"namespace", namespaceName,
+								"name", "machine-replacement-2",
+							},
+							Message: waitingForReady,
 						},
-						Message: waitingForReady,
-					},
+					}
 				},
 			}),
 		)
