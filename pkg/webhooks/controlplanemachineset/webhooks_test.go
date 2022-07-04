@@ -273,8 +273,8 @@ var _ = Describe("Webhooks", func() {
 				}
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"arn\""),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"arn\""),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"ARN\""),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"ARN\""),
 				)))
 			})
 		})
@@ -372,8 +372,8 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-different]}]}}"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-different]}]}}"),
 				)))
 			})
 
@@ -387,8 +387,8 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:id, Value:subnet-us-east-1c}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:ID, Value:subnet-us-east-1c}}]"),
 				)))
 			})
 
@@ -401,8 +401,8 @@ var _ = Describe("Webhooks", func() {
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
 				)))
 			})
 
@@ -416,7 +416,7 @@ var _ = Describe("Webhooks", func() {
 					),
 				)).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"))
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"))
 			})
 
 			It("when the availability zones don't match", func() {
@@ -430,13 +430,13 @@ var _ = Describe("Webhooks", func() {
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s)"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1e, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1f, Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1e, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1f, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
 				)))
 			})
 		})
@@ -543,8 +543,8 @@ var _ = Describe("Webhooks", func() {
 					},
 				}
 			})()).To(MatchError(SatisfyAll(
-				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"arn\""),
-				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"arn\""),
+				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"ARN\""),
+				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"ARN\""),
 			)))
 		})
 	})

@@ -60,9 +60,9 @@ var _ = Describe("FailureDomains", func() {
 
 			It("should construct a list of failure domains", func() {
 				Expect(failureDomains).To(ConsistOf(
-					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:id, Value:subenet-us-east-1a}}"),
-					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:id, Value:subenet-us-east-1b}}"),
-					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:id, Value:subenet-us-east-1c}}"),
+					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:ID, Value:subenet-us-east-1a}}"),
+					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:ID, Value:subenet-us-east-1b}}"),
+					HaveField("String()", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:ID, Value:subenet-us-east-1c}}"),
 				))
 			})
 		})
@@ -269,7 +269,7 @@ var _ = Describe("FailureDomains", func() {
 				})
 
 				It("returns the subnet for String()", func() {
-					Expect(fd.String()).To(Equal("AWSFailureDomain{Subnet:{Type:arn, Value:subnet-us-east-1a}}"))
+					Expect(fd.String()).To(Equal("AWSFailureDomain{Subnet:{Type:ARN, Value:subnet-us-east-1a}}"))
 				})
 			})
 
@@ -287,7 +287,7 @@ var _ = Describe("FailureDomains", func() {
 				})
 
 				It("returns the subnet for String()", func() {
-					Expect(fd.String()).To(Equal("AWSFailureDomain{Subnet:{Type:filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}"))
+					Expect(fd.String()).To(Equal("AWSFailureDomain{Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}"))
 				})
 			})
 
@@ -302,7 +302,7 @@ var _ = Describe("FailureDomains", func() {
 				})
 
 				It("returns the subnet for String()", func() {
-					Expect(fd.String()).To(Equal("AWSFailureDomain{Subnet:{Type:id, Value:subnet-us-east-1c}}"))
+					Expect(fd.String()).To(Equal("AWSFailureDomain{Subnet:{Type:ID, Value:subnet-us-east-1c}}"))
 				})
 			})
 		})
