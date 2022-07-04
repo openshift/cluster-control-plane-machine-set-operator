@@ -31,6 +31,7 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -113,7 +114,7 @@ var _ = Describe("With a running controller", func() {
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 		})
 
-		PIt("should add the controlplanemachineset.machine.openshift.io finalizer", func() {
+		It("should add the controlplanemachineset.machine.openshift.io finalizer", func() {
 			Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
 		})
 	})
@@ -144,7 +145,7 @@ var _ = Describe("With a running controller", func() {
 				Expect(cpms.ObjectMeta.Finalizers).To(BeEmpty())
 			})
 
-			PIt("should re-add the controlplanemachineset.machine.openshift.io finalizer", func() {
+			It("should re-add the controlplanemachineset.machine.openshift.io finalizer", func() {
 				Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
 			})
 		})
@@ -236,11 +237,11 @@ var _ = Describe("ensureFinalizer", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		PIt("returns that it updated the finalizer", func() {
+		It("returns that it updated the finalizer", func() {
 			Expect(updatedFinalizer).To(BeTrue())
 		})
 
-		PIt("sets an appropriate log line", func() {
+		It("sets an appropriate log line", func() {
 			Expect(logger.Entries()).To(ConsistOf(
 				test.LogEntry{
 					Level:   2,
@@ -249,7 +250,7 @@ var _ = Describe("ensureFinalizer", func() {
 			))
 		})
 
-		PIt("ensures the finalizer is set on the API", func() {
+		It("ensures the finalizer is set on the API", func() {
 			Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
 		})
 
@@ -281,7 +282,7 @@ var _ = Describe("ensureFinalizer", func() {
 			Expect(updatedFinalizer).To(BeFalse())
 		})
 
-		PIt("sets an appropriate log line", func() {
+		It("sets an appropriate log line", func() {
 			Expect(logger.Entries()).To(ConsistOf(
 				test.LogEntry{
 					Level:   4,
@@ -311,15 +312,15 @@ var _ = Describe("ensureFinalizer", func() {
 			updatedFinalizer, err = reconciler.ensureFinalizer(ctx, logger.Logger(), originalCPMS)
 		})
 
-		PIt("should return a conflict error", func() {
-			Expect(err).To(MatchError(ContainSubstring("TODO")))
+		It("should return a conflict error", func() {
+			Expect(apierrors.ReasonForError(err)).To(Equal(metav1.StatusReasonConflict))
 		})
 
 		It("returns that it did not update the finalizer", func() {
 			Expect(updatedFinalizer).To(BeFalse())
 		})
 
-		PIt("does not log", func() {
+		It("does not log", func() {
 			Expect(logger.Entries()).To(BeEmpty())
 		})
 
