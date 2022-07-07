@@ -43,17 +43,77 @@ import (
 var _ = Describe("MachineProvider", func() {
 	const ownerUID = "uid-1234abcd"
 	const ownerName = "machineOwner"
-	const awsSubnetName = "aws-subnet-12345678"
 
 	var namespaceName string
 	var logger test.TestLogger
 
-	subnetRef := machinev1.AWSResourceReference{
+	usEast1aSubnet := machinev1.AWSResourceReference{
 		Type: machinev1.AWSFiltersReferenceType,
-		Filters: &[]machinev1.AWSResourceFilter{{
-			Name:   "tag:Name",
-			Values: []string{awsSubnetName},
-		}},
+		Filters: &[]machinev1.AWSResourceFilter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1a",
+				},
+			},
+		},
+	}
+
+	usEast1bSubnet := machinev1.AWSResourceReference{
+		Type: machinev1.AWSFiltersReferenceType,
+		Filters: &[]machinev1.AWSResourceFilter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1b",
+				},
+			},
+		},
+	}
+
+	usEast1cSubnet := machinev1.AWSResourceReference{
+		Type: machinev1.AWSFiltersReferenceType,
+		Filters: &[]machinev1.AWSResourceFilter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1c",
+				},
+			},
+		},
+	}
+
+	usEast1aSubnetbeta1 := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1a",
+				},
+			},
+		},
+	}
+
+	usEast1bSubnetbeta1 := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1b",
+				},
+			},
+		},
+	}
+
+	usEast1cSubnetbeta1 := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1c",
+				},
+			},
+		},
 	}
 
 	BeforeEach(OncePerOrdered, func() {
@@ -73,20 +133,22 @@ var _ = Describe("MachineProvider", func() {
 	})
 
 	Context("GetMachineInfos", func() {
-		const clusterID = "cpms-machine-info-test-id"
+		const clusterID = "cpms-cluster-test-id"
 
 		providerSpecBuilder := resourcebuilder.AWSProviderSpec()
-		masterMachineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+		masterMachineBuilder := resourcebuilder.Machine().AsMaster().WithLabel(machinev1beta1.MachineClusterIDLabel, clusterID).WithNamespace(namespaceName)
 
 		machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 		nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
 
 		masterLabels := resourcebuilder.NewMachineRoleLabels("master")
+		masterLabels[machinev1beta1.MachineClusterIDLabel] = clusterID
 
 		unreadyMachineInfoBuilder := resourcebuilder.MachineInfo().
 			WithMachineGVR(machineGVR).
 			WithMachineLabels(masterLabels).
 			WithMachineNamespace(namespaceName).
+			WithNodeGVR(nodeGVR).
 			WithReady(false).
 			WithNeedsUpdate(false)
 
@@ -122,6 +184,12 @@ var _ = Describe("MachineProvider", func() {
 				Expect(k8sClient.Status().Update(ctx, machine)).To(Succeed())
 			}
 
+			// Inject namespace in the expected machine infos since it doesn't happen during
+			// initial building.
+			for i := 0; i < len(in.expectedMachineInfos); i++ {
+				in.expectedMachineInfos[i].MachineRef.ObjectMeta.SetNamespace(namespaceName)
+			}
+
 			cpms := resourcebuilder.ControlPlaneMachineSet().Build()
 
 			template := resourcebuilder.OpenShiftMachineV1Beta1Template().
@@ -149,10 +217,20 @@ var _ = Describe("MachineProvider", func() {
 				Expect(err).ToNot(HaveOccurred())
 			}
 
+			// We have to explicitly unset these parameters on the resulted machine infos
+			// because otherwise they would differ from the expected ones.
+			for i := 0; i < len(machineInfos); i++ {
+				machineInfos[i].MachineRef.ObjectMeta.ManagedFields = nil
+				machineInfos[i].MachineRef.ObjectMeta.UID = ""
+				machineInfos[i].MachineRef.ObjectMeta.Generation = 0
+				machineInfos[i].MachineRef.ObjectMeta.ResourceVersion = ""
+				machineInfos[i].MachineRef.ObjectMeta.CreationTimestamp = metav1.Time{}
+			}
+
 			Expect(machineInfos).To(ConsistOf(in.expectedMachineInfos))
 			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
 		},
-			PEntry("with no Machines", getMachineInfosTableInput{
+			Entry("with no Machines", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{},
 				failureDomains: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
@@ -162,19 +240,19 @@ var _ = Describe("MachineProvider", func() {
 				expectedMachineInfos: []machineproviders.MachineInfo{},
 				expectedLogs:         []test.LogEntry{},
 			}),
-			PEntry("with unready Machines", getMachineInfosTableInput{
+			Entry("with unready Machines", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("").Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Provisioning").Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Provisioned").Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					unreadyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).Build(),
@@ -187,7 +265,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "",
-							"index", 0,
+							"index", int32(0),
 							"ready", false,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -199,7 +277,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "",
-							"index", 1,
+							"index", int32(1),
 							"ready", false,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -211,7 +289,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "",
-							"index", 2,
+							"index", int32(2),
 							"ready", false,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -220,19 +298,19 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("with ready Machines", getMachineInfosTableInput{
+			Entry("with ready Machines", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
@@ -245,7 +323,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -257,7 +335,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "node-1",
-							"index", 1,
+							"index", int32(1),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -269,7 +347,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -278,19 +356,19 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("with Machines using the random suffix pattern", getMachineInfosTableInput{
+			Entry("with Machines using the random suffix pattern", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("abcde-0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("abcde-0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("fghij-1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("fghij-1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("abcde-0")).WithNodeName("node-0").Build(),
@@ -303,7 +381,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("abcde-0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -315,7 +393,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("fghij-1"),
 							"nodeName", "node-1",
-							"index", 1,
+							"index", int32(1),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -327,7 +405,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -336,19 +414,19 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("with one Machine with a different instance type", getMachineInfosTableInput{
+			Entry("with one Machine with a different instance type", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithInstanceType("different").WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithInstanceType("different").WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
@@ -361,7 +439,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -373,7 +451,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "node-1",
-							"index", 1,
+							"index", int32(1),
 							"ready", true,
 							"needsUpdate", true,
 							"errorMessage", "",
@@ -385,7 +463,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -394,19 +472,19 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("with one Machine with an unknown failure domain", getMachineInfosTableInput{
+			Entry("with one Machine with an unknown failure domain", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
 					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1d")).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").WithNeedsUpdate(true).Build(),
@@ -419,7 +497,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", true,
 							"needsUpdate", true,
 							"errorMessage", "",
@@ -431,7 +509,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "node-1",
-							"index", 1,
+							"index", int32(1),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -443,7 +521,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -452,21 +530,21 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("with multiple Machines in an index in different states", getMachineInfosTableInput{
+			Entry("with multiple Machines in an index in different states", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
 					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithInstanceType("different").WithAvailabilityZone("us-east-1c")).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("abcde-2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("abcde-2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-replacement-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
@@ -480,7 +558,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -492,7 +570,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "node-1",
-							"index", 1,
+							"index", int32(1),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -504,7 +582,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", true,
 							"errorMessage", "",
@@ -516,7 +594,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("abcde-2"),
 							"nodeName", "node-replacement-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -525,19 +603,19 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("when the failure domain mapping does not match, names take precedence for indexing", getMachineInfosTableInput{
+			Entry("when the failure domain mapping does not match, names take precedence for indexing", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
@@ -550,8 +628,8 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
-							"ready", false,
+							"index", int32(0),
+							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
 						},
@@ -562,8 +640,8 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "node-1",
-							"index", 1,
-							"ready", false,
+							"index", int32(1),
+							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
 						},
@@ -574,8 +652,8 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
-							"ready", false,
+							"index", int32(2),
+							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
 						},
@@ -583,57 +661,57 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("when the machine names do not fit the pattern, fall back to matching on failure domains", getMachineInfosTableInput{
+			Entry("when the machine names do not fit the pattern, fall back to matching on failure domains", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(clusterID + "-machine-a").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
-						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(clusterID + "-machine-1").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(clusterID + "-machine-a").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.WithName(clusterID + "-master-c").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(clusterID + "-machine-0").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
+						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
+					masterMachineBuilder.WithName(clusterID + "-master-c").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
-					readyMachineInfoBuilder.WithIndex(0).WithMachineName(clusterID + "-machine-1").WithNodeName("node-1").Build(),
-					readyMachineInfoBuilder.WithIndex(1).WithMachineName(clusterID + "master-c").WithNodeName("node-2").Build(),
-					readyMachineInfoBuilder.WithIndex(2).WithMachineName(clusterID + "machine-a").WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(0).WithMachineName(clusterID + "-machine-0").WithNodeName("node-0").Build(),
+					readyMachineInfoBuilder.WithIndex(1).WithMachineName(clusterID + "-master-c").WithNodeName("node-2").Build(),
+					readyMachineInfoBuilder.WithIndex(2).WithMachineName(clusterID + "-machine-a").WithNodeName("node-1").Build(),
 				},
 				expectedLogs: []test.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"machineName", clusterID + "-machine-1",
-							"nodeName", "node-1",
-							"index", 0,
-							"ready", false,
-							"needsUpdate", false,
-							"errorMessage", "",
-						},
-						Message: "Gathered Machine Info",
-					},
-					{
-						Level: 4,
-						KeysAndValues: []interface{}{
-							"machineName", clusterID + "master-c",
-							"nodeName", "node-2",
-							"index", 1,
-							"ready", false,
-							"needsUpdate", false,
-							"errorMessage", "",
-						},
-						Message: "Gathered Machine Info",
-					},
-					{
-						Level: 4,
-						KeysAndValues: []interface{}{
-							"machineName", clusterID + "machine-a",
+							"machineName", clusterID + "-machine-0",
 							"nodeName", "node-0",
-							"index", 2,
-							"ready", false,
+							"index", int32(0),
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", clusterID + "-master-c",
+							"nodeName", "node-2",
+							"index", int32(1),
+							"ready", true,
+							"needsUpdate", false,
+							"errorMessage", "",
+						},
+						Message: "Gathered Machine Info",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"machineName", clusterID + "-machine-a",
+							"nodeName", "node-1",
+							"index", int32(2),
+							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
 						},
@@ -641,9 +719,9 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("when the machine names do not fit the pattern, and the failure domains are not recognised, returns an error", getMachineInfosTableInput{
+			Entry("when the machine names do not fit the pattern, and the failure domains are not recognised, returns an error", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(clusterID + "-machine-a").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(clusterID + "-machine-a").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
 					masterMachineBuilder.WithName(clusterID + "-machine-1").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1f")).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
@@ -651,35 +729,32 @@ var _ = Describe("MachineProvider", func() {
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
 				},
 				expectedError:        errCouldNotDetermineMachineIndex,
 				expectedMachineInfos: []machineproviders.MachineInfo{},
 				expectedLogs: []test.LogEntry{
 					{
-						Error: errCouldNotDetermineMachineIndex,
-						KeysAndValues: []interface{}{
-							"machineName", clusterID + "-machine-a",
-						},
+						Error:   errCouldNotDetermineMachineIndex,
 						Message: "Could not gather Machine Info",
 					},
 				},
 			}),
-			PEntry("with Machines that have errored in some way", getMachineInfosTableInput{
+			Entry("with Machines that have errored in some way", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Failed").WithErrorMessage("Node missing").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Failed").WithErrorMessage("Cannot create VM").Build(),
-					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					masterMachineBuilder.WithName(masterMachineName("2")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					unreadyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithReady(false).WithErrorMessage("Node missing").WithNodeName("node-0").Build(),
@@ -692,7 +767,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", false,
 							"needsUpdate", false,
 							"errorMessage", "Node missing",
@@ -704,7 +779,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "",
-							"index", 1,
+							"index", int32(1),
 							"ready", false,
 							"needsUpdate", false,
 							"errorMessage", "Cannot create VM",
@@ -716,7 +791,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("2"),
 							"nodeName", "node-2",
-							"index", 2,
+							"index", int32(2),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -725,19 +800,19 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			PEntry("with additional Machines, not matched by the selector, ignores them", getMachineInfosTableInput{
+			Entry("with additional Machines, not matched by the selector, ignores them", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a")).
+					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b")).
+					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					masterMachineBuilder.AsWorker().WithName("worker-abcde").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c")).
+					resourcebuilder.Machine().AsWorker().WithNamespace(namespaceName).WithName("worker-abcde").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
 						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
 				},
 				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()),
-					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build()),
-					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").Build()),
+					0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+					1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+					2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 				},
 				expectedMachineInfos: []machineproviders.MachineInfo{
 					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
@@ -749,7 +824,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("0"),
 							"nodeName", "node-0",
-							"index", 0,
+							"index", int32(0),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -761,7 +836,7 @@ var _ = Describe("MachineProvider", func() {
 						KeysAndValues: []interface{}{
 							"machineName", masterMachineName("1"),
 							"nodeName", "node-1",
-							"index", 1,
+							"index", int32(1),
 							"ready", true,
 							"needsUpdate", false,
 							"errorMessage", "",
@@ -856,7 +931,7 @@ var _ = Describe("MachineProvider", func() {
 								KeysAndValues: []interface{}{
 									"index", index,
 									"machineName", machine.Name,
-									"failureDomain", fmt.Sprintf("AWSFailureDomain{AvailabilityZone:%s, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[%s]}]}}", failureDomain, awsSubnetName),
+									"failureDomain", fmt.Sprintf("AWSFailureDomain{AvailabilityZone:%s, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-%s]}]}}", failureDomain, failureDomain),
 								},
 								Message: "Created machine",
 							},
@@ -881,9 +956,9 @@ var _ = Describe("MachineProvider", func() {
 				provider = &openshiftMachineProvider{
 					client: k8sClient,
 					indexToFailureDomain: map[int32]failuredomain.FailureDomain{
-						0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(subnetRef).Build()),
-						1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(subnetRef).Build()),
-						2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(subnetRef).Build()),
+						0: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
+						1: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
+						2: failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 					},
 					machineSelector: resourcebuilder.ControlPlaneMachineSet().Build().Spec.Selector,
 					machineTemplate: *template.OpenShiftMachineV1Beta1Machine,
@@ -897,9 +972,9 @@ var _ = Describe("MachineProvider", func() {
 				}
 			})
 
-			assertCreatesMachine(0, providerConfigBuilder.WithAvailabilityZone("us-east-1a"), "cpms-aws-cluster-id", "us-east-1a")
-			assertCreatesMachine(1, providerConfigBuilder.WithAvailabilityZone("us-east-1b"), "cpms-aws-cluster-id", "us-east-1b")
-			assertCreatesMachine(2, providerConfigBuilder.WithAvailabilityZone("us-east-1c"), "cpms-aws-cluster-id", "us-east-1c")
+			assertCreatesMachine(0, providerConfigBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1), "cpms-aws-cluster-id", "us-east-1a")
+			assertCreatesMachine(1, providerConfigBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1), "cpms-aws-cluster-id", "us-east-1b")
+			assertCreatesMachine(2, providerConfigBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1), "cpms-aws-cluster-id", "us-east-1c")
 
 			Context("if the Machine template is missing the cluster ID label", func() {
 				var err error
