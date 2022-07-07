@@ -962,11 +962,12 @@ var _ = Describe("MachineProvider", func() {
 
 				BeforeEach(func() {
 					machineRef.ObjectMeta.Name = machineName
+					machineRef.ObjectMeta.Namespace = namespaceName
 
 					err = machineProvider.DeleteMachine(ctx, logger.Logger(), machineRef)
 				})
 
-				PIt("deletes the Machine", func() {
+				It("deletes the Machine", func() {
 					machine := resourcebuilder.Machine().
 						WithNamespace(namespaceName).
 						WithName(machineName).
@@ -977,11 +978,11 @@ var _ = Describe("MachineProvider", func() {
 					Eventually(komega.Get(machine)).Should(MatchError(notFoundErr))
 				})
 
-				PIt("does not error", func() {
+				It("does not error", func() {
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				PIt("logs that the machine was deleted", func() {
+				It("logs that the machine was deleted", func() {
 					Expect(logger.Entries()).To(ConsistOf(
 						test.LogEntry{
 							Level: 2,
@@ -1003,11 +1004,12 @@ var _ = Describe("MachineProvider", func() {
 
 				BeforeEach(func() {
 					machineRef.ObjectMeta.Name = unknown
+					machineRef.ObjectMeta.Namespace = namespaceName
 
 					err = machineProvider.DeleteMachine(ctx, logger.Logger(), machineRef)
 				})
 
-				PIt("does not delete the existing Machine", func() {
+				It("does not delete the existing Machine", func() {
 					machine := resourcebuilder.Machine().
 						WithNamespace(namespaceName).
 						WithName(machineName).
@@ -1016,11 +1018,11 @@ var _ = Describe("MachineProvider", func() {
 					Consistently(komega.Get(machine)).Should(Succeed())
 				})
 
-				PIt("does not error", func() {
+				It("does not error", func() {
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				PIt("logs that the machine was already deleted", func() {
+				It("logs that the machine was already deleted", func() {
 					Expect(logger.Entries()).To(ConsistOf(
 						test.LogEntry{
 							Level: 2,
@@ -1051,11 +1053,11 @@ var _ = Describe("MachineProvider", func() {
 				err = machineProvider.DeleteMachine(ctx, logger.Logger(), machineRef)
 			})
 
-			PIt("returns an error", func() {
+			It("returns an error", func() {
 				Expect(err).To(MatchError(fmt.Errorf("%w: expected %s, got %s", errUnknownGroupVersionResource, machinev1beta1.GroupVersion.WithResource("machines").String(), machinev1.GroupVersion.WithResource("machines").String())))
 			})
 
-			PIt("logs the error", func() {
+			It("logs the error", func() {
 				Expect(logger.Entries()).To(ConsistOf(
 					test.LogEntry{
 						Error: errUnknownGroupVersionResource,

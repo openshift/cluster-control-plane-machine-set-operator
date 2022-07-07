@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
@@ -139,5 +140,53 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 
 // DeleteMachine deletes the Machine references in the machineRef provided.
 func (m *openshiftMachineProvider) DeleteMachine(ctx context.Context, logger logr.Logger, machineRef *machineproviders.ObjectRef) error {
+	machinesGVR := machinev1beta1.GroupVersion.WithResource("machines")
+
+	if machineRef.GroupVersionResource != machinesGVR {
+		logger.Error(errUnknownGroupVersionResource,
+			"Could not delete machine",
+			"expectedGVR", machinesGVR.String(),
+			"gotGVR", machineRef.GroupVersionResource.String(),
+		)
+
+		return fmt.Errorf("%w: expected %s, got %s", errUnknownGroupVersionResource, machinesGVR.String(), machineRef.GroupVersionResource.String())
+	}
+
+	machine := machinev1beta1.Machine{
+		ObjectMeta: machineRef.ObjectMeta,
+	}
+
+	if err := m.client.Delete(ctx, &machine); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(2).Info(
+				"Machine not found",
+				"namespace", machineRef.ObjectMeta.Namespace,
+				"machineName", machineRef.ObjectMeta.Name,
+				"group", machinev1beta1.GroupVersion.Group,
+				"version", machinev1beta1.GroupVersion.Version,
+			)
+
+			return nil
+		}
+
+		logger.Error(err,
+			"Could not delete machine",
+			"namespace", machineRef.ObjectMeta.Namespace,
+			"machineName", machineRef.ObjectMeta.Name,
+			"group", machinev1beta1.GroupVersion.Group,
+			"version", machinev1beta1.GroupVersion.Version,
+		)
+
+		return fmt.Errorf("could not delete machine %s in namespace %s: %w", machineRef.ObjectMeta.Name, machineRef.ObjectMeta.Namespace, err)
+	}
+
+	logger.V(2).Info(
+		"Deleted machine",
+		"namespace", machineRef.ObjectMeta.Namespace,
+		"machineName", machineRef.ObjectMeta.Name,
+		"group", machinev1beta1.GroupVersion.Group,
+		"version", machinev1beta1.GroupVersion.Version,
+	)
+
 	return nil
 }
