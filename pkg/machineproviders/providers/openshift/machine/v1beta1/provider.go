@@ -26,12 +26,21 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	// openshiftMachineRoleLabel is the OpenShift Machine API machine role label.
+	// This must be present on all OpenShift Machine API Machine templates.
+	openshiftMachineRoleLabel = "machine.openshift.io/cluster-api-machine-role"
 )
 
 var (
@@ -49,6 +58,11 @@ var (
 	// is not present and therefore a Machine cannot be created. The Cluster ID is required to construct the name for
 	// the new Machines.
 	errMissingClusterIDLabel = fmt.Errorf("missing required label on machine template metadata: %s", machinev1beta1.MachineClusterIDLabel)
+
+	// errMissingMachineRoleLabel is used to denote that the machine role label, expected to be on the Machine template
+	// is not present and therefore a Machine cannot be created. The Machine Role is required to construct the name for
+	// the new Machines.
+	errMissingMachineRoleLabel = fmt.Errorf("missing required label on machine template metadata: %s", openshiftMachineRoleLabel)
 
 	// errUnexpectedMachineType is used to denote that the machine provider was requested
 	// for an unsupported machine provider type (ie not OpenShift Machine v1beta1).
@@ -84,6 +98,15 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, fmt.Errorf("error mapping machine indexes: %w", err)
 	}
 
+	machineAPIScheme := apimachineryruntime.NewScheme()
+	if err := machinev1.Install(machineAPIScheme); err != nil {
+		return nil, fmt.Errorf("unable to add machine.openshift.io/v1 scheme: %w", err)
+	}
+
+	if err := machinev1beta1.Install(machineAPIScheme); err != nil {
+		return nil, fmt.Errorf("unable to add machine.openshift.io/v1beta1 scheme: %w", err)
+	}
+
 	return &openshiftMachineProvider{
 		client:               cl,
 		indexToFailureDomain: indexToFailureDomain,
@@ -91,6 +114,8 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		machineTemplate:      *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine,
 		ownerMetadata:        cpms.ObjectMeta,
 		providerConfig:       providerConfig,
+		namespace:            cpms.Namespace,
+		machineAPIScheme:     machineAPIScheme,
 	}, nil
 }
 
@@ -118,6 +143,12 @@ type openshiftMachineProvider struct {
 
 	// providerConfig stores the providerConfig for creating new Machines.
 	providerConfig providerconfig.ProviderConfig
+
+	// namespace store the namespace where new machines will be created.
+	namespace string
+
+	// machineAPIScheme contains scheme for Machine API v1 and v1beta1.
+	machineAPIScheme *apimachineryruntime.Scheme
 }
 
 // GetMachineInfos inspects the current state of the Machines matched by the selector
@@ -135,7 +166,76 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 // CreateMachine creates a new Machine from the template provider config based on the
 // failure domain index provided.
 func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger logr.Logger, index int32) error {
+	machineName, err := m.getMachineName(index)
+	if err != nil {
+		return fmt.Errorf("could not generate machine name: %w", err)
+	}
+
+	cpms := &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: m.ownerMetadata,
+	}
+
+	machine := &machinev1beta1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        machineName,
+			Namespace:   m.namespace,
+			Annotations: m.machineTemplate.ObjectMeta.Annotations,
+			Labels:      m.machineTemplate.ObjectMeta.Labels,
+		},
+		Spec: m.machineTemplate.Spec,
+	}
+
+	pc, err := m.providerConfig.InjectFailureDomain(m.indexToFailureDomain[index])
+	if err != nil {
+		return fmt.Errorf("cannot inject failure domain in the provider config: %w", err)
+	}
+
+	rawConfig, err := pc.RawConfig()
+	if err != nil {
+		return fmt.Errorf("cannot fetch raw config from provider config: %w", err)
+	}
+
+	machine.Spec.ProviderSpec.Value.Raw = rawConfig
+
+	if err := controllerutil.SetControllerReference(cpms, machine, m.machineAPIScheme); err != nil {
+		return fmt.Errorf("could not set owner reference: %w", err)
+	}
+
+	if err := m.client.Create(ctx, machine); err != nil {
+		logger.Error(err,
+			"Could not create machine",
+			"namespace", machine.ObjectMeta.Namespace,
+			"machineName", machine.ObjectMeta.Name,
+			"group", machinev1beta1.GroupVersion.Group,
+			"version", machinev1beta1.GroupVersion.Version,
+		)
+
+		return fmt.Errorf("cannot create machine %s in namespace %s: %w", machine.Name, machine.Namespace, err)
+	}
+
+	logger.V(2).Info(
+		"Created machine",
+		"index", index,
+		"machineName", machine.Name,
+		"failureDomain", m.indexToFailureDomain[index].String(),
+	)
+
 	return nil
+}
+
+// getMachineName generates a machine name based on the index.
+func (m *openshiftMachineProvider) getMachineName(index int32) (string, error) {
+	clusterID, ok := m.machineTemplate.ObjectMeta.Labels[machinev1beta1.MachineClusterIDLabel]
+	if !ok {
+		return "", errMissingClusterIDLabel
+	}
+
+	machineRole, ok := m.machineTemplate.ObjectMeta.Labels[openshiftMachineRoleLabel]
+	if !ok {
+		return "", errMissingMachineRoleLabel
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%d", clusterID, machineRole, rand.String(5), index), nil
 }
 
 // DeleteMachine deletes the Machine references in the machineRef provided.
