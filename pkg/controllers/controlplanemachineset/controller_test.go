@@ -589,6 +589,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 					By("Adding an owner reference for an alternative controller owner")
 					Expect(machineInfos[0][0].MachineRef).ToNot(BeNil())
 					machineInfos[i][i].MachineRef.ObjectMeta.OwnerReferences = []metav1.OwnerReference{badOwnerReference}
+
 					continue
 				}
 

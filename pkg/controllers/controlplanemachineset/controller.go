@@ -251,48 +251,51 @@ func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Con
 			mObjectMeta := mInfo.MachineRef.ObjectMeta
 			mLogger := logger.WithValues("machineNamespace", mObjectMeta.GetNamespace(), "machineName", mObjectMeta.GetName())
 
-			machineGvk, err := r.RESTMapper.KindFor(mInfo.MachineRef.GroupVersionResource)
+			machineGVK, err := r.RESTMapper.KindFor(mInfo.MachineRef.GroupVersionResource)
 			if err != nil {
 				return fmt.Errorf("error getting GVK for machine: %w", err)
 			}
 
 			machine := &metav1.PartialObjectMetadata{}
-			machine.SetGroupVersionKind(machineGvk)
+			machine.SetGroupVersionKind(machineGVK)
 			machine.ObjectMeta = mObjectMeta
 
 			if isOwnedByCurrentCPMS(cpms, machine) {
 				mLogger.V(4).Info("Owner reference already present on machine")
+
 				continue
 			}
 
 			patchBase := client.MergeFrom(machine.DeepCopy())
 
-			err = controllerutil.SetControllerReference(cpms, machine, r.Scheme)
-			if err != nil {
+			if err := controllerutil.SetControllerReference(cpms, machine, r.Scheme); err != nil {
 				mLogger.Error(err, "Cannot add owner reference to machine")
+
 				var alreadyOwnedErr *controllerutil.AlreadyOwnedError
 				if errors.As(err, &alreadyOwnedErr) {
 					meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
 						Type:               conditionDegraded,
 						Status:             metav1.ConditionTrue,
 						Reason:             reasonMachinesAlreadyOwned,
-						ObservedGeneration: 2,
+						ObservedGeneration: cpms.Generation,
 						Message:            "Observed already owned machine(s) in target machines",
 					})
 
 					// don't return an error here and continue iterating through the machines
 					continue
 				}
+
 				return fmt.Errorf("error setting owner reference: %w", err)
 			}
 
 			if err := r.Client.Patch(ctx, machine, patchBase); err != nil {
-				return fmt.Errorf("error patching the macine: %w", err)
+				return fmt.Errorf("error patching machine: %w", err)
 			}
 
 			mLogger.V(2).Info("Added owner reference to machine")
 		}
 	}
+
 	return nil
 }
 
@@ -333,6 +336,7 @@ func isControlPlaneMachineSetDegraded(cpms *machinev1.ControlPlaneMachineSet) bo
 	return false
 }
 
+// isOwnedByCurrentCPMS determines if the given machine is owned by the ControlPlaneMachineSet.
 func isOwnedByCurrentCPMS(cpms *machinev1.ControlPlaneMachineSet, machineObjectMeta *metav1.PartialObjectMetadata) bool {
 	if machineObjectMeta.OwnerReferences == nil {
 		return false
