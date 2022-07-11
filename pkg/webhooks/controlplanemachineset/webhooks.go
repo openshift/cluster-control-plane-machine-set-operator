@@ -255,7 +255,11 @@ func validateOpenShiftMachineV1BetaTemplate(parentPath *field.Path, template mac
 func validateOpenShiftMachineV1BetaTemplateOnCreate(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, machines []machinev1beta1.Machine) []error {
 	errs := []error{}
 
-	errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(parentPath.Child("failureDomains"), template.FailureDomains, machines)...)
+	if template.FailureDomains.Platform == "" {
+		errs = append(errs, checkOpenShiftProviderSpecFailureDomainMatchesMachines(parentPath.Child("template", "providerSpec"), template, machines)...)
+	} else {
+		errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(parentPath.Child("failureDomains"), template.FailureDomains, machines)...)
+	}
 
 	return errs
 }
@@ -351,14 +355,38 @@ func (r *ControlPlaneMachineSetWebhook) fetchControlPlaneMachines(ctx context.Co
 	return controlPlaneMachines, nil
 }
 
+// checkOpenShiftProviderSpecFailureDomainMatchesMachines ensures that failure domains of the Control Plane Machines match the
+// failure domain extracted from the OpenShift Machine template MachineSpec on the ControlPlaneMachineSet.
+// This check is performed when no failure domains are defined on the OpenShift Machine template on the ControlPlaneMachineSet.
+// For example on single zone AWS deployment.
+func checkOpenShiftProviderSpecFailureDomainMatchesMachines(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, machines []machinev1beta1.Machine) []error {
+	errs := []error{}
+
+	templateProviderConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(template)
+	if err != nil {
+		return []error{field.Invalid(parentPath, template, fmt.Sprintf("error parsing provider config from machine template: %v", err))}
+	}
+
+	templateProviderSpecFailureDomain := templateProviderConfig.ExtractFailureDomain()
+
+	failureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
+	if err != nil {
+		return append(errs, field.InternalError(parentPath, fmt.Errorf("could not get failure domains from cluster machines: %w", err)))
+	}
+
+	for _, failureDomain := range failureDomains {
+		if !templateProviderSpecFailureDomain.Equal(failureDomain) {
+			errs = append(errs, field.Invalid(parentPath, templateProviderSpecFailureDomain, "Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
+		}
+	}
+
+	return errs
+}
+
 // checkOpenShiftFailureDomainsMatchMachines ensures that failure domains of the Control Plane Machines match the
 // failure domains defined on the OpenShift Machine template on the ControlPlaneMachineSet.
 func checkOpenShiftFailureDomainsMatchMachines(parentPath *field.Path, failureDomains machinev1.FailureDomains, machines []machinev1beta1.Machine) []error {
 	errs := []error{}
-
-	if failureDomains.Platform == "" {
-		return nil
-	}
 
 	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
 	if err != nil {

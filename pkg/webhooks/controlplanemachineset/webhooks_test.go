@@ -243,6 +243,14 @@ var _ = Describe("Webhooks", func() {
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io: Required value")))
 			})
 
+			It("with machine template zone not matching machines", func() {
+				tempateProviderSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("different-zone-1")
+				templateBuilder := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(tempateProviderSpec)
+				cpms := builder.WithMachineTemplateBuilder(templateBuilder).Build()
+
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.template.providerSpec: Invalid value: AWSFailureDomain{AvailabilityZone:different-zone-1, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}: Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
+			})
+
 			It("with invalid failure domain information", func() {
 				cpms := builder.Build()
 
