@@ -123,7 +123,7 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	// Take a copy of the original object to be able to create a patch for the status at the end.
-	patchBase := client.MergeFrom(cpms)
+	patchBase := client.MergeFrom(cpms.DeepCopy())
 
 	// Collect errors as an aggregate to return together after all patches have been performed.
 	var errs []error
@@ -234,7 +234,23 @@ func (r *ControlPlaneMachineSetReconciler) reconcileDelete(ctx context.Context, 
 // If the finalizer is added, the function will return true so that the reconciler can requeue the object.
 // Adding the finalizer in a separate reconcile ensures that spec updates are separate from status updates.
 func (r *ControlPlaneMachineSetReconciler) ensureFinalizer(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (bool, error) {
-	return false, nil
+	// Check if we need to add the finalizer.
+	for _, finalizer := range cpms.GetFinalizers() {
+		if finalizer == controlPlaneMachineSetFinalizer {
+			logger.V(4).Info("Finalizer already present on control plane machine set")
+			return false, nil
+		}
+	}
+
+	cpms.SetFinalizers(append(cpms.GetFinalizers(), controlPlaneMachineSetFinalizer))
+
+	if err := r.Client.Update(ctx, cpms); err != nil {
+		return false, fmt.Errorf("error updating control plane machine set: %w", err)
+	}
+
+	logger.V(2).Info("Added finalizer to control plane machine set")
+
+	return true, nil
 }
 
 // ensureOwnerReferences determines if any of the Machines within the machineInfos require a new controller owner

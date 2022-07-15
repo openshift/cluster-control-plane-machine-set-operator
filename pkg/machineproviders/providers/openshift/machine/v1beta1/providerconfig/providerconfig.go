@@ -41,6 +41,9 @@ var (
 	// errUnknownProviderConfigType is an error used when provider type
 	// cannot be deduced from providerSpec object kind.
 	errUnknownProviderConfigType = errors.New("unknown provider config type")
+
+	// errUnsupportedProviderConfigType is an error used when provider spec is nil.
+	errNilProviderSpec = errors.New("provider spec is nil")
 )
 
 // ProviderConfig is an interface that allows external code to interact
@@ -210,6 +213,11 @@ func getPlatformTypeFromProviderSpec(providerSpec machinev1beta1.ProviderSpec) (
 	}
 
 	providerKind := providerSpecKind{}
+
+	if providerSpec.Value == nil {
+		return "", errNilProviderSpec
+	}
+
 	if err := json.Unmarshal(providerSpec.Value.Raw, &providerKind); err != nil {
 		return "", fmt.Errorf("could not unmarshal provider spec: %w", err)
 	}
