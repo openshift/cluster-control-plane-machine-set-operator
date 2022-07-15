@@ -18,6 +18,7 @@ package controlplanemachineset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -26,15 +27,16 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -256,11 +258,60 @@ func (r *ControlPlaneMachineSetReconciler) ensureFinalizer(ctx context.Context, 
 // ensureOwnerReferences determines if any of the Machines within the machineInfos require a new controller owner
 // reference to be added, and then uses PartialObjectMetadata to ensure that the owner reference is added.
 func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos map[int32][]machineproviders.MachineInfo) error {
-	// TODO: Iterate over the MachineInfos, for each Machine, check the owner references for an owner reference matching
-	// that of the current CPMS (it should be the controller so should be easy to find).
-	// If required, look up the GVK using the rest mapper from the GVR, then uses metav1.PartialObjectMetadata to Patch
-	// the owner references. This should mean we can update the metadata of any type given we know the GVR and existing
-	// ObjectMeta.
+	for _, machineInfo := range machineInfos {
+		for _, mInfo := range machineInfo {
+			if mInfo.MachineRef == nil {
+				continue
+			}
+
+			mObjectMeta := mInfo.MachineRef.ObjectMeta
+			mLogger := logger.WithValues("machineNamespace", mObjectMeta.GetNamespace(), "machineName", mObjectMeta.GetName())
+
+			machineGVK, err := r.RESTMapper.KindFor(mInfo.MachineRef.GroupVersionResource)
+			if err != nil {
+				return fmt.Errorf("error getting GVK for machine: %w", err)
+			}
+
+			machine := &metav1.PartialObjectMetadata{}
+			machine.SetGroupVersionKind(machineGVK)
+			machine.ObjectMeta = mObjectMeta
+
+			if isOwnedByCurrentCPMS(cpms, machine) {
+				mLogger.V(4).Info("Owner reference already present on machine")
+
+				continue
+			}
+
+			patchBase := client.MergeFrom(machine.DeepCopy())
+
+			if err := controllerutil.SetControllerReference(cpms, machine, r.Scheme); err != nil {
+				mLogger.Error(err, "Cannot add owner reference to machine")
+
+				var alreadyOwnedErr *controllerutil.AlreadyOwnedError
+				if errors.As(err, &alreadyOwnedErr) {
+					meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+						Type:               conditionDegraded,
+						Status:             metav1.ConditionTrue,
+						Reason:             reasonMachinesAlreadyOwned,
+						ObservedGeneration: cpms.Generation,
+						Message:            "Observed already owned machine(s) in target machines",
+					})
+
+					// don't return an error here and continue iterating through the machines
+					continue
+				}
+
+				return fmt.Errorf("error setting owner reference: %w", err)
+			}
+
+			if err := r.Client.Patch(ctx, machine, patchBase); err != nil {
+				return fmt.Errorf("error patching machine: %w", err)
+			}
+
+			mLogger.V(2).Info("Added owner reference to machine")
+		}
+	}
+
 	return nil
 }
 
@@ -298,5 +349,28 @@ func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []
 // isControlPlaneMachineSetDegraded determines whether or not the ControlPlaneMachineSet
 // has a true, degraded condition.
 func isControlPlaneMachineSetDegraded(cpms *machinev1.ControlPlaneMachineSet) bool {
+	return false
+}
+
+// isOwnedByCurrentCPMS determines if the given machine is owned by the ControlPlaneMachineSet.
+func isOwnedByCurrentCPMS(cpms *machinev1.ControlPlaneMachineSet, machineObjectMeta *metav1.PartialObjectMetadata) bool {
+	if machineObjectMeta.OwnerReferences == nil {
+		return false
+	}
+
+	if controlledBy := metav1.GetControllerOf(machineObjectMeta); controlledBy != nil {
+		currentCpmsGV, err := schema.ParseGroupVersion(cpms.APIVersion)
+		if err != nil {
+			return false
+		}
+
+		machineOwnerGV, err := schema.ParseGroupVersion(controlledBy.APIVersion)
+		if err != nil {
+			return false
+		}
+
+		return currentCpmsGV.Group == machineOwnerGV.Group && cpms.Kind == controlledBy.Kind && cpms.Name == controlledBy.Name
+	}
+
 	return false
 }
