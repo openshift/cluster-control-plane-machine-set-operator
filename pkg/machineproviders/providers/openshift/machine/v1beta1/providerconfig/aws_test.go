@@ -153,4 +153,91 @@ var _ = Describe("AWS Provider Config", func() {
 			Expect(providerConfig.AWS().Config()).To(Equal(expectedAWSConfig))
 		})
 	})
+
+	Context("ConvertAWSResourceReference", func() {
+		type convertAWSResourceReferenceInput struct {
+			awsResourceV1    *machinev1.AWSResourceReference
+			awsResourceBeta1 machinev1beta1.AWSResourceReference
+		}
+
+		idInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{
+				ID: stringPtr("test-id"),
+			},
+			awsResourceV1: &machinev1.AWSResourceReference{
+				Type: machinev1.AWSIDReferenceType,
+				ID:   stringPtr("test-id"),
+			},
+		}
+
+		arnInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{
+				ARN: stringPtr("test-arn"),
+			},
+			awsResourceV1: &machinev1.AWSResourceReference{
+				Type: machinev1.AWSARNReferenceType,
+				ARN:  stringPtr("test-arn"),
+			},
+		}
+
+		filterInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{
+				Filters: []machinev1beta1.Filter{{
+					Name:   "tag:Name",
+					Values: []string{"aws-subnet-12345678"},
+				}},
+			},
+			awsResourceV1: &machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{{
+					Name:   "tag:Name",
+					Values: []string{"aws-subnet-12345678"},
+				}},
+			},
+		}
+
+		nilInput := convertAWSResourceReferenceInput{
+			awsResourceBeta1: machinev1beta1.AWSResourceReference{},
+			awsResourceV1:    nil,
+		}
+
+		DescribeTable("converts correctly to V1", func(in convertAWSResourceReferenceInput) {
+			Expect(in.awsResourceV1).To(Equal(convertAWSResourceReferenceV1Beta1ToV1(in.awsResourceBeta1)))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+		DescribeTable("converts correctly to Beta1", func(in convertAWSResourceReferenceInput) {
+			Expect(in.awsResourceBeta1).To(Equal(convertAWSResourceReferenceV1ToV1Beta1(in.awsResourceV1)))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+		DescribeTable("is the same after back and forth conversion - V1", func(in convertAWSResourceReferenceInput) {
+			converted := convertAWSResourceReferenceV1Beta1ToV1(convertAWSResourceReferenceV1ToV1Beta1(in.awsResourceV1))
+			Expect(in.awsResourceV1).To(Equal(converted))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+		DescribeTable("is the same after back and forth conversion - Beta1", func(in convertAWSResourceReferenceInput) {
+			converted := convertAWSResourceReferenceV1ToV1Beta1(convertAWSResourceReferenceV1Beta1ToV1(in.awsResourceBeta1))
+			Expect(in.awsResourceBeta1).To(Equal(converted))
+		},
+			Entry("with ID", idInput),
+			Entry("with ARN", arnInput),
+			Entry("with Filter", filterInput),
+			Entry("with Nil", nilInput),
+		)
+
+	})
 })
