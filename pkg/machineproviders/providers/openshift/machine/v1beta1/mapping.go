@@ -67,16 +67,14 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 		return nil, fmt.Errorf("could not construct machine mapping: %w", err)
 	}
 
-	reconciledMapping := reconcileMappings(logger, baseMapping, machineMapping)
-
-	rebalancedMachineMapping := rebalanceMachineMapping(logger, reconciledMapping, failureDomains)
+	out := reconcileMappings(logger, baseMapping, machineMapping)
 
 	logger.V(4).Info(
 		"Mapped provided failure domains",
-		"mapping", rebalancedMachineMapping,
+		"mapping", out,
 	)
 
-	return rebalancedMachineMapping, nil
+	return out, nil
 }
 
 // createBaseFailureDomainMapping is used to create the basic failure domain mapping based on the number of failure
@@ -172,72 +170,123 @@ func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Cli
 
 // reconcileMappings takes a base mapping and a machines mapping and reconciles the differences. If any machine failure
 // domain has an identical failure domain in the base mapping, the mapping from the Machine should take precedence.
-// When overwriting a mapping, the mapping in place must be swapped to avoid losing information.
+// This works by starting with the machine mapping and identifying where in the base mapping (candidates) the failure
+// domains can be matched. If any index isn't matched this can then be handled later.
+// When matching the indexes, it's important to swap the index to match the machine index to ensure any missing index
+// from the Machine mapping is handled later in the unmatched index processing.
+// When processing the indexes, everything must be sorted to ensure the output is stable (note iterating over a map
+// is randomised by golang).
 func reconcileMappings(logger logr.Logger, base, machines map[int32]failuredomain.FailureDomain) map[int32]failuredomain.FailureDomain {
-	out := make(map[int32]failuredomain.FailureDomain)
-	used := mapToSlice(machines) // Consider all failure domains from machines as used.
-	replicas := int32(len(base))
+	// Create the initial output mapping based on the machines.
+	// Remove any extra indexes that aren't present in the base mapping.
+	// This might occur if the control plane has been scaled down horizontally.
+	out := copyMapping(machines)
+	removeExtraIndexes(out, base)
 
-	for i := int32(0); i < replicas; i++ {
-		machineFailureDomain, ok := machines[i]
-		if !ok {
-			// If there is no failure domain specified in "machines", we pick the
-			// first unused item from "base". If all "base" domain are used then
-			// pick ith element from "base".
-			firstUnusedFailureDomain := getFirstUnusedFailureDomain(used, base)
-			if firstUnusedFailureDomain == nil {
-				out[i] = base[i%replicas]
-			} else {
-				out[i] = *firstUnusedFailureDomain
-				used = append(used, *firstUnusedFailureDomain)
-			}
+	// Create the list of candidates based on the base mapping.
+	// These will be matched against the machine mapping.
+	candidates := copyMapping(base)
 
-			continue
-		}
+	// We need to keep track of the indexes we haven't yet matched.
+	// Create a list of unmatched indexes.
+	unmatchedIndexes := make(map[int32]struct{})
+	for idx := range candidates {
+		unmatchedIndexes[idx] = struct{}{}
+	}
 
-		// If current machine failure domain has been removed from "base", we replace it
-		// with ith element from "base".
-		if !contains(mapToSlice(base), machineFailureDomain) {
-			out[i] = base[i%replicas]
+	// Run through the mappings and match these to candidates where possible.
+	matchMachinesToCandidates(out, candidates, unmatchedIndexes)
 
-			logger.V(4).Info(
-				"Ignoring unknown failure domain",
-				"index", int(i),
-				"failureDomain", machineFailureDomain.String(),
-			)
+	// Get the maximum number of replicas per failure domain. This is needed
+	// to ensure we balance appropriately across the available failure domains.
+	maxPerFailureDomain := maxIndexesPerFailureDomain(base)
 
-			continue
-		}
-
-		// If there are several machines in the same failure domain, we try to replace one
-		// with the first unused element from "base". If it's not possible - keep the duplicate.
-		if contains(mapToSlice(out), machineFailureDomain) {
-			firstUnusedFailureDomain := getFirstUnusedFailureDomain(used, base)
-			if firstUnusedFailureDomain == nil {
-				out[i] = machineFailureDomain
-			} else {
-				out[i] = *firstUnusedFailureDomain
-				used = append(used, *firstUnusedFailureDomain)
-
-				logger.V(4).Info(
-					"Failure domain changed for index",
-					"index", int(i),
-					"oldFailureDomain", machineFailureDomain.String(),
-					"newFailureDomain", out[i].String(),
-				)
-			}
-
-			continue
-		}
-
-		out[i] = machineFailureDomain
+	// Handle any remaining unmatched indexes.
+	for _, idx := range sortedIndexes(unmatchedIndexes) {
+		handleUnmatchedIndex(logger, idx, out, base, candidates, unmatchedIndexes, maxPerFailureDomain)
 	}
 
 	return out
 }
 
-// contains checks if there is a failure domain in the slice.
-func contains(s []failuredomain.FailureDomain, e failuredomain.FailureDomain) bool {
+// matchMachinesToCandidates runs through the output mapping and looks for a candidate that has an equal failure domain.
+// If the candidate index differs from the output index, swap these and then use the candidate.
+// This matches and cements this index to a particular failure domain.
+// Any unmatched indexes will be handled separately later.
+func matchMachinesToCandidates(out, candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes map[int32]struct{}) {
+	for _, idy := range sortedIndexes(out) {
+		for _, idx := range sortedIndexes(candidates) {
+			if out[idy].Equal(candidates[idx]) {
+				if idx != idy {
+					swapIndexes(candidates, idx, idy)
+				}
+
+				useCandidate(candidates, unmatchedIndexes, idy)
+
+				break
+			}
+		}
+	}
+}
+
+// handleUnmatchedIndex is used to assess what should be done with an index that doesn't match with the Machine mapping.
+// They may not have matched originally for one of the following reasons:
+// - There's no machine mapping for that index.
+// - The failure domain from the machine mapping was removed from the base.
+// - A new failure domain was added to the base mapping.
+// - The machine mapping is balanced in a different weighting to the machine mapping.
+func handleUnmatchedIndex(logger logr.Logger, idx int32, out, base, candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes map[int32]struct{}, maxPerFailureDomain int) {
+	switch {
+	case !indexExists(out, idx):
+		// There is no machine in this index presently,
+		// so just use the candidate for this index.
+		out[idx] = candidates[idx]
+		useCandidate(candidates, unmatchedIndexes, idx)
+	case !contains(base, out[idx]):
+		// The mapped failure domain no longer exists in the base,
+		// this likely means the failure domains on the CPMS have been changed and this failure domain has been removed.
+		// Use the candidate instead going forward.
+		logger.V(4).Info(
+			"Ignoring unknown failure domain",
+			"index", int(idx),
+			"failureDomain", out[idx].String(),
+		)
+
+		out[idx] = candidates[idx]
+		useCandidate(candidates, unmatchedIndexes, idx)
+	case countForFailureDomain(out, out[idx]) > maxPerFailureDomain:
+		// This failure domain is over represented in the mapping.
+		// In this case, we must switch it to the candidate failure domain to rebalance
+		// the mapping.
+		logger.V(4).Info(
+			"Failure domain changed for index",
+			"index", int(idx),
+			"oldFailureDomain", out[idx].String(),
+			"newFailureDomain", candidates[idx].String(),
+		)
+
+		out[idx] = candidates[idx]
+		useCandidate(candidates, unmatchedIndexes, idx)
+	default:
+		// The index exists, the failure domain is contained in the base,
+		// and is represented in the mapping fewer than maxPerFailureDomain times.
+		// In this case, it's ok to accept the mapping even though it doesn't match
+		// a candidate.
+		// This is likely to happen if the machine mapping is balanced using a
+		// different weighting to the base, eg aabbc vs abbcc.
+		useCandidate(candidates, unmatchedIndexes, idx)
+	}
+}
+
+// useCandidate is used when we have matched a candidate with a machine mapping. It removes it from the list of
+// candidates and "matches" the index.
+func useCandidate(candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes map[int32]struct{}, idx int32) {
+	delete(unmatchedIndexes, idx)
+	delete(candidates, idx)
+}
+
+// contains checks if there is a failure domain in the map.
+func contains(s map[int32]failuredomain.FailureDomain, e failuredomain.FailureDomain) bool {
 	for _, a := range s {
 		if a.Equal(e) {
 			return true
@@ -247,35 +296,100 @@ func contains(s []failuredomain.FailureDomain, e failuredomain.FailureDomain) bo
 	return false
 }
 
-// mapToSlice converts a map of failure domains into a slice.
-func mapToSlice(s map[int32]failuredomain.FailureDomain) []failuredomain.FailureDomain {
-	d := []failuredomain.FailureDomain{}
+// sortedIndexes looks at a map of int32 to anything and returns a sorted list of the keys.
+func sortedIndexes[V any](mapping map[int32]V) []int32 {
+	out := []int32{}
 
-	for _, fd := range s {
-		d = append(d, fd)
+	for idx := range mapping {
+		out = append(out, idx)
 	}
 
-	return d
+	sort.Slice(out, func(i int, j int) bool {
+		return out[i] < out[j]
+	})
+
+	return out
 }
 
-// getFirstUnusedFailureDomain returns the first failure domain from candidates that doesn't exist in the used list.
-func getFirstUnusedFailureDomain(used []failuredomain.FailureDomain, candidatesMap map[int32]failuredomain.FailureDomain) *failuredomain.FailureDomain {
-	candidates := []failuredomain.FailureDomain{}
+// indexExists checks whether an index exists within a map.
+func indexExists(mapping map[int32]failuredomain.FailureDomain, idx int32) bool {
+	_, ok := mapping[idx]
+	return ok
+}
 
-	for _, candidate := range candidatesMap {
-		candidates = append(candidates, candidate)
+// swapIndexes swaps the items in the given indexes within the mapping.
+func swapIndexes(mapping map[int32]failuredomain.FailureDomain, x, y int32) {
+	mapping[x], mapping[y] = mapping[y], mapping[x]
+}
+
+// copyMapping creates a new map with a copy of the keys and values from the source mapping.
+func copyMapping(mapping map[int32]failuredomain.FailureDomain) map[int32]failuredomain.FailureDomain {
+	out := make(map[int32]failuredomain.FailureDomain)
+
+	for idx, val := range mapping {
+		out[idx] = val
 	}
 
-	// Sort failure domains alphabetically
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].String() < candidates[j].String() })
+	return out
+}
 
-	for _, candidate := range candidates {
-		if !contains(used, candidate) {
-			return &candidate
+// maxIndexesPerFailureDomain is used to calculate the maximum number of allowed indexes per failure domain.
+// That is, based on how many failure domains are in the base mapping and the total number of indexes, to
+// create a balanced mapping, what is the maximum number of Machines we want to create per failure domain.
+func maxIndexesPerFailureDomain(base map[int32]failuredomain.FailureDomain) int {
+	uniqueFailureDomains := countUniqueFailureDomain(base)
+
+	// To get an accurate division we must work in floats.
+	d := float64(len(base)) / float64(uniqueFailureDomains)
+
+	return int(math.Ceil(d))
+}
+
+// countUniqueFailureDomain calculates the number of unique failure domains present within the passed mapping.
+func countUniqueFailureDomain(mapping map[int32]failuredomain.FailureDomain) int {
+	out := make(map[failuredomain.FailureDomain]struct{})
+
+	for _, failureDomain := range mapping {
+		matched := false
+
+		for k := range out {
+			if k.Equal(failureDomain) {
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
+			// This is a new failure domain, make sure it's accounted for.
+			out[failureDomain] = struct{}{}
 		}
 	}
 
-	return nil
+	return len(out)
+}
+
+// countForFailureDomain counts how many times the target failure domain is present in the mapping.
+func countForFailureDomain(mapping map[int32]failuredomain.FailureDomain, target failuredomain.FailureDomain) int {
+	count := 0
+
+	for _, failureDomain := range mapping {
+		if failureDomain.Equal(target) {
+			count++
+		}
+	}
+
+	return count
+}
+
+// removeExtraIndexes removes any key in the mapping that isn't present in the target.
+func removeExtraIndexes(mapping, target map[int32]failuredomain.FailureDomain) {
+	for idx := range mapping {
+		if !indexExists(target, idx) {
+			// The machine mapping has additional indexes not present in the base.
+			// This would typically only happen when the control plane shrinks horizontally.
+			delete(mapping, idx)
+		}
+	}
 }
 
 // parseMachineNameIndex returns an integer suffix from the machine name. If there is no sufficient suffix, it
@@ -283,7 +397,7 @@ func getFirstUnusedFailureDomain(used []failuredomain.FailureDomain, candidatesM
 // Example:
 //   machine-master-3 -> 3, true
 //   machine-master-a -> 0, false
-//   machine-master3  -> 0, false
+//   machine-master3  -> 0 , false
 func parseMachineNameIndex(machineName string) (int, bool) {
 	machineNameIndex, err := strconv.ParseInt(machineName[strings.LastIndex(machineName, "-")+1:], 10, 32)
 	if err != nil {
@@ -291,78 +405,4 @@ func parseMachineNameIndex(machineName string) (int, bool) {
 	}
 
 	return int(machineNameIndex), true
-}
-
-// rebalanceMachineMapping replaces domains that are used too much with least used ones.
-// Example:
-//   c,b,a,c,c -> c,b,a,c,a
-//   c,c,c,c,c -> c,c,a,b,a
-//   a,b,c,a,b -> a,b,c,a,b (stays the same as it's already balanced)
-// Algorithm:
-//   1. Calculate the maximum possible number for each failure domain in the output mapping:
-//        maxCount := len(machines)/len(failureDomains) + 1
-//   2. Iterate over the mapping and calculate how many occurrences of failure domain we have.
-//     2.1 If the current number is still less or equal than the maximum allowed number, we
-//         add the domain to the result without change and increase its count.
-//     2.2 Otherwise we pick the least used domain and increase its count. If there several
-//         domains with the same number of occurrences, we sort them alphabetically and pick
-//         the highest one.
-func rebalanceMachineMapping(logger logr.Logger, machines map[int32]failuredomain.FailureDomain, failureDomains []failuredomain.FailureDomain) map[int32]failuredomain.FailureDomain {
-	out := make(map[int32]failuredomain.FailureDomain)
-
-	// stringsToFailureDomains is used to quickly convert failure domain string representation into the failure domain.
-	stringsToFailureDomains := make(map[string]failuredomain.FailureDomain)
-
-	// failureDomainCount contains the amount for each failure domain in machines.
-	// As a key we use failure domain string representation.
-	failureDomainCount := make(map[string]int)
-
-	for _, fd := range failureDomains {
-		stringsToFailureDomains[fd.String()] = fd
-		failureDomainCount[fd.String()] = 0
-	}
-
-	// maxCount shows the allowed amount for each failure domain in the mapping.
-	maxCount := len(machines)/len(failureDomains) + 1
-
-	for i := int32(0); i < int32(len(machines)); i++ {
-		fd := machines[i]
-
-		if failureDomainCount[fd.String()] < maxCount {
-			// Keep the domain as-is.
-			out[i] = fd
-			failureDomainCount[fd.String()]++
-		} else {
-			// Too many occurrences of this particular domain - we have to replace it with
-			// the least used one.
-			out[i] = stringsToFailureDomains[leastUsedFailureDomain(failureDomainCount)]
-			failureDomainCount[out[i].String()]++
-
-			logger.V(4).Info(
-				"Failure domain changed for index",
-				"index", int(i),
-				"oldFailureDomain", fd.String(),
-				"newFailureDomain", out[i].String(),
-			)
-		}
-	}
-
-	return out
-}
-
-// leastUsedFailureDomain returns the least used failure domain.
-// If several domains have the same count, we pick the first alphabetically ordered one.
-func leastUsedFailureDomain(failureDomainCount map[string]int) string {
-	minCount := math.MaxInt
-
-	var res string
-
-	for item, count := range failureDomainCount {
-		if count < minCount || (count == minCount && item < res) {
-			minCount = count
-			res = item
-		}
-	}
-
-	return res
 }
