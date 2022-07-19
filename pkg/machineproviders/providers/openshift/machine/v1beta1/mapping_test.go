@@ -983,12 +983,15 @@ var _ = Describe("Failure Domain Mapping", func() {
 		}
 
 		DescribeTable("should keep the machine indexes stable where possible", func(in reconcileMappingsTableInput) {
-			logger := test.NewTestLogger()
+			// Run each test 10 times in an attempt to make sure the output is stable.
+			for i := 0; i < 10; i++ {
+				logger := test.NewTestLogger()
 
-			mapping := reconcileMappings(logger.Logger(), in.baseMapping, in.machineMapping)
+				mapping := reconcileMappings(logger.Logger(), in.baseMapping, in.machineMapping)
 
-			Expect(mapping).To(Equal(in.expectedMapping))
-			Expect(logger.Entries()).To(Equal(in.expectedLogs))
+				Expect(mapping).To(Equal(in.expectedMapping))
+				Expect(logger.Entries()).To(Equal(in.expectedLogs))
+			}
 		},
 			Entry("when the mappings match", reconcileMappingsTableInput{
 				baseMapping: map[int32]failuredomain.FailureDomain{
