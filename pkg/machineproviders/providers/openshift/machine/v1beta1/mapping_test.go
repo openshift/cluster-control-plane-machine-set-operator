@@ -1101,4 +1101,124 @@ var _ = Describe("Failure Domain Mapping", func() {
 			}),
 		)
 	})
+
+	Context("getFirstUnusedFailureDomain", func() {
+		type getFirstUnusedFailureDomainTableInput struct {
+			used                        []failuredomain.FailureDomain
+			candidates                  map[int32]failuredomain.FailureDomain
+			expectedNotFound            bool
+			expectedFailureDomainNumber int
+		}
+
+		DescribeTable("should get first unused domain from the list", func(in getFirstUnusedFailureDomainTableInput) {
+			fd := getFirstUnusedFailureDomain(in.used, in.candidates)
+
+			if in.expectedNotFound {
+				Expect(fd).To(BeNil())
+			} else {
+				Expect(*fd).To(Equal(in.candidates[int32(in.expectedFailureDomainNumber)]))
+			}
+		},
+			Entry("empty used and candidates", getFirstUnusedFailureDomainTableInput{
+				used:             []failuredomain.FailureDomain{},
+				candidates:       map[int32]failuredomain.FailureDomain{},
+				expectedNotFound: true,
+			}),
+			Entry("empty candidates and 3 used domains", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				candidates:       map[int32]failuredomain.FailureDomain{},
+				expectedNotFound: true,
+			}),
+			Entry("all candidates are used", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedNotFound: true,
+			}),
+			Entry("empty used and 3 candidates ordered (a,b,c)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 0,
+			}),
+			Entry("empty used and 3 candidates ordered (b,a,c)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 1,
+			}),
+			Entry("empty used and 3 candidates ordered (c,b,a)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 2,
+			}),
+			Entry("used a and 3 candidates ordered (a,b,c)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 1,
+			}),
+			Entry("used a and 3 candidates ordered (b,a,c)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 0,
+			}),
+			Entry("used a and b, and 3 candidates ordered (a,b,c)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 2,
+			}),
+			Entry("used a and c, and 3 candidates ordered (a,c,b)", getFirstUnusedFailureDomainTableInput{
+				used: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				candidates: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedFailureDomainNumber: 2,
+			}),
+		)
+	})
 })
