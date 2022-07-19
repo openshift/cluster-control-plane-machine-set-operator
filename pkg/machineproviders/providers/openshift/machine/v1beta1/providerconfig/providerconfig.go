@@ -71,6 +71,9 @@ type ProviderConfig interface {
 
 	// Azure returns the AzureProviderConfig if the platform type is Azure.
 	Azure() AzureProviderConfig
+
+	// GCP returns the GCPProviderConfig if the platform type is GCP.
+	GCP() GCPProviderConfig
 }
 
 // NewProviderConfigFromMachineTemplate creates a new ProviderConfig from the provided machine template.
@@ -99,6 +102,8 @@ func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec,
 		return newAWSProviderConfig(providerSpec.Value)
 	case configv1.AzurePlatformType:
 		return newAzureProviderConfig(providerSpec.Value)
+	case configv1.GCPPlatformType:
+		return newGCPProviderConfig(providerSpec.Value)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platformType)
 	}
@@ -109,6 +114,7 @@ type providerConfig struct {
 	platformType configv1.PlatformType
 	aws          AWSProviderConfig
 	azure        AzureProviderConfig
+	gcp          GCPProviderConfig
 }
 
 // InjectFailureDomain is used to inject a failure domain into the ProviderConfig.
@@ -122,6 +128,8 @@ func (p providerConfig) InjectFailureDomain(fd failuredomain.FailureDomain) (Pro
 		newConfig.aws = p.AWS().InjectFailureDomain(fd.AWS())
 	case configv1.AzurePlatformType:
 		newConfig.azure = p.Azure().InjectFailureDomain(fd.Azure())
+	case configv1.GCPPlatformType:
+		newConfig.gcp = p.GCP().InjectFailureDomain(fd.GCP())
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, p.platformType)
 	}
@@ -136,6 +144,8 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 		return failuredomain.NewAWSFailureDomain(p.AWS().ExtractFailureDomain())
 	case configv1.AzurePlatformType:
 		return failuredomain.NewAzureFailureDomain(p.Azure().ExtractFailureDomain())
+	case configv1.GCPPlatformType:
+		return failuredomain.NewGCPFailureDomain(p.GCP().ExtractFailureDomain())
 	default:
 		return nil
 	}
@@ -152,6 +162,8 @@ func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
 		return reflect.DeepEqual(p.aws.providerConfig, other.AWS().providerConfig), nil
 	case configv1.AzurePlatformType:
 		return reflect.DeepEqual(p.azure.providerConfig, other.Azure().providerConfig), nil
+	case configv1.GCPPlatformType:
+		return reflect.DeepEqual(p.gcp.providerConfig, other.GCP().providerConfig), nil
 	default:
 		return false, errUnsupportedPlatformType
 	}
@@ -169,6 +181,8 @@ func (p providerConfig) RawConfig() ([]byte, error) {
 		rawConfig, err = json.Marshal(p.aws.providerConfig)
 	case configv1.AzurePlatformType:
 		rawConfig, err = json.Marshal(p.azure.providerConfig)
+	case configv1.GCPPlatformType:
+		rawConfig, err = json.Marshal(p.gcp.providerConfig)
 	default:
 		return nil, errUnsupportedPlatformType
 	}
@@ -193,6 +207,11 @@ func (p providerConfig) AWS() AWSProviderConfig {
 // Azure returns the AzureProviderConfig if the platform type is Azure.
 func (p providerConfig) Azure() AzureProviderConfig {
 	return p.azure
+}
+
+// GCP returns the GCPProviderConfig if the platform type is GCP.
+func (p providerConfig) GCP() GCPProviderConfig {
+	return p.gcp
 }
 
 // getPlatformTypeFromProviderSpecKind determines machine platform from providerSpec kind.

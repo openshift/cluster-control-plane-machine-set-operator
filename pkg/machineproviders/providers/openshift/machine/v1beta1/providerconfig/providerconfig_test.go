@@ -99,6 +99,18 @@ var _ = Describe("Provider Config", func() {
 				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
 				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
 			}),
+			Entry("with a GCP config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.GCPPlatformType,
+				failureDomainsBuilder: resourcebuilder.GCPFailureDomains(),
+				providerSpecBuilder:   resourcebuilder.GCPProviderSpec(),
+				providerConfigMatcher: HaveField("GCP().Config()", *resourcebuilder.GCPProviderSpec().Build()),
+			}),
+			Entry("with a GCP config without failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.GCPPlatformType,
+				failureDomainsBuilder: nil,
+				providerSpecBuilder:   resourcebuilder.GCPProviderSpec(),
+				providerConfigMatcher: HaveField("GCP().Config()", *resourcebuilder.GCPProviderSpec().Build()),
+			}),
 		)
 	})
 
@@ -174,6 +186,32 @@ var _ = Describe("Provider Config", func() {
 				matchPath:        "Azure().Config().Zone",
 				matchExpectation: stringPtr("2"),
 			}),
+			Entry("when keeping a GCP zone the same", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewGCPFailureDomain(
+					resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+				),
+				matchPath:        "GCP().Config().Zone",
+				matchExpectation: "us-central1-a",
+			}),
+			Entry("when changing a GCP zone", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewGCPFailureDomain(
+					resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
+				),
+				matchPath:        "GCP().Config().Zone",
+				matchExpectation: "us-central1-b",
+			}),
 		)
 	})
 
@@ -225,6 +263,11 @@ var _ = Describe("Provider Config", func() {
 				expectedPlatformType:  configv1.AzurePlatformType,
 				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
 				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
+			}),
+			Entry("with a GCP config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.GCPPlatformType,
+				providerSpecBuilder:   resourcebuilder.GCPProviderSpec(),
+				providerConfigMatcher: HaveField("GCP().Config()", *resourcebuilder.GCPProviderSpec().Build()),
 			}),
 		)
 	})
@@ -330,6 +373,17 @@ var _ = Describe("Provider Config", func() {
 					resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				),
 			}),
+			Entry("with a GCP us-central1-a failure domain", extractFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+					},
+				},
+				expectedFailureDomain: failuredomain.NewGCPFailureDomain(
+					resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+				),
+			}),
 		)
 	})
 
@@ -422,6 +476,36 @@ var _ = Describe("Provider Config", func() {
 				},
 				expectedEqual: false,
 			}),
+			Entry("with matching GCP configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+					},
+				},
+				expectedEqual: true,
+			}),
+			Entry("with mis-matched GCP configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-b").Build(),
+					},
+				},
+				expectedEqual: false,
+			}),
 		)
 	})
 
@@ -460,6 +544,15 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedOut: resourcebuilder.AzureProviderSpec().BuildRawExtension().Raw,
+			}),
+			Entry("with a GCP config", rawConfigTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *resourcebuilder.GCPProviderSpec().Build(),
+					},
+				},
+				expectedOut: resourcebuilder.GCPProviderSpec().BuildRawExtension().Raw,
 			}),
 		)
 	})
