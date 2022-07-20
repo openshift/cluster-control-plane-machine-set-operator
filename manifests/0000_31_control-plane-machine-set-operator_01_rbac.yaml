@@ -32,6 +32,7 @@ rules:
       - machine.openshift.io
     resources:
       - controlplanemachinesets
+      - controlplanemachinesets/status
     verbs:
       - get
       - list
