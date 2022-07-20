@@ -87,6 +87,18 @@ var _ = Describe("Provider Config", func() {
 				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
 				providerConfigMatcher: HaveField("AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
 			}),
+			Entry("with an Azure config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.AzurePlatformType,
+				failureDomainsBuilder: resourcebuilder.AzureFailureDomains(),
+				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
+				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
+			}),
+			Entry("with an Azure config without failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.AzurePlatformType,
+				failureDomainsBuilder: nil,
+				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
+				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
+			}),
 		)
 	})
 
@@ -136,6 +148,32 @@ var _ = Describe("Provider Config", func() {
 				matchPath:        "AWS().Config().Placement.AvailabilityZone",
 				matchExpectation: "us-east-1b",
 			}),
+			Entry("when keeping an Azure availability zone the same", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewAzureFailureDomain(
+					resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+				),
+				matchPath:        "Azure().Config().Zone",
+				matchExpectation: stringPtr("1"),
+			}),
+			Entry("when changing an Azure zone", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewAzureFailureDomain(
+					resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+				),
+				matchPath:        "Azure().Config().Zone",
+				matchExpectation: stringPtr("2"),
+			}),
 		)
 	})
 
@@ -182,6 +220,11 @@ var _ = Describe("Provider Config", func() {
 				expectedPlatformType:  configv1.AWSPlatformType,
 				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
 				providerConfigMatcher: HaveField("AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
+			}),
+			Entry("with an Azure config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.AzurePlatformType,
+				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
+				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
 			}),
 		)
 	})
@@ -276,6 +319,17 @@ var _ = Describe("Provider Config", func() {
 					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(filterSubnet).Build(),
 				),
 			}),
+			Entry("with an Azure 2 failure domain", extractFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+					},
+				},
+				expectedFailureDomain: failuredomain.NewAzureFailureDomain(
+					resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+				),
+			}),
 		)
 	})
 
@@ -338,6 +392,36 @@ var _ = Describe("Provider Config", func() {
 				},
 				expectedEqual: false,
 			}),
+			Entry("with matching Azure configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+					},
+				},
+				expectedEqual: true,
+			}),
+			Entry("with mis-matched Azure configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+					},
+				},
+				expectedEqual: false,
+			}),
 		)
 	})
 
@@ -367,6 +451,15 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedOut: resourcebuilder.AWSProviderSpec().BuildRawExtension().Raw,
+			}),
+			Entry("with an Azure config", rawConfigTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *resourcebuilder.AzureProviderSpec().Build(),
+					},
+				},
+				expectedOut: resourcebuilder.AzureProviderSpec().BuildRawExtension().Raw,
 			}),
 		)
 	})
