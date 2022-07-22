@@ -54,7 +54,7 @@ func ControlPlaneMachineSet() ControlPlaneMachineSetBuilder {
 			MatchLabels: map[string]string{
 				machineRoleLabelName:                 "master",
 				machineTypeLabelName:                 "master",
-				machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+				machinev1beta1.MachineClusterIDLabel: testClusterIDValue,
 			},
 		},
 		strategyType: machinev1.RollingUpdate,

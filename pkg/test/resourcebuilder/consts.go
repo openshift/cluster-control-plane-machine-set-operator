@@ -20,4 +20,6 @@ const (
 	// OpenshiftMachineAPINamespaceName is the name of the OpenShift
 	// Machine API namespace.
 	OpenshiftMachineAPINamespaceName = "openshift-machine-api"
+
+	testClusterIDValue = "cpms-cluster-test-id"
 )

@@ -177,16 +177,62 @@ var _ = Describe("With a running controller", func() {
 			Expect(k8sClient.Delete(ctx, cpms)).To(Succeed())
 		})
 
-		PIt("should eventually be removed", func() {
+		It("should eventually be removed", func() {
 			Eventually(komega.Get(cpms)).Should(MatchError("controlplanemachinesets.machine.openshift.io \"cluster\" not found"))
 		})
 
-		PIt("should remove the owner references from the Machines", func() {
+		It("should remove the owner references from the Machines", func() {
 			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", SatisfyAll(
 				HaveLen(3),
 				HaveEach(HaveField("ObjectMeta.OwnerReferences", HaveLen(0))),
 			)), "3 Machines should exist, each should have no owner references")
 		})
+	})
+})
+
+var _ = Describe("ownerRef helpers", Ordered, func() {
+	var (
+		ownerOne, ownerTwo, ownerThree, target client.Object
+		namespaceName                          string
+	)
+
+	BeforeAll(func() {
+		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		namespaceName = ns.GetName()
+
+		ownerOne = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+		ownerTwo = resourcebuilder.ClusterOperator().WithName("bar").Build()
+		ownerThree = resourcebuilder.ClusterOperator().WithName("fizz").Build()
+		// Create objects to populate UIDs
+		Expect(k8sClient.Create(ctx, ownerOne)).To(Succeed())
+		Expect(k8sClient.Create(ctx, ownerTwo)).To(Succeed())
+		Expect(k8sClient.Create(ctx, ownerThree)).To(Succeed())
+
+		target = resourcebuilder.Machine().AsMaster().WithGenerateName("owner-ref-test-").WithNamespace(namespaceName).Build()
+		Expect(controllerutil.SetControllerReference(ownerOne, target, testScheme)).To(Succeed())
+		Expect(controllerutil.SetOwnerReference(ownerTwo, target, testScheme)).To(Succeed())
+		Expect(target.GetOwnerReferences()).To(HaveLen(2))
+	})
+
+	It("hasOwnerRef should return true if object is target's owner", func() {
+		Expect(hasOwnerRef(target, ownerOne)).Should(BeTrue())
+		Expect(hasOwnerRef(target, ownerTwo)).Should(BeTrue())
+	})
+
+	It("hasOwnerRef should return false if object is not target's owner", func() {
+		Expect(hasOwnerRef(target, ownerThree)).Should(BeFalse())
+	})
+
+	It("removeOwnerRef should return false if object is not target's owner", func() {
+		Expect(removeOwnerRef(target, ownerThree)).Should(BeFalse())
+		Expect(target.GetOwnerReferences()).To(HaveLen(2))
+	})
+
+	It("removeOwnerRef should remove only passed owner and return true", func() {
+		Expect(removeOwnerRef(target, ownerOne)).Should(BeTrue())
+		Expect(target.GetOwnerReferences()).To(HaveLen(1))
+		Expect(target.GetOwnerReferences()[0].UID).To(BeEquivalentTo(ownerTwo.GetUID()))
 	})
 })
 

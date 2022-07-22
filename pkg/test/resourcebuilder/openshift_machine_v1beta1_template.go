@@ -27,7 +27,7 @@ func OpenShiftMachineV1Beta1Template() OpenShiftMachineV1Beta1TemplateBuilder {
 		labels: map[string]string{
 			machineRoleLabelName:                 "master",
 			machineTypeLabelName:                 "master",
-			machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+			machinev1beta1.MachineClusterIDLabel: testClusterIDValue,
 		},
 		providerSpecBuilder: AWSProviderSpec(),
 	}
