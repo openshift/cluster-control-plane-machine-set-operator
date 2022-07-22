@@ -650,6 +650,52 @@ var _ = Describe("Failure Domain Mapping", func() {
 					},
 				},
 			}),
+			Entry("when the machine mappings are unbalanced, should rebalance the failure domains (c,b,a,c,c)", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(5),
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-3").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 4,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1c]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+								4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+							},
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
 		)
 	})
 

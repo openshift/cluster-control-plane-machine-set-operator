@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,14 +67,16 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 		return nil, fmt.Errorf("could not construct machine mapping: %w", err)
 	}
 
-	out := reconcileMappings(logger, baseMapping, machineMapping)
+	reconciledMapping := reconcileMappings(logger, baseMapping, machineMapping)
+
+	rebalancedMachineMapping := rebalanceMachineMapping(logger, reconciledMapping, failureDomains)
 
 	logger.V(4).Info(
 		"Mapped provided failure domains",
-		"mapping", out,
+		"mapping", rebalancedMachineMapping,
 	)
 
-	return out, nil
+	return rebalancedMachineMapping, nil
 }
 
 // createBaseFailureDomainMapping is used to create the basic failure domain mapping based on the number of failure
@@ -172,9 +175,7 @@ func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Cli
 // When overwriting a mapping, the mapping in place must be swapped to avoid losing information.
 func reconcileMappings(logger logr.Logger, base, machines map[int32]failuredomain.FailureDomain) map[int32]failuredomain.FailureDomain {
 	out := make(map[int32]failuredomain.FailureDomain)
-	// Consider all failure domains from machines as used.
-	used := mapToSlice(machines)
-
+	used := mapToSlice(machines) // Consider all failure domains from machines as used.
 	replicas := int32(len(base))
 
 	for i := int32(0); i < replicas; i++ {
@@ -282,7 +283,7 @@ func getFirstUnusedFailureDomain(used []failuredomain.FailureDomain, candidatesM
 // Example:
 //   machine-master-3 -> 3, true
 //   machine-master-a -> 0, false
-//   machine-master3  -> 0 , false
+//   machine-master3  -> 0, false
 func parseMachineNameIndex(machineName string) (int, bool) {
 	machineNameIndex, err := strconv.ParseInt(machineName[strings.LastIndex(machineName, "-")+1:], 10, 32)
 	if err != nil {
@@ -290,4 +291,78 @@ func parseMachineNameIndex(machineName string) (int, bool) {
 	}
 
 	return int(machineNameIndex), true
+}
+
+// rebalanceMachineMapping replaces domains that are used too much with least used ones.
+// Example:
+//   c,b,a,c,c -> c,b,a,c,a
+//   c,c,c,c,c -> c,c,a,b,a
+//   a,b,c,a,b -> a,b,c,a,b (stays the same as it's already balanced)
+// Algorithm:
+//   1. Calculate the maximum possible number for each failure domain in the output mapping:
+//        maxCount := int(math.Ceil(float64(len(machines))/float64(len(failureDomains))))
+//   2. Iterate over the mapping and calculate how many occurrences of failure domain we have.
+//     2.1 If the current number is still less or equal than the maximum allowed number, we
+//         add the domain to the result without change and increase its count.
+//     2.2 Otherwise we pick the least used domain and increase its count. If there several
+//         domains with the same number of occurrences, we sort them alphabetically and pick
+//         the highest one.
+func rebalanceMachineMapping(logger logr.Logger, machines map[int32]failuredomain.FailureDomain, failureDomains []failuredomain.FailureDomain) map[int32]failuredomain.FailureDomain {
+	out := make(map[int32]failuredomain.FailureDomain)
+
+	// stringsToFailureDomains is used to quickly convert failure domain string representation into the failure domain.
+	stringsToFailureDomains := make(map[string]failuredomain.FailureDomain)
+
+	// failureDomainCount contains the amount for each failure domain in machines.
+	// As a key we use failure domain string representation.
+	failureDomainCount := make(map[string]int)
+
+	for _, fd := range failureDomains {
+		stringsToFailureDomains[fd.String()] = fd
+		failureDomainCount[fd.String()] = 0
+	}
+
+	// maxCount shows the allowed amount for each failure domain in the mapping.
+	maxCount := int(math.Ceil(float64(len(machines)) / float64(len(failureDomains))))
+
+	for i := int32(0); i < int32(len(machines)); i++ {
+		fd := machines[i]
+
+		if failureDomainCount[fd.String()] < maxCount {
+			// Keep the domain as-is.
+			out[i] = fd
+			failureDomainCount[fd.String()]++
+		} else {
+			// Too many occurrences of this particular domain - we have to replace it with
+			// the least used one.
+			out[i] = stringsToFailureDomains[leastUsedFailureDomain(failureDomainCount)]
+			failureDomainCount[out[i].String()]++
+
+			logger.V(4).Info(
+				"Failure domain changed for index",
+				"index", int(i),
+				"oldFailureDomain", fd.String(),
+				"newFailureDomain", out[i].String(),
+			)
+		}
+	}
+
+	return out
+}
+
+// leastUsedFailureDomain returns the least used failure domain.
+// If several domains have the same count, we pick the first alphabetically ordered one.
+func leastUsedFailureDomain(failureDomainCount map[string]int) string {
+	minCount := math.MaxInt
+
+	var res string
+
+	for item, count := range failureDomainCount {
+		if count < minCount || (count == minCount && item < res) {
+			minCount = count
+			res = item
+		}
+	}
+
+	return res
 }
