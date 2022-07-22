@@ -66,6 +66,8 @@ func (m MachineBuilder) Build() *machinev1beta1.Machine {
 		machine.Spec.ProviderSpec.Value = m.providerSpecBuilder.BuildRawExtension()
 	}
 
+	m.WithLabel(machinev1beta1.MachineClusterIDLabel, testClusterIDValue)
+
 	return machine
 }
 

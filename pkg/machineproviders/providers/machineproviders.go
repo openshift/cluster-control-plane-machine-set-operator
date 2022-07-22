@@ -23,9 +23,11 @@ import (
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	openshiftmachinev1beta1 "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -48,5 +50,20 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return provider, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnexpectedMachineType, cpms.Spec.Template.MachineType)
+	}
+}
+
+// GetMachineTypeMeta returns proper TypeMeta from ControlPlaneMachineSetMachineType.
+func GetMachineTypeMeta(cpmsMachineType machinev1.ControlPlaneMachineSetMachineType) (metav1.TypeMeta, error) {
+	switch cpmsMachineType {
+	case machinev1.OpenShiftMachineV1Beta1MachineType:
+		gv := machinev1beta1.GroupVersion
+
+		return metav1.TypeMeta{
+			Kind:       gv.WithKind("Machine").Kind,
+			APIVersion: gv.String(),
+		}, nil
+	default:
+		return metav1.TypeMeta{}, fmt.Errorf("%w: %s", errUnexpectedMachineType, cpmsMachineType)
 	}
 }

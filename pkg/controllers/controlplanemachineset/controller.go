@@ -228,7 +228,95 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context
 // Once the owner references are removed, it removes the finalizer to allow the garbage collector to reap
 // the deleted ControlPlaneMachineSet.
 func (r *ControlPlaneMachineSetReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (ctrl.Result, error) {
+	logger.V(1).Info("Reconciling control plane machine set deletion")
+
+	machineTypeMeta, err := providers.GetMachineTypeMeta(cpms.Spec.Template.MachineType)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("could not determine machines type: %w", err)
+	}
+
+	logger.V(4).Info("Detected machines type", "kind", machineTypeMeta.Kind, "apiVersion", machineTypeMeta.APIVersion)
+
+	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("could not convert label selector to selector: %w", err)
+	}
+
+	machinesMeta := &metav1.PartialObjectMetadataList{
+		TypeMeta: machineTypeMeta,
+	}
+	if err := r.List(ctx, machinesMeta, &client.ListOptions{LabelSelector: selector}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	var errs []error
+
+	for i := range machinesMeta.Items {
+		machineObjectMeta := machinesMeta.Items[i]
+		logger.V(4).Info("Removing owner reference", "machine", machineObjectMeta.Name)
+		patchBase := client.MergeFrom(machineObjectMeta.DeepCopy())
+
+		if !removeOwnerRef(&machineObjectMeta, cpms) {
+			continue
+		}
+
+		if err := r.Patch(ctx, &machineObjectMeta, patchBase); err != nil {
+			errs = append(errs, fmt.Errorf("error removing owner reference from machine %s: %w", machineObjectMeta.Name, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return ctrl.Result{}, errorutils.NewAggregate(errs)
+	}
+
+	cpmsCopy := cpms.DeepCopy()
+
+	finalizerUpdated := controllerutil.RemoveFinalizer(cpmsCopy, controlPlaneMachineSetFinalizer)
+	if finalizerUpdated {
+		logger.V(4).Info("Removing finalizer from the control plane machine set")
+
+		if err := r.Update(ctx, cpmsCopy); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update control plane machine set: %w", err)
+		}
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// hasOwnerRef returns true if target has an ownerRef to owner.
+func hasOwnerRef(target, owner client.Object) bool {
+	ownerUID, ownerName := owner.GetUID(), owner.GetName()
+	for _, ownerRef := range target.GetOwnerReferences() {
+		if ownerRef.UID == ownerUID &&
+			ownerRef.Name == ownerName {
+			return true
+		}
+	}
+
+	return false
+}
+
+// removeOwnerRef removes owner from the ownerRefs of target, if necessary. Returns true if target needs
+// to be updated and false otherwise.
+func removeOwnerRef(target, owner client.Object) bool {
+	if !hasOwnerRef(target, owner) {
+		return false
+	}
+
+	ownerUID := owner.GetUID()
+	newRefs := []metav1.OwnerReference{}
+
+	for _, ref := range target.GetOwnerReferences() {
+		if ref.UID == ownerUID {
+			continue
+		}
+
+		newRefs = append(newRefs, ref)
+	}
+
+	target.SetOwnerReferences(newRefs)
+
+	return true
 }
 
 // ensureFinalizer adds a finalizer to the ControlPlaneMachineSet if required.
