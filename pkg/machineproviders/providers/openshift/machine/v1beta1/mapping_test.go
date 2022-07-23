@@ -1372,4 +1372,257 @@ var _ = Describe("Failure Domain Mapping", func() {
 			}),
 		)
 	})
+
+	Context("rebalanceMachineMapping", func() {
+		type rebalanceMachineMappingTableInput struct {
+			failureDomains  []failuredomain.FailureDomain
+			mapping         map[int32]failuredomain.FailureDomain
+			expectedMapping map[int32]failuredomain.FailureDomain
+			expectedLogs    []test.LogEntry
+		}
+
+		DescribeTable("should rebalance machine mappings", func(in rebalanceMachineMappingTableInput) {
+			logger := test.NewTestLogger()
+
+			rebalancedMapping := rebalanceMachineMapping(logger.Logger(), in.mapping, in.failureDomains)
+
+			Expect(rebalancedMapping).To(Equal(in.expectedMapping))
+			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+		},
+			Entry("balanced mapping with 3 failure domains (a,b,c,a,b)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{},
+			}),
+			Entry("balanced mapping with 2 failure domains (a,b,a,b,a)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{},
+			}),
+			Entry("unbalanced mapping with 3 failure domains (c,b,a,c,c)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 4,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1c]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+				},
+			}),
+			Entry("unbalanced mapping with 3 failure domains (b,b,b,b,b)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 2,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 3,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1c]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 4,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+				},
+			}),
+			Entry("unbalanced mapping with 2 failure domains (a,a,a,a,b)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 3,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+				},
+			}),
+			Entry("unbalanced mapping with 2 failure domains (a,a,a,a,a)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 3,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 4,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+				},
+			}),
+			Entry("unbalanced mapping with 2 failure domains (a,a,a,a)", rebalanceMachineMappingTableInput{
+				failureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				mapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 2,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 3,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+				},
+			}),
+		)
+	})
 })
