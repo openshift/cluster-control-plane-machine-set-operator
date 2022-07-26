@@ -256,7 +256,7 @@ func validateOpenShiftMachineV1BetaTemplateOnCreate(parentPath *field.Path, temp
 	errs := []error{}
 
 	if template.FailureDomains.Platform == "" {
-		errs = append(errs, checkOpenShiftProviderSpecFailureDomainMatchesMachines(parentPath.Child("template", "providerSpec"), template, machines)...)
+		errs = append(errs, checkOpenShiftProviderSpecFailureDomainMatchesMachines(parentPath.Child("providerSpec"), template, machines)...)
 	} else {
 		errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(parentPath.Child("failureDomains"), template.FailureDomains, machines)...)
 	}
