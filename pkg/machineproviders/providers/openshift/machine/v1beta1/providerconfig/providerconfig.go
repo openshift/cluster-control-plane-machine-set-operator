@@ -283,3 +283,13 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 
 	return machineFailureDomains, nil
 }
+
+// ExtractFailureDomainFromMachine FailureDomain extracted from the provided machine.
+func ExtractFailureDomainFromMachine(machine machinev1beta1.Machine) (failuredomain.FailureDomain, error) {
+	providerConfig, err := NewProviderConfigFromMachine(machine)
+	if err != nil {
+		return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
+	}
+
+	return providerConfig.ExtractFailureDomain(), nil
+}
