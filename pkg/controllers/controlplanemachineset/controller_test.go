@@ -49,6 +49,50 @@ var _ = Describe("With a running controller", func() {
 
 	var co *configv1.ClusterOperator
 
+	usEast1aFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+		WithAvailabilityZone("us-east-1a").
+		WithSubnet(machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"subnet-us-east-1a"},
+				},
+			},
+		})
+
+	usEast1bFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+		WithAvailabilityZone("us-east-1b").
+		WithSubnet(machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"subnet-us-east-1b"},
+				},
+			},
+		})
+
+	usEast1cFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+		WithAvailabilityZone("us-east-1c").
+		WithSubnet(machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"subnet-us-east-1c"},
+				},
+			},
+		})
+
+	tmplBuilder := resourcebuilder.OpenShiftMachineV1Beta1Template().
+		WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+			usEast1aFailureDomainBuilder,
+			usEast1bFailureDomainBuilder,
+			usEast1cFailureDomainBuilder,
+		)).
+		WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec())
+
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
 		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
@@ -110,7 +154,8 @@ var _ = Describe("With a running controller", func() {
 		// various test cases in BeforeEach blocks.
 		JustBeforeEach(func() {
 			// The default CPMS should be sufficient for this test.
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 		})
 
@@ -124,7 +169,7 @@ var _ = Describe("With a running controller", func() {
 
 		BeforeEach(func() {
 			// The default CPMS should be sufficient for this test.
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
 			// To ensure that at least one reconcile happens, wait for the status to not be empty.
@@ -156,7 +201,7 @@ var _ = Describe("With a running controller", func() {
 
 		BeforeEach(func() {
 			By("Creating a ControlPlaneMachineSet")
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
 			cpms.SetFinalizers([]string{controlPlaneMachineSetFinalizer})
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
