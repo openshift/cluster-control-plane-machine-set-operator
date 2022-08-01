@@ -54,7 +54,7 @@ type MachineInfo struct {
 
 // ObjectRef allows you to uniquely identify a resource within a cluster.
 type ObjectRef struct {
-	// GroupVersionResource allows the object API path to be contstructed by
+	// GroupVersionResource allows the object API path to be constructed by
 	// a dynamic client. It will provide the API Group, Version and the Resource name.
 	GroupVersionResource schema.GroupVersionResource
 
@@ -76,7 +76,7 @@ type MachineProvider interface {
 	// has all the required information for creating a new Machine stored, based solely on the index.
 	CreateMachine(context.Context, logr.Logger, int32) error
 
-	// DeleteMachine is used to instruct the Machine Provider to delete a paritcular Machine. This is used by the
+	// DeleteMachine is used to instruct the Machine Provider to delete a particular Machine. This is used by the
 	// RollingUpdate strategy of the ControlPlaneMachineSet so that it can remove old Machines once they have been
 	// replaced.
 	DeleteMachine(context.Context, logr.Logger, *ObjectRef) error
