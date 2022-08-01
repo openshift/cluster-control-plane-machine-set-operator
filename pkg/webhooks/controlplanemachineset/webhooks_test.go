@@ -248,7 +248,7 @@ var _ = Describe("Webhooks", func() {
 				templateBuilder := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(tempateProviderSpec)
 				cpms := builder.WithMachineTemplateBuilder(templateBuilder).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.providerSpec: Invalid value: AWSFailureDomain{AvailabilityZone:different-zone-1, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}: Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
+				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec: Invalid value: AWSFailureDomain{AvailabilityZone:different-zone-1, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}: Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
 			})
 
 			It("with invalid failure domain information", func() {
