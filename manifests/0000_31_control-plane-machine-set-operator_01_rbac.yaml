@@ -33,6 +33,7 @@ rules:
     resources:
       - controlplanemachinesets
       - controlplanemachinesets/status
+      - controlplanemachinesets/finalizers
     verbs:
       - get
       - list
