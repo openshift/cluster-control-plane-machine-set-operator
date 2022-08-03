@@ -324,128 +324,190 @@ var _ = Describe("Webhooks", func() {
 				ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
 				Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 				namespaceName = ns.GetName()
-
-				providerSpec := resourcebuilder.AWSProviderSpec()
-				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
-				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster()
-				workerMachineBuilder := machineBuilder.WithGenerateName("worker-machine-").AsWorker()
-				machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
-				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-
-				var filterSubnet = machinev1beta1.AWSResourceReference{
-					Filters: []machinev1beta1.Filter{{
-						Name:   "tag:Name",
-						Values: []string{"aws-subnet-12345678"},
-					}},
-				}
-
-				By("Creating a selection of Machines")
-				for _, az := range []string{"us-east-1a", "us-east-1b", "us-east-1c"} {
-					ps := providerSpec.WithAvailabilityZone(az).WithSubnet(filterSubnet)
-					worker := workerMachineBuilder.WithProviderSpecBuilder(ps).Build()
-					controlPlane := controlPlaneMachineBuilder.WithProviderSpecBuilder(ps).Build()
-
-					Expect(k8sClient.Create(ctx, worker)).To(Succeed())
-					Expect(k8sClient.Create(ctx, controlPlane)).To(Succeed())
-				}
-				for _, az := range []string{"us-east-1d", "us-east-1e", "us-east-1f"} {
-					ps := providerSpec.WithAvailabilityZone(az)
-					worker := workerMachineBuilder.WithProviderSpecBuilder(ps).Build()
-
-					Expect(k8sClient.Create(ctx, worker)).To(Succeed())
-				}
 			})
 
-			It("with a valid failure domains spec", func() {
-				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-						usEast1aBuilder,
-						usEast1bBuilder,
-						usEast1cBuilder,
-					),
-				)).Build()
+			Context("with machines spread evenly across failure domains", func() {
+				BeforeEach(func() {
+					providerSpec := resourcebuilder.AWSProviderSpec()
+					machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+					machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster()
+					workerMachineBuilder := machineBuilder.WithGenerateName("worker-machine-").AsWorker()
+					machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 
-				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+					builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+
+					var filterSubnet = machinev1beta1.AWSResourceReference{
+						Filters: []machinev1beta1.Filter{{
+							Name:   "tag:Name",
+							Values: []string{"aws-subnet-12345678"},
+						}},
+					}
+
+					By("Creating a selection of Machines")
+					for _, az := range []string{"us-east-1a", "us-east-1b", "us-east-1c"} {
+						ps := providerSpec.WithAvailabilityZone(az).WithSubnet(filterSubnet)
+						worker := workerMachineBuilder.WithProviderSpecBuilder(ps).Build()
+						controlPlane := controlPlaneMachineBuilder.WithProviderSpecBuilder(ps).Build()
+
+						Expect(k8sClient.Create(ctx, worker)).To(Succeed())
+						Expect(k8sClient.Create(ctx, controlPlane)).To(Succeed())
+					}
+					for _, az := range []string{"us-east-1d", "us-east-1e", "us-east-1f"} {
+						ps := providerSpec.WithAvailabilityZone(az)
+						worker := workerMachineBuilder.WithProviderSpecBuilder(ps).Build()
+
+						Expect(k8sClient.Create(ctx, worker)).To(Succeed())
+					}
+				})
+
+				It("with a valid failure domains spec", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+							usEast1bBuilder,
+							usEast1cBuilder,
+						),
+					)).Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+				})
+
+				It("with a invalid subnet filter - different value", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+							usEast1bBuilder,
+							usEast1cBuilderWithSubnet,
+						),
+					)).Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					)))
+				})
+
+				It("with a invalid subnet type - different type", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+							usEast1bBuilder,
+							usEast1cBuilderWithIDSubnet,
+						),
+					)).Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"),
+					)))
+				})
+
+				It("when reducing the availability", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+						),
+					)).Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
+						ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+						ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					)))
+				})
+
+				It("when increasing the availability", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+							usEast1bBuilder,
+							usEast1cBuilder,
+							usEast1dBuilder,
+						),
+					)).Build()
+
+					// We allow additional failure domains to be present to allow expansion horizontally if required later.
+					// The load balancing algorithm for the failure domain mapping should ensure the failure domains are stable
+					// so this shouldn't cause any issues with install.
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+				})
+
+				It("when the availability zones don't match", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1dBuilder,
+							usEast1eBuilder,
+							usEast1fBuilder,
+						),
+					)).Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
+						ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+						ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+						ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
+					)))
+				})
 			})
 
-			It("with a invalid subnet filter - different value", func() {
-				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-						usEast1aBuilder,
-						usEast1bBuilder,
-						usEast1cBuilderWithSubnet,
-					),
-				)).Build()
+			Context("with machines spread unevenly across failure domains", func() {
+				BeforeEach(func() {
+					providerSpec := resourcebuilder.AWSProviderSpec()
+					machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+					machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster()
+					workerMachineBuilder := machineBuilder.WithGenerateName("worker-machine-").AsWorker()
+					machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-different]}]}}"),
-				)))
-			})
+					builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 
-			It("with a invalid subnet type - different type", func() {
-				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-						usEast1aBuilder,
-						usEast1bBuilder,
-						usEast1cBuilderWithIDSubnet,
-					),
-				)).Build()
+					var filterSubnet = machinev1beta1.AWSResourceReference{
+						Filters: []machinev1beta1.Filter{{
+							Name:   "tag:Name",
+							Values: []string{"aws-subnet-12345678"},
+						}},
+					}
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:ID, Value:subnet-us-east-1c}}]"),
-				)))
-			})
+					By("Creating a selection of Machines")
+					for _, az := range []string{"us-east-1a", "us-east-1b", "us-east-1b"} {
+						ps := providerSpec.WithAvailabilityZone(az).WithSubnet(filterSubnet)
+						worker := workerMachineBuilder.WithProviderSpecBuilder(ps).Build()
+						controlPlane := controlPlaneMachineBuilder.WithProviderSpecBuilder(ps).Build()
 
-			It("when reducing the availability", func() {
-				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-						usEast1aBuilder,
-					),
-				)).Build()
+						Expect(k8sClient.Create(ctx, worker)).To(Succeed())
+						Expect(k8sClient.Create(ctx, controlPlane)).To(Succeed())
+					}
+					for _, az := range []string{"us-east-1c", "us-east-1d", "us-east-1e", "us-east-1f"} {
+						ps := providerSpec.WithAvailabilityZone(az)
+						worker := workerMachineBuilder.WithProviderSpecBuilder(ps).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-				)))
-			})
+						Expect(k8sClient.Create(ctx, worker)).To(Succeed())
+					}
+				})
 
-			It("when increasing the availability", func() {
-				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-						usEast1aBuilder,
-						usEast1bBuilder,
-						usEast1cBuilder,
-						usEast1dBuilder,
-					),
-				)).Build()
+				It("with matching failure domains", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+							usEast1bBuilder,
+						),
+					)).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}]"))
-			})
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+				})
 
-			It("when the availability zones don't match", func() {
-				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-						usEast1dBuilder,
-						usEast1eBuilder,
-						usEast1fBuilder,
-					),
-				)).Build()
+				It("with an additional failure domain in the spec", func() {
+					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aBuilder,
+							usEast1bBuilder,
+							usEast1cBuilder,
+						),
+					)).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s)"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s)"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1d, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1e, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-					ContainSubstring("AWSFailureDomain{AvailabilityZone:us-east-1f, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}"),
-				)))
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: no control plane machine is using specified failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}], failure domain(s) [AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}] are duplicated within the control plane machines, please correct failure domains to match control plane machines"),
+					)))
+				})
 			})
 		})
 	})
