@@ -405,7 +405,9 @@ func checkOpenShiftFailureDomainsMatchMachines(parentPath *field.Path, failureDo
 
 	// Failure domains specified in the control plane machine set but not used by control plane machines
 	if missingFailureDomains := missingFailureDomains(specifiedFailureDomains, machineFailureDomains); len(missingFailureDomains) > 0 {
-		errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("no control plane machine is using specified failure domain(s) %s", missingFailureDomains)))
+		if duplicatedFailureDomains := duplicatedFailureDomains(machineFailureDomains); len(duplicatedFailureDomains) > 0 {
+			errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("no control plane machine is using specified failure domain(s) %s, failure domain(s) %s are duplicated within the control plane machines, please correct failure domains to match control plane machines", missingFailureDomains, duplicatedFailureDomains)))
+		}
 	}
 
 	return errs
@@ -431,6 +433,36 @@ func missingFailureDomains(list1 []failuredomain.FailureDomain, list2 []failured
 	}
 
 	return missing
+}
+
+// duplicatedFailureDomains returns failure domains that are duplicated within the given list.
+func duplicatedFailureDomains(in []failuredomain.FailureDomain) []failuredomain.FailureDomain {
+	seen := []failuredomain.FailureDomain{}
+	duplicated := []failuredomain.FailureDomain{}
+
+	for _, failureDomain := range in {
+		if !contains(seen, failureDomain) {
+			seen = append(seen, failureDomain)
+			continue
+		}
+
+		if !contains(duplicated, failureDomain) {
+			duplicated = append(duplicated, failureDomain)
+		}
+	}
+
+	return duplicated
+}
+
+// contains checks if a failure domain is already present within a list of failure domains.
+func contains(in []failuredomain.FailureDomain, fd failuredomain.FailureDomain) bool {
+	for _, failureDomain := range in {
+		if fd.Equal(failureDomain) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // validateDiscriminatedUnion checks that the discriminated union is valid.
