@@ -21,18 +21,23 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/pflag"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/component-base/config"
+	"k8s.io/component-base/config/options"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	cpmswebhook "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/webhooks/controlplanemachineset"
 
 	//+kubebuilder:scaffold:imports
@@ -40,6 +45,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+)
+
+const (
+	// defaultLeaderElectionID is the default name to use for the leader election resource.
+	defaultLeaderElectionID = "control-plane-machine-set-leader"
 )
 
 func main() { //nolint:funlen
@@ -52,30 +62,48 @@ func main() { //nolint:funlen
 	}
 
 	var (
-		metricsAddr          string
-		enableLeaderElection bool
-		probeAddr            string
+		metricsAddr      string
+		probeAddr        string
+		managedNamespace string
+
+		leaderElectionConfig = config.LeaderElectionConfiguration{
+			LeaderElect:  true,
+			ResourceName: defaultLeaderElectionID,
+		}
 	)
 
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	pflag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	pflag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	pflag.StringVar(&managedNamespace, "namespace", "openshift-machine-api", "The namespace for managed objects, where the machines and control plane machine set will operate.")
+	options.BindLeaderElectionFlags(&leaderElectionConfig, pflag.CommandLine)
 
 	klog.InitFlags(flag.CommandLine)
-	flag.Parse()
+
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 
 	ctrl.SetLogger(klogr.New())
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "control-plane-machine-set-operator",
-		Namespace:              "openshift-machine-api",
+	cfg := ctrl.GetConfigOrDie()
+	le := util.GetLeaderElectionDefaults(cfg, configv1.LeaderElection{
+		Disable:       !leaderElectionConfig.LeaderElect,
+		RenewDeadline: leaderElectionConfig.RenewDeadline,
+		RetryPeriod:   leaderElectionConfig.RetryPeriod,
+		LeaseDuration: leaderElectionConfig.LeaseDuration,
+	})
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:                  scheme,
+		MetricsBindAddress:      metricsAddr,
+		Port:                    9443,
+		HealthProbeBindAddress:  probeAddr,
+		LeaderElectionNamespace: leaderElectionConfig.ResourceNamespace,
+		LeaderElection:          leaderElectionConfig.LeaderElect,
+		LeaderElectionID:        leaderElectionConfig.ResourceName,
+		LeaseDuration:           &le.LeaseDuration.Duration,
+		RetryPeriod:             &le.RetryPeriod.Duration,
+		RenewDeadline:           &le.RenewDeadline.Duration,
+		Namespace:               managedNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -85,7 +113,7 @@ func main() { //nolint:funlen
 	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
-		Namespace:    "openshift-machine-api",
+		Namespace:    managedNamespace,
 		OperatorName: "control-plane-machine-set",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
