@@ -52,7 +52,7 @@ func report(pass *analysis.Pass, pos token.Pos, name string) {
 
 	// If prefix is Test or Benchmark, Fuzz, skip
 	// FYI https://go.dev/blog/examples
-	if strings.Contains(name, "Test") || strings.Contains(name, "Benchmark") || strings.Contains(name, "Fuzz") {
+	if strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Fuzz") {
 		return
 	}
 
