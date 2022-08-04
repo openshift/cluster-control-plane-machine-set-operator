@@ -1073,6 +1073,67 @@ var _ = Describe("validateClusterState", func() {
 				},
 			},
 		}),
+		PEntry("with a failed machine", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").WithErrorMessage("Instance missing").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			},
+			expectedLogs: []test.LogEntry{},
+		}),
+		PEntry("with a failed replacement machine", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").WithNeedsUpdate(true).Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithErrorMessage("Could not create new instance").Build(),
+				},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").WithNeedsUpdate(true).Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").WithNeedsUpdate(true).Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonFailedReplacement).WithMessage("Observed 1 replacement machine(s) in error state").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			},
+			expectedLogs: []test.LogEntry{
+				{
+					Error: errors.New("found replacement control plane machines in an error state, the following machines(s) are currently reporting an error: machine-replacement-0"),
+					KeysAndValues: []interface{}{
+						"failedReplacements", "machine-replacement-0",
+					},
+					Message: "Observed failed replacement control plane machines",
+				},
+			},
+		}),
 	)
 })
 

@@ -404,13 +404,14 @@ func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Con
 }
 
 // validateClusterState uses the machineInfos to validate that:
-// - All Nodes in the cluster claiming to be control plane nodes have a valid machine
+// - All Nodes in the cluster claiming to be control plane nodes have a valid machine.
 // - At least 1 of the control plane machines is in the ready state (if there are no ready Machines then the cluster
-//   is likely misconfigured)
+//   is likely misconfigured).
 // - We have the correct number of indexes:
-//   + Right number of indexes, valid
-//   + Too few indexes, valid. We will later scale up without user intervention when we perform reconcileMachineUpdates
-//   + Too many indexes, invalid. We set the operator to degraded and ask the user for manual intervention
+//   + Right number of indexes, valid.
+//   + Too few indexes, valid. We will later scale up without user intervention when we perform reconcileMachineUpdates.
+//   + Too many indexes, invalid. We set the operator to degraded and ask the user for manual intervention.
+// - No replacement machines (one that doesn't need update but has an equivalent in the index that needs update) have an error.
 func (r *ControlPlaneMachineSetReconciler) validateClusterState(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos map[int32][]machineproviders.MachineInfo) error {
 	return nil
 }
