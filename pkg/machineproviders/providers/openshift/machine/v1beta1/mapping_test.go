@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -230,11 +232,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -261,11 +263,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -292,11 +294,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -327,13 +329,13 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -364,13 +366,13 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -401,13 +403,13 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -441,11 +443,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -479,11 +481,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -524,11 +526,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -564,11 +566,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -602,11 +604,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -640,11 +642,11 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},
@@ -684,13 +686,13 @@ var _ = Describe("Failure Domain Mapping", func() {
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
-							"mapping", map[int32]failuredomain.FailureDomain{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
 								0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 								2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 								4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
-							},
+							}),
 						},
 						Message: "Mapped provided failure domains",
 					},

@@ -71,7 +71,7 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 
 	logger.V(4).Info(
 		"Mapped provided failure domains",
-		"mapping", out,
+		"mapping", fmt.Sprintf("%v", out),
 	)
 
 	return out, nil
