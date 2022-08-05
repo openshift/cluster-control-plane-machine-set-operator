@@ -57,6 +57,12 @@ var (
 	// not currently specified in the ControlPlaneMachineSet definition. User intervention is required here.
 	errCouldNotDetermineMachineIndex = errors.New("could not determine Machine index from name or failure domain")
 
+	// errCouldNotFindFailureDomain is used to denote that the MachineProvider could not find a failure domain
+	// within the mapping for a given index.
+	// This means the Machine has an index in its name that is outside the bounds of the current mapping.
+	// This may happen if the cluster is trying to horizontally scale down.
+	errCouldNotFindFailureDomain = errors.New("could not find failure domain for index")
+
 	// errEmptyConfig is used to denote that the machine provider could not be constructed
 	// because no configuration was provided by the user.
 	errEmptyConfig = fmt.Errorf("cannot initialise %s provider with empty config", machinev1.OpenShiftMachineV1Beta1MachineType)
@@ -180,7 +186,7 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 	}
 
 	for _, machine := range machineList.Items {
-		machineInfo, err := m.generateMachineInfo(machine, logger)
+		machineInfo, err := m.generateMachineInfo(logger, machine)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate machine info for machine %s: %w", machine.Name, err)
 		}
@@ -210,42 +216,13 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 }
 
 // generateMachineInfo creates a MachineInfo object for a given machine.
-func (m *openshiftMachineProvider) generateMachineInfo(machine machinev1beta1.Machine, logger logr.Logger) (machineproviders.MachineInfo, error) {
+func (m *openshiftMachineProvider) generateMachineInfo(logger logr.Logger, machine machinev1beta1.Machine) (machineproviders.MachineInfo, error) {
 	machineRef := getMachineRef(machine)
-
 	nodeRef := getNodeRef(machine)
 
-	machineNameIndex, correctFormat := getMachineNameIndex(machine)
-
-	failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(machine)
+	machineIndex, err := m.getMachineIndex(logger, machine)
 	if err != nil {
-		return machineproviders.MachineInfo{}, fmt.Errorf("cannot extract failure domain from machine: %w", err)
-	}
-
-	index, indexFound := m.failureDomainToIndex(failureDomain)
-	if !indexFound && !correctFormat {
-		// When the machine names do not fit the pattern, and the failure domains are
-		// not recognised, returns an error.
-		// Example:
-		//   Machine "master-a" has a name which format doesn't allow to determine its name index.
-		//   Additionally, machine's failure domain "domain-z" is not present in the domain index
-		//   mapping, and we can't get its index either. In this case we have to stop the process
-		//   of gathering machine info.
-		logger.Error(errCouldNotDetermineMachineIndex,
-			"Could not gather Machine Info",
-		)
-
-		return machineproviders.MachineInfo{}, errCouldNotDetermineMachineIndex
-	}
-
-	// If machine name index and domain index are different, we should use the machine
-	// name index in the result.
-	// Example:
-	//   Machine name is master-0, and therefore its name index is "0". But its failure domain is
-	//   domain-b, which is mapped at "1" domain index. Since they are different and there is
-	//   a collision, by convention we pick the resulting index from the name, i.e. "0".
-	if correctFormat && int32(machineNameIndex) != index {
-		index = int32(machineNameIndex)
+		return machineproviders.MachineInfo{}, fmt.Errorf("could not determine machine index: %w", err)
 	}
 
 	providerConfig, err := providerconfig.NewProviderConfigFromMachine(machine)
@@ -253,7 +230,13 @@ func (m *openshiftMachineProvider) generateMachineInfo(machine machinev1beta1.Ma
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not compare existing and desired provider configs: %w", err)
 	}
 
-	templateProviderConfig, err := m.providerConfig.InjectFailureDomain(failureDomain)
+	// Make sure to compare using the desired failure domain from the mapping.
+	mappedFailureDomain, ok := m.indexToFailureDomain[machineIndex]
+	if !ok {
+		return machineproviders.MachineInfo{}, fmt.Errorf("%w: unknown index %d", errCouldNotFindFailureDomain, machineIndex)
+	}
+
+	templateProviderConfig, err := m.providerConfig.InjectFailureDomain(mappedFailureDomain)
 	if err != nil {
 		return machineproviders.MachineInfo{}, fmt.Errorf("error injecting failure domain into provider config: %w", err)
 	}
@@ -267,10 +250,43 @@ func (m *openshiftMachineProvider) generateMachineInfo(machine machinev1beta1.Ma
 		MachineRef:   machineRef,
 		NodeRef:      nodeRef,
 		Ready:        pointer.StringDeref(machine.Status.Phase, "") == runningPhase,
-		NeedsUpdate:  !configsEqual || !indexFound,
-		Index:        index,
+		NeedsUpdate:  !configsEqual,
+		Index:        machineIndex,
 		ErrorMessage: pointer.StringDeref(machine.Status.ErrorMessage, ""),
 	}, nil
+}
+
+func (m *openshiftMachineProvider) getMachineIndex(logger logr.Logger, machine machinev1beta1.Machine) (int32, error) {
+	machineNameIndex, correctFormat := getMachineNameIndex(machine)
+	if correctFormat {
+		// If the machine name has the correct format we implicitly trust it to be correct.
+		return machineNameIndex, nil
+	}
+
+	// If the Machine name format doesn't match, try to fallback to matching based on the failure domain
+	// with the Machine's provider spec.
+	failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(machine)
+	if err != nil {
+		return 0, fmt.Errorf("cannot extract failure domain from machine: %w", err)
+	}
+
+	index, indexFound := m.failureDomainToIndex(failureDomain)
+	if !indexFound {
+		// When the machine names do not fit the pattern, and the failure domains are
+		// not recognised, returns an error.
+		// Example:
+		//   Machine "master-a" has a name which format doesn't allow to determine its name index.
+		//   Additionally, machine's failure domain "domain-z" is not present in the domain index
+		//   mapping, and we can't get its index either. In this case we don't know how to map the
+		//   machine and user intervention is required.
+		logger.Error(errCouldNotDetermineMachineIndex,
+			"Could not gather Machine Info",
+		)
+
+		return 0, errCouldNotDetermineMachineIndex
+	}
+
+	return index, nil
 }
 
 // failureDomainToIndex returns the index of failure domain in the list. If there is nothing found, it returns false as
@@ -287,7 +303,7 @@ func (m *openshiftMachineProvider) failureDomainToIndex(failureDomain failuredom
 
 // getMachineNameIndex tries to fetch machine index from its name. If it's not possible,
 // it returns false as a second parameter.
-func getMachineNameIndex(machine machinev1beta1.Machine) (int, bool) {
+func getMachineNameIndex(machine machinev1beta1.Machine) (int32, bool) {
 	// Get a substring after the last occurrence of "-" to find the machine index suffix.
 	// Then try to convert it to a number.
 	machineNameIndex, err := strconv.ParseInt(machine.Name[strings.LastIndex(machine.Name, "-")+1:], 10, 32)
@@ -295,7 +311,7 @@ func getMachineNameIndex(machine machinev1beta1.Machine) (int, bool) {
 		return 0, false
 	}
 
-	return int(machineNameIndex), true
+	return int32(machineNameIndex), true
 }
 
 // getMachineRef returns returns machine object reference for the given machine.
