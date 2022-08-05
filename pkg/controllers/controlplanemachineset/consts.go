@@ -65,6 +65,12 @@ const (
 	// and is not currently encountering any issues in operation.
 	reasonAsExpected = "AsExpected"
 
+	// reasonFailedReplacement denotes that the ControlPlaneMachineSet has identified that
+	// a replacement machines is in an error state. In this case, operations must not
+	// continue and manual intervention is required to identify and rectify the cause
+	// of the issue.
+	reasonFailedReplacement = "FailedReplacement"
+
 	// reasonInvalidStrategy denotes that the ControlPlaneMachineSet has identified an
 	// invalid value for the spec.strategy.type field.
 	// This must be resolved by the user before operation of the ControlPlaneMachineSet
