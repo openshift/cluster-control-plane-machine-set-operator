@@ -24,7 +24,7 @@ spec:
       serviceAccountName: control-plane-machine-set-operator
       containers:
       - name: control-plane-machine-set-operator
-        image: quay.io/origin/origin-control-plane-machine-set-operator
+        image: quay.io/openshift/origin-cluster-control-plane-machine-set-operator
         command:
         - "/manager"
         args:
