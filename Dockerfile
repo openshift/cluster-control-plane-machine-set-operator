@@ -5,5 +5,6 @@ RUN make build
 
 FROM registry.ci.openshift.org/ocp/4.11:base
 COPY --from=builder /go/src/github.com/openshift/cluster-control-plane-machine-set-operator/bin/manager .
+COPY --from=builder /go/src/github.com/openshift/cluster-control-plane-machine-set-operator/manifests manifests
 
 LABEL io.openshift.release.operator true
