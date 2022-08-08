@@ -71,6 +71,9 @@ type ControlPlaneMachineSetReconciler struct {
 	// OperatorName is the name of the ClusterOperator with which the controller should report
 	// its status.
 	OperatorName string
+
+	// ReleaseVersion is the version of current cluster operator release.
+	ReleaseVersion string
 }
 
 // SetupWithManager sets up the controller with the Manager.
