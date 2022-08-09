@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -50,6 +51,11 @@ import (
 const (
 	// defaultLeaderElectionID is the default name to use for the leader election resource.
 	defaultLeaderElectionID = "control-plane-machine-set-leader"
+)
+
+const (
+	releaseVersionEnvVariableName = "RELEASE_VERSION"
+	unknownVersionValue           = "unknown"
 )
 
 func main() { //nolint:funlen
@@ -111,10 +117,11 @@ func main() { //nolint:funlen
 	}
 
 	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
-		Client:       mgr.GetClient(),
-		Scheme:       mgr.GetScheme(),
-		Namespace:    managedNamespace,
-		OperatorName: "control-plane-machine-set",
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		Namespace:      managedNamespace,
+		OperatorName:   "control-plane-machine-set",
+		ReleaseVersion: getReleaseVersion(setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
 		os.Exit(1)
@@ -165,4 +172,14 @@ func setupScheme(scheme *runtime.Scheme) error {
 	}
 
 	return nil
+}
+
+func getReleaseVersion(setupLog logr.Logger) string {
+	releaseVersion := os.Getenv(releaseVersionEnvVariableName)
+	if len(releaseVersion) == 0 {
+		releaseVersion = unknownVersionValue
+		setupLog.Info(fmt.Sprintf("%s environment variable is missing, defaulting to %q", releaseVersionEnvVariableName, unknownVersionValue))
+	}
+
+	return releaseVersion
 }

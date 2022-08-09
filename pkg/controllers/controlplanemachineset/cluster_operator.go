@@ -19,6 +19,7 @@ package controlplanemachineset
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -43,7 +44,7 @@ func (r *ControlPlaneMachineSetReconciler) setClusterOperatorAvailable(ctx conte
 		newClusterOperatorStatusCondition(configv1.OperatorUpgradeable, configv1.ConditionTrue, reasonAsExpected, "cluster operator is upgradable"),
 	}
 
-	return r.patchClusterOperatorConditions(ctx, logger, co, conds)
+	return r.patchClusterOperatorStatus(ctx, logger, co, conds)
 }
 
 // setClusterOperatorStatus sets the control-plane-machine-set cluster operator status based on the status of the
@@ -81,7 +82,7 @@ func (r *ControlPlaneMachineSetReconciler) updateClusterOperatorStatus(ctx conte
 			"cluster operator is not upgradable"))
 	}
 
-	return r.patchClusterOperatorConditions(ctx, logger, co, conds)
+	return r.patchClusterOperatorStatus(ctx, logger, co, conds)
 }
 
 // getClusterOperator returns an instance of Cluster Operator resource for control-plane-machine-set cluster operator.
@@ -109,9 +110,9 @@ func newClusterOperatorStatusCondition(conditionType configv1.ClusterStatusCondi
 	}
 }
 
-// patchClusterOperatorConditions updates cluster operator status with given conditions.
-func (r *ControlPlaneMachineSetReconciler) patchClusterOperatorConditions(ctx context.Context, logger logr.Logger, co *configv1.ClusterOperator, conds []configv1.ClusterOperatorStatusCondition) error {
-	// We need to perform update only if conditions have been changed.
+// patchClusterOperatorStatus updates cluster operator status with given conditions.
+func (r *ControlPlaneMachineSetReconciler) patchClusterOperatorStatus(ctx context.Context, logger logr.Logger, co *configv1.ClusterOperator, conds []configv1.ClusterOperatorStatusCondition) error {
+	// We need to perform update only if conditions or versions have been changed.
 	needUpdate := false
 
 	for _, c := range conds {
@@ -120,6 +121,13 @@ func (r *ControlPlaneMachineSetReconciler) patchClusterOperatorConditions(ctx co
 
 			v1helpers.SetStatusCondition(&co.Status.Conditions, c)
 		}
+	}
+
+	versions := []configv1.OperandVersion{{Name: "operator", Version: r.ReleaseVersion}}
+	if !reflect.DeepEqual(co.Status.Versions, versions) {
+		needUpdate = true
+
+		co.Status.Versions = versions
 	}
 
 	if !needUpdate {
