@@ -160,6 +160,10 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 
 // Equal compares two ProviderConfigs to determine whether or not they are equal.
 func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
+	if other == nil {
+		return false, nil
+	}
+
 	if p.platformType != other.Type() {
 		return false, errMismatchedPlatformTypes
 	}

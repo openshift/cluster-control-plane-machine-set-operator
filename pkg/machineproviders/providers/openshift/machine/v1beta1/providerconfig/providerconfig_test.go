@@ -431,6 +431,13 @@ var _ = Describe("Provider Config", func() {
 
 			Expect(equal).To(Equal(in.expectedEqual), "Equality of provider configs was not as expected")
 		},
+			Entry("with nil provider config", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+				},
+				comparePC:     nil,
+				expectedEqual: false,
+			}),
 			Entry("with different platform types", equalTableInput{
 				basePC: &providerConfig{
 					platformType: configv1.AWSPlatformType,
