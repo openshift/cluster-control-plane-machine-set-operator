@@ -119,6 +119,10 @@ func (f failureDomain) OpenStack() machinev1.OpenStackFailureDomain {
 
 // Equal compares the underlying failure domain.
 func (f failureDomain) Equal(other FailureDomain) bool {
+	if other == nil {
+		return false
+	}
+
 	if f.platformType != other.Type() {
 		return false
 	}
