@@ -128,12 +128,37 @@ var _ = Describe("Provider Config", func() {
 
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
+				Expect(pc).To(BeNil())
 			} else {
 				Expect(err).ToNot(HaveOccurred())
+				Expect(pc).To(HaveField(in.matchPath, Equal(in.matchExpectation)))
 			}
 
-			Expect(pc).To(HaveField(in.matchPath, Equal(in.matchExpectation)))
 		},
+			Entry("with nil failure domain", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				failureDomain: nil,
+				expectedError: errNilFailureDomain,
+			}),
+			Entry("with empty failure domain", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewAWSFailureDomain(
+					machinev1.AWSFailureDomain{},
+				),
+				expectedError:    nil,
+				matchPath:        "AWS().Config().Placement.AvailabilityZone",
+				matchExpectation: "",
+			}),
 			Entry("when keeping an AWS availability zone the same", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,

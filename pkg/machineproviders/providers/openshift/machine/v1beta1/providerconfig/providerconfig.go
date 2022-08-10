@@ -44,6 +44,9 @@ var (
 
 	// errUnsupportedProviderConfigType is an error used when provider spec is nil.
 	errNilProviderSpec = errors.New("provider spec is nil")
+
+	// errNilFailureDomain is an error used when when nil value is present and failure domain is expected.
+	errNilFailureDomain = errors.New("failure domain is nil")
 )
 
 // ProviderConfig is an interface that allows external code to interact
@@ -121,6 +124,10 @@ type providerConfig struct {
 // The returned ProviderConfig will be a copy of the current ProviderConfig with
 // the new failure domain injected.
 func (p providerConfig) InjectFailureDomain(fd failuredomain.FailureDomain) (ProviderConfig, error) {
+	if fd == nil {
+		return nil, errNilFailureDomain
+	}
+
 	newConfig := p
 
 	switch p.platformType {
