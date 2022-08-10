@@ -216,7 +216,6 @@ var _ = Describe("With a running controller", func() {
 
 			machines := &machinev1beta1.MachineList{}
 			Expect(k8sClient.List(ctx, machines)).To(Succeed())
-			Expect(machines.Items).To(HaveLen(3))
 
 			By("Deleting the ControlPlaneMachineSet")
 			Expect(k8sClient.Delete(ctx, cpms)).To(Succeed())
@@ -228,9 +227,8 @@ var _ = Describe("With a running controller", func() {
 
 		It("should remove the owner references from the Machines", func() {
 			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", SatisfyAll(
-				HaveLen(3),
 				HaveEach(HaveField("ObjectMeta.OwnerReferences", HaveLen(0))),
-			)), "3 Machines should exist, each should have no owner references")
+			)), "each machine should have no owner references")
 		})
 	})
 })
@@ -923,7 +921,7 @@ var _ = Describe("validateClusterState", func() {
 		Expect(cpms.Status.Conditions).To(test.MatchConditions(in.expectedConditions))
 		Expect(in.expectedLogs).To(ConsistOf(in.expectedLogs))
 	},
-		PEntry("with a valid cluster state", validateClusterTableInput{
+		Entry("with a valid cluster state", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
@@ -948,7 +946,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{},
 		}),
-		PEntry("with a valid cluster state and pre-existing conditions", validateClusterTableInput{
+		Entry("with a valid cluster state and pre-existing conditions", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonMachinesAlreadyOwned).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
@@ -973,7 +971,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{},
 		}),
-		PEntry("with no machines are ready", validateClusterTableInput{
+		Entry("with no machines are ready", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
@@ -1006,7 +1004,7 @@ var _ = Describe("validateClusterState", func() {
 				},
 			},
 		}),
-		PEntry("with only 1 machine is ready", validateClusterTableInput{
+		Entry("with only 1 machine is ready", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
@@ -1039,7 +1037,7 @@ var _ = Describe("validateClusterState", func() {
 				},
 			},
 		}),
-		PEntry("with an additional unowned master node", validateClusterTableInput{
+		Entry("with an additional unowned master node", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
@@ -1073,7 +1071,7 @@ var _ = Describe("validateClusterState", func() {
 				},
 			},
 		}),
-		PEntry("with a failed machine", validateClusterTableInput{
+		Entry("with a failed machine", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
@@ -1098,7 +1096,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{},
 		}),
-		PEntry("with a failed replacement machine", validateClusterTableInput{
+		Entry("with a failed replacement machine", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
@@ -1122,7 +1120,7 @@ var _ = Describe("validateClusterState", func() {
 			expectedError: nil,
 			expectedConditions: []metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonFailedReplacement).WithMessage("Observed 1 replacement machine(s) in error state").Build(),
-				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
 			expectedLogs: []test.LogEntry{
 				{
@@ -1131,6 +1129,128 @@ var _ = Describe("validateClusterState", func() {
 						"failedReplacements", "machine-replacement-0",
 					},
 					Message: "Observed failed replacement control plane machines",
+				},
+			},
+		}),
+		Entry("with multiple failed replacement machines", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").WithNeedsUpdate(true).Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithErrorMessage("Could not create new instance").Build(),
+				},
+				1: {
+					updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").WithNeedsUpdate(true).Build(),
+					updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithErrorMessage("Could not create new instance").Build(),
+				},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").WithNeedsUpdate(true).Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonFailedReplacement).WithMessage("Observed 2 replacement machine(s) in error state").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+			expectedLogs: []test.LogEntry{
+				{
+					Error: errors.New("found replacement control plane machines in an error state, the following machines(s) are currently reporting an error: machine-replacement-0,machine-replacement-1"),
+					KeysAndValues: []interface{}{
+						"failedReplacements", "machine-replacement-0,machine-replacement-1",
+					},
+					Message: "Observed failed replacement control plane machines",
+				},
+			},
+		}),
+		Entry("with the desired number of control plane indexes", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}).WithReplicas(3),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			},
+			expectedLogs: []test.LogEntry{},
+		}),
+		Entry("with a less than desired number of control plane indexes", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}).WithReplicas(3),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			},
+			expectedLogs: []test.LogEntry{},
+		}),
+		Entry("with an excess in number of control plane indexes", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}).WithReplicas(3),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+				3: {updatedMachineBuilder.WithIndex(3).WithMachineName("machine-3").WithNodeName("master-3").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				masterNodeBuilder.WithName("master-3").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonExcessIndexes).WithMessage("Observed 1 index(es) in excess").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+			expectedLogs: []test.LogEntry{
+				{
+					Error: errors.New("found an excessive number of indexes for the control plane machine set, 1 index(es) are in excess"),
+					KeysAndValues: []interface{}{
+						"excessIndexes", "1",
+					},
+					Message: "Observed an excessive number of control plane machine indexes",
 				},
 			},
 		}),

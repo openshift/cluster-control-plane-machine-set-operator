@@ -16,6 +16,13 @@ limitations under the License.
 
 package controlplanemachineset
 
+const (
+	// masterNodeRoleLabel denotes the master node label for a node.
+	masterNodeRoleLabel = "node-role.kubernetes.io/master"
+	// controlPlaneNodeRoleLabel denotes the control-plane node label for a node.
+	controlPlaneNodeRoleLabel = "node-role.kubernetes.io/control-plane"
+)
+
 // Condition types for use in the ControlPlaneMachineSet status.
 // These types will define the output of the ContorlPlaneMachineSet status
 // as conditions which in turn will influence how the ClusterOperator
@@ -95,6 +102,13 @@ const (
 	// configuration, the ControlPlaneMachineSet will cease all operations.
 	reasonUnmanagedNodes = "UnmanagedNodes"
 
+	// reasonExcessIndexes denotes that the ControlPlaneMachineSet has more indexes
+	// than desired.
+	// This will typically occur when extra indexes have been created outside of the cpms.
+	// In this scenario, to prevent potential for degrading the cluster into an unsupported
+	// configuration, the ControlPlaneMachineSet will cease all operations.
+	reasonExcessIndexes = "ExcessIndexes"
+
 	// END: Degraded reasons.
 
 	// BEGIN: Progressing reasons.
@@ -108,7 +122,7 @@ const (
 	// action towards a rollout because the operator is currently in a degraded state.
 	reasonOperatorDegraded = "OperatorDegraded"
 
-	// reasonExcessReplicas denotes that the ControlPLaneMachineSet has the correct number
+	// reasonExcessReplicas denotes that the ControlPlaneMachineSet has the correct number
 	// of ready and updated replicas, however, has more replicas than expected.
 	// This will typically occur when an old replica has not yet been removed.
 	reasonExcessReplicas = "ExcessReplicas"
