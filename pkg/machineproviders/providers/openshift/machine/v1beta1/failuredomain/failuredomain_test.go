@@ -360,6 +360,19 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With nil failure domain", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.AWSPlatformType,
+					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(nil)).To(BeFalse())
+			})
+		})
+
 		Context("With two identical Azure failure domains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
