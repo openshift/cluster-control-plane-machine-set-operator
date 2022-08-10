@@ -910,7 +910,7 @@ var _ = Describe("validateClusterState", func() {
 			Namespace: namespaceName,
 		}
 
-		cpms := cpmsBuilder.Build()
+		cpms := in.cpmsBuilder.Build()
 
 		err := reconciler.validateClusterState(ctx, logger.Logger(), cpms, in.machineInfos)
 
