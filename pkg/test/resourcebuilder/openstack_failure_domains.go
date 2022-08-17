@@ -58,7 +58,7 @@ func (m OpenStackFailureDomainsBuilder) WithFailureDomainBuilder(fdbuilder OpenS
 }
 
 // WithFailureDomainBuilders replaces the OpenStack failure domains builder's builders with the given builders.
-func (m OpenStackFailureDomainsBuilder) WithFailureDomainBuilders(fdbuilders []OpenStackFailureDomainBuilder) OpenStackFailureDomainsBuilder {
+func (m OpenStackFailureDomainsBuilder) WithFailureDomainBuilders(fdbuilders ...OpenStackFailureDomainBuilder) OpenStackFailureDomainsBuilder {
 	m.failureDomainsBuilders = fdbuilders
 	return m
 }

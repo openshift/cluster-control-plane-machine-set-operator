@@ -621,6 +621,41 @@ var _ = Describe("Webhooks", func() {
 				))
 			})
 		})
+
+		Context("on GCP", func() {
+			var usCentral1aBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1a")
+			var usCentral1bBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1b")
+			var usCentral1cBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1c")
+
+			BeforeEach(func() {
+				providerSpec := resourcebuilder.GCPProviderSpec()
+				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				// Default CPMS builder should be valid, individual tests will override to make it invalid
+				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+
+				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+
+				By("Creating a selection of Machines")
+				for _, az := range []string{"us-central-1a", "us-central-1b", "us-central-1c"} {
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec.WithZone(az))
+
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
+				}
+			})
+
+			It("with a valid failure domains spec", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
+						usCentral1aBuilder,
+						usCentral1bBuilder,
+						usCentral1cBuilder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value: Forbidden: automatic replacement of control plane machines on GCP is not currently supported")))
+			})
+		})
 	})
 
 	Context("on update", func() {
