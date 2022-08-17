@@ -246,6 +246,7 @@ func validateOpenShiftMachineV1BetaTemplate(parentPath *field.Path, template mac
 
 	errs = append(errs, validateTemplateLabels(parentPath.Child("metadata", "labels"), template.ObjectMeta.Labels, selector)...)
 	errs = append(errs, validateOpenShiftFailureDomains(parentPath.Child("failureDomains"), template.FailureDomains)...)
+	errs = append(errs, validateOpenShiftProviderConfig(parentPath, template)...)
 
 	return errs
 }
@@ -332,6 +333,38 @@ func validateOpenShiftAWSFailureDomains(parentPath *field.Path, failureDomains *
 
 	for i, failureDomain := range *failureDomains {
 		errs = append(errs, validateDiscriminatedUnion(parentPath.Index(i).Child("subnet"), failureDomain.Subnet, "Type")...)
+	}
+
+	return errs
+}
+
+// validateOpenShiftProviderConfig checks the provider config on the ControlPlaneMachineSet to ensure that the
+// ControlPlaneMachineSet can safely replace control plane machines.
+func validateOpenShiftProviderConfig(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate) []error {
+	providerSpecPath := parentPath.Child("spec", "providerSpec")
+
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(template)
+	if err != nil {
+		return []error{field.Invalid(providerSpecPath, template.Spec.ProviderSpec, fmt.Sprintf("error determining provider configuration: %s", err))}
+	}
+
+	switch providerConfig.Type() {
+	case configv1.AzurePlatformType:
+		return validateOpenShiftAzureProviderConfig(providerSpecPath.Child("value"), providerConfig.Azure())
+	}
+
+	return []error{}
+}
+
+// validateOpenShiftAzureProviderConfig runs Azure specific checks on the provider config on the ControlPlaneMachineSet.
+// This ensure that the ControlPlaneMachineSet can safely replace Azure control plane machines.
+func validateOpenShiftAzureProviderConfig(parentPath *field.Path, providerConfig providerconfig.AzureProviderConfig) []error {
+	errs := []error{}
+
+	config := providerConfig.Config()
+
+	if config.InternalLoadBalancer == "" {
+		errs = append(errs, field.Required(parentPath.Child("internalLoadBalancer"), "internalLoadBalancer is required for control plane machines"))
 	}
 
 	return errs
