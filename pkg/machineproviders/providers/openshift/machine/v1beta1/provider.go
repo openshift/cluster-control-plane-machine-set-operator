@@ -230,15 +230,21 @@ func (m *openshiftMachineProvider) generateMachineInfo(logger logr.Logger, machi
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not compare existing and desired provider configs: %w", err)
 	}
 
-	// Make sure to compare using the desired failure domain from the mapping.
-	mappedFailureDomain, ok := m.indexToFailureDomain[machineIndex]
-	if !ok {
-		return machineproviders.MachineInfo{}, fmt.Errorf("%w: unknown index %d", errCouldNotFindFailureDomain, machineIndex)
-	}
+	templateProviderConfig := m.providerConfig
 
-	templateProviderConfig, err := m.providerConfig.InjectFailureDomain(mappedFailureDomain)
-	if err != nil {
-		return machineproviders.MachineInfo{}, fmt.Errorf("error injecting failure domain into provider config: %w", err)
+	if len(m.indexToFailureDomain) > 0 {
+		// Make sure to compare using the desired failure domain from the mapping.
+		mappedFailureDomain, ok := m.indexToFailureDomain[machineIndex]
+		if !ok {
+			return machineproviders.MachineInfo{}, fmt.Errorf("%w: unknown index %d", errCouldNotFindFailureDomain, machineIndex)
+		}
+
+		injectedProviderConfig, err := m.providerConfig.InjectFailureDomain(mappedFailureDomain)
+		if err != nil {
+			return machineproviders.MachineInfo{}, fmt.Errorf("error injecting failure domain into provider config: %w", err)
+		}
+
+		templateProviderConfig = injectedProviderConfig
 	}
 
 	configsEqual, err := templateProviderConfig.Equal(providerConfig)
