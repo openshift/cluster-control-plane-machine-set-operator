@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -27,9 +28,11 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
@@ -56,6 +59,20 @@ const (
 	// degradedClusterState is used to denote that the control plane machine set has detected a degraded cluster.
 	// In this case, the controller will not perform any further actions.
 	degradedClusterState = "Cluster state is degraded. The control plane machine set will not take any action until issues have been resolved."
+)
+
+var (
+	// errFoundUnmanagedControlPlaneNodes is used to inform users that one or more nodes do not have machines associated with them.
+	errFoundUnmanagedControlPlaneNodes = errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines")
+
+	// errNoReadyControlPlaneMachines is used to inform users that no control plane machines in the cluster are ready.
+	errNoReadyControlPlaneMachines = errors.New("no ready control plane machines")
+
+	// errFoundErroredReplacementControlPlaneMachine is used to inform users that one or more replacement control plane machines, have been found.
+	errFoundErroredReplacementControlPlaneMachine = errors.New("found replacement control plane machines in an error state, the following machines(s) are currently reporting an error")
+
+	// errFoundExcessiveIndexes is used to inform users that an excessive number of indexes has been found.
+	errFoundExcessiveIndexes = errors.New("found an excessive number of indexes for the control plane machine set")
 )
 
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
@@ -416,6 +433,48 @@ func (r *ControlPlaneMachineSetReconciler) ensureOwnerReferences(ctx context.Con
 //   + Too many indexes, invalid. We set the operator to degraded and ask the user for manual intervention.
 // - No replacement machines (one that doesn't need update but has an equivalent in the index that needs update) have an error.
 func (r *ControlPlaneMachineSetReconciler) validateClusterState(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfos map[int32][]machineproviders.MachineInfo) error {
+	sortedIndexedMs := sortMachineInfosByIndex(machineInfos)
+
+	// Check that at least one of the control plane machines is in the ready state
+	// (if there are no ready Machines then the cluster is likely misconfigured).
+	if ok := r.checkReadyControlPlaneMachineExists(logger, cpms, sortedIndexedMs); !ok {
+		return nil
+	}
+
+	// Check that all Nodes in the cluster claiming to be control plane nodes have a valid machine.
+	ok, err := r.checkControlPlaneNodesToMachinesMappings(ctx, logger, cpms, sortedIndexedMs)
+	if err != nil {
+		return fmt.Errorf("failed to check control plane nodes to machines mappings: %w", err)
+	} else if !ok {
+		return nil
+	}
+
+	// Check that the number of the cpms indexes in the cluster is valid.
+	if ok := r.checkCorrectNumberOfIndexes(logger, cpms, sortedIndexedMs); !ok {
+		return nil
+	}
+
+	// Check that no replacement machines (one that doesn't need update but has an equivalent in the index that needs update)
+	// have an error.
+	if ok := r.checkNoErrorForReplacements(logger, cpms, sortedIndexedMs); !ok {
+		return nil
+	}
+
+	// Normal conditions case.
+	if meta.FindStatusCondition(cpms.Status.Conditions, conditionDegraded) == nil {
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:   conditionDegraded,
+			Status: metav1.ConditionFalse,
+		})
+	}
+
+	if meta.FindStatusCondition(cpms.Status.Conditions, conditionProgressing) == nil {
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:   conditionProgressing,
+			Status: metav1.ConditionFalse,
+		})
+	}
+
 	return nil
 }
 
@@ -445,7 +504,7 @@ func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []
 // isControlPlaneMachineSetDegraded determines whether or not the ControlPlaneMachineSet
 // has a true, degraded condition.
 func isControlPlaneMachineSetDegraded(cpms *machinev1.ControlPlaneMachineSet) bool {
-	return false
+	return meta.IsStatusConditionTrue(cpms.Status.Conditions, conditionDegraded)
 }
 
 // isOwnedByCurrentCPMS determines if the given machine is owned by the ControlPlaneMachineSet.
@@ -469,4 +528,197 @@ func isOwnedByCurrentCPMS(cpms *machinev1.ControlPlaneMachineSet, machineObjectM
 	}
 
 	return false
+}
+
+// checkControlPlaneNodesToMachinesMappings checks that all nodes in the cluster claiming to be control plane nodes are referenced by a control plane machine.
+func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappings(ctx context.Context, logger logr.Logger,
+	cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) (bool, error) {
+	var (
+		unmanagedNodeNames []string
+	)
+
+	cpmsNodes, err := r.fetchControlPlaneNodes(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch control plane nodes: %w", err)
+	}
+
+	for _, node := range cpmsNodes {
+		found := false
+
+		for _, indexMachines := range sortedIndexedMs {
+			for _, machineInfo := range indexMachines {
+				if machineInfo.NodeRef != nil && machineInfo.NodeRef.ObjectMeta.Name == node.ObjectMeta.Name {
+					found = true
+					break
+				}
+			}
+		}
+
+		if !found {
+			unmanagedNodeNames = append(unmanagedNodeNames, node.ObjectMeta.Name)
+		}
+	}
+
+	if len(unmanagedNodeNames) > 0 {
+		logger.Error(
+			fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, strings.Join(unmanagedNodeNames, ", ")),
+			"Observed unmanaged control plane nodes",
+			"unmanagedNodes", strings.Join(unmanagedNodeNames, ","),
+		)
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:   conditionProgressing,
+			Status: metav1.ConditionFalse,
+			Reason: reasonOperatorDegraded,
+		})
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:    conditionDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonUnmanagedNodes,
+			Message: fmt.Sprintf("Found %d unmanaged node(s)", len(unmanagedNodeNames)),
+		})
+
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// checkReadyControlPlaneMachineExists checks that at least one ready control plane machine exists in the cluster.
+func (r *ControlPlaneMachineSetReconciler) checkReadyControlPlaneMachineExists(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
+	var nonReadyMachineNames []string
+
+	for _, indexMachines := range sortedIndexedMs {
+		if len(indexMachines) > 0 && isEmpty(readyMachines(indexMachines)) {
+			nonReadyMachineNames = append(nonReadyMachineNames, indexMachines[0].MachineRef.ObjectMeta.Name)
+		}
+	}
+
+	if len(nonReadyMachineNames) == len(sortedIndexedMs) {
+		logger.Error(
+			errNoReadyControlPlaneMachines,
+			"No ready control plane machines found",
+			"unreadyMachines", strings.Join(nonReadyMachineNames, ","),
+		)
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:   conditionProgressing,
+			Status: metav1.ConditionFalse,
+			Reason: reasonOperatorDegraded,
+		})
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:    conditionDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonNoReadyMachines,
+			Message: "No ready control plane machines found",
+		})
+
+		return false
+	}
+
+	return true
+}
+
+// checkCorrectNumberOfIndexes checks that the number of control plane machine set indexes found in the cluster is valid.
+func (r *ControlPlaneMachineSetReconciler) checkCorrectNumberOfIndexes(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
+	currentIndexesCount := int32(len(sortedIndexedMs))
+
+	switch {
+	case currentIndexesCount == *cpms.Spec.Replicas:
+		// Right number of indexes. The cluster state is valid.
+	case currentIndexesCount < *cpms.Spec.Replicas:
+		// Too few indexes. The cluster state is valid.
+		// We will later scale up without user intervention when we perform reconcileMachineUpdates.
+	case currentIndexesCount > *cpms.Spec.Replicas:
+		// Too many indexes. The cluster state is invalid.
+		// We set the operator to degraded and ask the user for manual intervention.
+		excessiveIndexes := currentIndexesCount - *cpms.Spec.Replicas
+		logger.Error(
+			fmt.Errorf("%w: %d index(es) are in excess", errFoundExcessiveIndexes, excessiveIndexes),
+			"Observed an excessive number of control plane machine indexes",
+			"excessIndexes", excessiveIndexes,
+		)
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:   conditionProgressing,
+			Status: metav1.ConditionFalse,
+			Reason: reasonOperatorDegraded,
+		})
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:    conditionDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonExcessIndexes,
+			Message: fmt.Sprintf("Observed %d index(es) in excess", excessiveIndexes),
+		})
+
+		return false
+	}
+
+	return true
+}
+
+// checkNoErrorForReplacements checks that there is no errored replacement machine.
+func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
+	var erroredReplacementMachineNames []string
+
+	for _, machines := range sortedIndexedMs {
+		machinesUpdated := updatedMachines(machines)
+		machinesOutdated := needReplacementMachines(machines)
+
+		if hasAny(machinesOutdated) && hasAny(machinesUpdated) {
+			for _, m := range machinesUpdated {
+				if m.ErrorMessage != "" {
+					erroredReplacementMachineNames = append(erroredReplacementMachineNames, m.MachineRef.ObjectMeta.Name)
+				}
+			}
+		}
+	}
+
+	if len(erroredReplacementMachineNames) > 0 {
+		logger.Error(
+			fmt.Errorf("%w: %s", errFoundErroredReplacementControlPlaneMachine, strings.Join(erroredReplacementMachineNames, ", ")),
+			"Observed failed replacement control plane machines",
+			"failedReplacements", strings.Join(erroredReplacementMachineNames, ","),
+		)
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:   conditionProgressing,
+			Status: metav1.ConditionFalse,
+			Reason: reasonOperatorDegraded,
+		})
+
+		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+			Type:    conditionDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonFailedReplacement,
+			Message: fmt.Sprintf("Observed %d replacement machine(s) in error state", len(erroredReplacementMachineNames)),
+		})
+
+		return false
+	}
+
+	return true
+}
+
+// fetchControlPlaneNodes fetches a map of unique nodes that have the "control-plane" (and/or legacy "master") labels.
+func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Context) (map[string]corev1.Node, error) {
+	cpmsNodes := make(map[string]corev1.Node)
+
+	for _, label := range []string{masterNodeRoleLabel, controlPlaneNodeRoleLabel} {
+		nodesList := &corev1.NodeList{}
+		if err := r.List(ctx, nodesList, &client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(map[string]string{label: ""}),
+		}); err != nil {
+			return nil, fmt.Errorf("failed to get Nodes: %w", err)
+		}
+
+		for _, n := range nodesList.Items {
+			cpmsNodes[n.ObjectMeta.Name] = n
+		}
+	}
+
+	return cpmsNodes, nil
 }
