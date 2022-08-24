@@ -58,7 +58,7 @@ func (a AzureFailureDomainsBuilder) WithFailureDomainBuilder(fdbuilder AzureFail
 }
 
 // WithFailureDomainBuilders replaces the failure domains builder's builders with the given builders.
-func (a AzureFailureDomainsBuilder) WithFailureDomainBuilders(fdbuilders []AzureFailureDomainBuilder) AzureFailureDomainsBuilder {
+func (a AzureFailureDomainsBuilder) WithFailureDomainBuilders(fdbuilders ...AzureFailureDomainBuilder) AzureFailureDomainsBuilder {
 	a.failureDomainsBuilders = fdbuilders
 	return a
 }

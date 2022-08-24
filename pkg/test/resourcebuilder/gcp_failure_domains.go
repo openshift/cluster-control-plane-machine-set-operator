@@ -58,7 +58,7 @@ func (g GCPFailureDomainsBuilder) WithFailureDomainBuilder(fdbuilder GCPFailureD
 }
 
 // WithFailureDomainBuilders replaces the failure domains builder's builders with the given builders.
-func (g GCPFailureDomainsBuilder) WithFailureDomainBuilders(fdbuilders []GCPFailureDomainBuilder) GCPFailureDomainsBuilder {
+func (g GCPFailureDomainsBuilder) WithFailureDomainBuilders(fdbuilders ...GCPFailureDomainBuilder) GCPFailureDomainsBuilder {
 	g.failureDomainsBuilders = fdbuilders
 	return g
 }

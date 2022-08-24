@@ -47,6 +47,10 @@ var _ = Describe("Webhooks", func() {
 
 	var namespaceName string
 
+	const (
+		dummyValue = "value"
+	)
+
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
 		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
@@ -510,112 +514,330 @@ var _ = Describe("Webhooks", func() {
 				})
 			})
 		})
+
+		Context("on Azure", func() {
+			zone1Builder := resourcebuilder.AzureFailureDomain().WithZone("1")
+			zone2Builder := resourcebuilder.AzureFailureDomain().WithZone("2")
+			zone3Builder := resourcebuilder.AzureFailureDomain().WithZone("3")
+			zone4Builder := resourcebuilder.AzureFailureDomain().WithZone("4")
+
+			BeforeEach(func() {
+				providerSpec := resourcebuilder.AzureProviderSpec()
+				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				// Default CPMS builder should be valid, individual tests will override to make it invalid
+				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+
+				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+
+				By("Creating a selection of Machines")
+				for i := 1; i <= 3; i++ {
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec.WithZone(fmt.Sprintf("%d", i)))
+
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
+				}
+			})
+
+			It("with a valid failure domains spec", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
+
+			It("with a mismatched failure domains spec", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone4Builder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3}]"),
+				))
+			})
+
+			It("when reducing the availability", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3}]"),
+				))
+			})
+
+			It("when increasing the availability", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+						zone4Builder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
+
+			It("with an internal load balancer", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				).WithProviderSpecBuilder(
+					resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer("internal-load-balancer-12345678"),
+				),
+				).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
+
+			It("without an internal load balancer", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				).WithProviderSpecBuilder(
+					resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer(""), // Set to the empty string to remove it.
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines"),
+				))
+			})
+		})
+
+		Context("on GCP", func() {
+			var usCentral1aBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1a")
+			var usCentral1bBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1b")
+			var usCentral1cBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1c")
+
+			BeforeEach(func() {
+				providerSpec := resourcebuilder.GCPProviderSpec()
+				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				// Default CPMS builder should be valid, individual tests will override to make it invalid
+				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+
+				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+
+				By("Creating a selection of Machines")
+				for _, az := range []string{"us-central-1a", "us-central-1b", "us-central-1c"} {
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec.WithZone(az))
+
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
+				}
+			})
+
+			It("with a valid failure domains spec", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
+						usCentral1aBuilder,
+						usCentral1bBuilder,
+						usCentral1cBuilder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value: Forbidden: automatic replacement of control plane machines on GCP is not currently supported")))
+			})
+		})
 	})
 
 	Context("on update", func() {
 		var cpms *machinev1.ControlPlaneMachineSet
 
-		BeforeEach(func() {
-			providerSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
-			machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-			// Default CPMS builder should be valid
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
+		Context("on AWS", func() {
+			BeforeEach(func() {
+				providerSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
+				machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				// Default CPMS builder should be valid
+				cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
 
-			machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
-			controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
-			By("Creating a selection of Machines")
-			for i := 0; i < 3; i++ {
-				controlPlaneMachine := controlPlaneMachineBuilder.Build()
-				Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
-			}
-
-			By("Creating a valid ControlPlaneMachineSet")
-			Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
-		})
-
-		It("with an update to the providerSpec", func() {
-			// Change the providerSpec, expect the update to be successful
-			rawProviderSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-2").BuildRawExtension()
-
-			Expect(komega.Update(cpms, func() {
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
-			})()).Should(Succeed())
-		})
-
-		It("with 4 replicas", func() {
-			// This is an openapi validation but it makes sense to include it here as well
-			Expect(komega.Update(cpms, func() {
-				four := int32(4)
-				cpms.Spec.Replicas = &four
-			})()).Should(MatchError(ContainSubstring("Unsupported value: 4: supported values: \"3\", \"5\"")))
-		})
-
-		It("with 5 replicas", func() {
-			// Five replicas is a valid value but the existing CPMS has three replicas
-			Expect(komega.Update(cpms, func() {
-				five := int32(5)
-				cpms.Spec.Replicas = &five
-			})()).Should(MatchError(ContainSubstring(`spec.replicas: Forbidden: control plane machine set replicas cannot be changed`)), "Replicas should be immutable")
-		})
-
-		It("when modifying the machine labels and the selector still matches", func() {
-			Expect(komega.Update(cpms, func() {
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels["new"] = "value"
-			})()).Should(Succeed(), "Machine label updates are allowed provided the selector still matches")
-		})
-
-		It("when modifying the machine labels so that the selector no longer matches", func() {
-			Expect(komega.Update(cpms, func() {
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels = map[string]string{
-					"different":                          "labels",
-					machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
-					openshiftMachineRoleLabel:            "not-matching-label",
-					openshiftMachineTypeLabel:            masterMachineRole,
+				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+				By("Creating a selection of Machines")
+				for i := 0; i < 3; i++ {
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
 				}
-			})()).Should(MatchError(ContainSubstring("selector does not match template labels")), "The selector must always match the machine labels")
-		})
 
-		It("when modifying the machine labels to remove the cluster ID label", func() {
-			Expect(komega.Update(cpms, func() {
-				delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
-			})()).Should(MatchError(ContainSubstring("Required value: machine.openshift.io/cluster-api-cluster label is required")), "The labels must always contain a cluster ID label")
-		})
+				By("Creating a valid ControlPlaneMachineSet")
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
 
-		It("when mutating the selector", func() {
-			Expect(komega.Update(cpms, func() {
-				cpms.Spec.Selector.MatchLabels["new"] = "value"
-			})()).Should(MatchError(ContainSubstring("Forbidden: control plane machine set selector is immutable")), "The selector should be immutable")
-		})
+			It("with an update to the providerSpec", func() {
+				// Change the providerSpec, expect the update to be successful
+				rawProviderSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-2").BuildRawExtension()
 
-		It("when adding invalid failure domain information", func() {
-			Expect(komega.Update(cpms, func() {
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &[]machinev1.AzureFailureDomain{
-					{
-						Zone: "us-central-1",
-					},
-				}
-			})()).To(MatchError(SatisfyAll(
-				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws: Required value: value required when platform is \"AWS\""),
-				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.azure: Forbidden: value not allowed when platform is \"AWS\""),
-			)))
-		})
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
+				})()).Should(Succeed())
+			})
 
-		It("when adding invalid subnets in the faliure domains", func() {
-			Expect(komega.Update(cpms, func() {
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &[]machinev1.AWSFailureDomain{
-					{
-						Subnet: &machinev1.AWSResourceReference{
-							Type: machinev1.AWSARNReferenceType,
-							ID:   pointer.String("id-123"),
+			It("with 4 replicas", func() {
+				// This is an openapi validation but it makes sense to include it here as well
+				Expect(komega.Update(cpms, func() {
+					four := int32(4)
+					cpms.Spec.Replicas = &four
+				})()).Should(MatchError(ContainSubstring("Unsupported value: 4: supported values: \"3\", \"5\"")))
+			})
+
+			It("with 5 replicas", func() {
+				// Five replicas is a valid value but the existing CPMS has three replicas
+				Expect(komega.Update(cpms, func() {
+					five := int32(5)
+					cpms.Spec.Replicas = &five
+				})()).Should(MatchError(ContainSubstring(`spec.replicas: Forbidden: control plane machine set replicas cannot be changed`)), "Replicas should be immutable")
+			})
+
+			It("when modifying the machine labels and the selector still matches", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels["new"] = dummyValue
+				})()).Should(Succeed(), "Machine label updates are allowed provided the selector still matches")
+			})
+
+			It("when modifying the machine labels so that the selector no longer matches", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels = map[string]string{
+						"different":                          "labels",
+						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						openshiftMachineRoleLabel:            "not-matching-label",
+						openshiftMachineTypeLabel:            masterMachineRole,
+					}
+				})()).Should(MatchError(ContainSubstring("selector does not match template labels")), "The selector must always match the machine labels")
+			})
+
+			It("when modifying the machine labels to remove the cluster ID label", func() {
+				Expect(komega.Update(cpms, func() {
+					delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
+				})()).Should(MatchError(ContainSubstring("Required value: machine.openshift.io/cluster-api-cluster label is required")), "The labels must always contain a cluster ID label")
+			})
+
+			It("when mutating the selector", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
+				})()).Should(MatchError(ContainSubstring("Forbidden: control plane machine set selector is immutable")), "The selector should be immutable")
+			})
+
+			It("when adding invalid failure domain information", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &[]machinev1.AzureFailureDomain{
+						{
+							Zone: "us-central-1",
 						},
-					},
+					}
+				})()).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws: Required value: value required when platform is \"AWS\""),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.azure: Forbidden: value not allowed when platform is \"AWS\""),
+				)))
+			})
+
+			It("when adding invalid subnets in the faliure domains", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &[]machinev1.AWSFailureDomain{
+						{
+							Subnet: &machinev1.AWSResourceReference{
+								Type: machinev1.AWSARNReferenceType,
+								ID:   pointer.String("id-123"),
+							},
+						},
+					}
+				})()).To(MatchError(SatisfyAll(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"ARN\""),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"ARN\""),
+				)))
+			})
+		})
+
+		Context("on Azure", func() {
+			BeforeEach(func() {
+				providerSpec := resourcebuilder.AzureProviderSpec()
+				machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				// Default CPMS builder should be valid
+				cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
+
+				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+				By("Creating a selection of Machines")
+				for i := 0; i < 3; i++ {
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
 				}
-			})()).To(MatchError(SatisfyAll(
-				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.arn: Required value: value required when type is \"ARN\""),
-				ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet.id: Forbidden: value not allowed when type is \"ARN\""),
-			)))
+
+				By("Creating a valid ControlPlaneMachineSet")
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
+
+			It("with 4 replicas", func() {
+				// This is an openapi validation but it makes sense to include it here as well
+				Expect(komega.Update(cpms, func() {
+					four := int32(4)
+					cpms.Spec.Replicas = &four
+				})()).Should(MatchError(ContainSubstring("Unsupported value: 4: supported values: \"3\", \"5\"")))
+			})
+
+			It("with 5 replicas", func() {
+				// Five replicas is a valid value but the existing CPMS has three replicas
+				Expect(komega.Update(cpms, func() {
+					five := int32(5)
+					cpms.Spec.Replicas = &five
+				})()).Should(MatchError(ContainSubstring(`spec.replicas: Forbidden: control plane machine set replicas cannot be changed`)), "Replicas should be immutable")
+			})
+
+			It("when modifying the machine labels and the selector still matches", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels["new"] = dummyValue
+				})()).Should(Succeed(), "Machine label updates are allowed provided the selector still matches")
+			})
+
+			It("when modifying the machine labels so that the selector no longer matches", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels = map[string]string{
+						"different":                          "labels",
+						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						openshiftMachineRoleLabel:            "not-matching-label",
+						openshiftMachineTypeLabel:            masterMachineRole,
+					}
+				})()).Should(MatchError(ContainSubstring("selector does not match template labels")), "The selector must always match the machine labels")
+			})
+
+			It("when modifying the machine labels to remove the cluster ID label", func() {
+				Expect(komega.Update(cpms, func() {
+					delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
+				})()).Should(MatchError(ContainSubstring("Required value: machine.openshift.io/cluster-api-cluster label is required")), "The labels must always contain a cluster ID label")
+			})
+
+			It("when mutating the selector", func() {
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
+				})()).Should(MatchError(ContainSubstring("Forbidden: control plane machine set selector is immutable")), "The selector should be immutable")
+			})
+
+			It("when removing the internal load balancer", func() {
+				// Change the providerSpec, expect the update to be successful
+				rawProviderSpec := resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer("").BuildRawExtension()
+
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
+				})()).Should(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines")))
+			})
 		})
 	})
 })

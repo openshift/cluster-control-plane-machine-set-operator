@@ -28,15 +28,17 @@ import (
 // AzureProviderSpec creates a new Azure machine config builder.
 func AzureProviderSpec() AzureProviderSpecBuilder {
 	return AzureProviderSpecBuilder{
-		Zone:   "1",
-		VMSize: "Standard_D4s_v3",
+		internalLoadBalancer: "internal-load-balancer-12345678",
+		vmSize:               "Standard_D4s_v3",
+		zone:                 "1",
 	}
 }
 
 // AzureProviderSpecBuilder is used to build a Azure machine config object.
 type AzureProviderSpecBuilder struct {
-	Zone   string
-	VMSize string
+	internalLoadBalancer string
+	vmSize               string
+	zone                 string
 }
 
 // Build builds a new Azure machine config based on the configuration provided.
@@ -55,7 +57,7 @@ func (m AzureProviderSpecBuilder) Build() *machinev1beta1.AzureMachineProviderSp
 		},
 		Location: "test-location",
 		Vnet:     "vnet-12345678",
-		VMSize:   m.VMSize,
+		VMSize:   m.vmSize,
 		Image: machinev1beta1.Image{
 			ResourceID: "/resourceGroups/test-rg/providers/Microsoft.Compute/images/test-image",
 		},
@@ -68,10 +70,11 @@ func (m AzureProviderSpecBuilder) Build() *machinev1beta1.AzureMachineProviderSp
 			OSType: "Linux",
 		},
 		NetworkResourceGroup:  "network-resource-group-12345678",
+		InternalLoadBalancer:  m.internalLoadBalancer,
 		PublicLoadBalancer:    "public-load-balancer-12345678",
 		PublicIP:              false,
 		ResourceGroup:         "resource-group-12345678",
-		Zone:                  &m.Zone,
+		Zone:                  &m.zone,
 		AcceleratedNetworking: true,
 		Subnet:                "subnet-12345678",
 	}
@@ -92,14 +95,20 @@ func (m AzureProviderSpecBuilder) BuildRawExtension() *runtime.RawExtension {
 	}
 }
 
-// WithZone sets the availabilityZone for the Azure machine config builder.
-func (m AzureProviderSpecBuilder) WithZone(az string) AzureProviderSpecBuilder {
-	m.Zone = az
+// WithInternalLoadBalancer sets the internalLoadBalancer for the Azure machine config builder.
+func (m AzureProviderSpecBuilder) WithInternalLoadBalancer(lb string) AzureProviderSpecBuilder {
+	m.internalLoadBalancer = lb
 	return m
 }
 
 // WithVMSize sets the VMSize (Instance type) for the Azure machine config builder.
 func (m AzureProviderSpecBuilder) WithVMSize(vmSize string) AzureProviderSpecBuilder {
-	m.VMSize = vmSize
+	m.vmSize = vmSize
+	return m
+}
+
+// WithZone sets the availabilityZone for the Azure machine config builder.
+func (m AzureProviderSpecBuilder) WithZone(az string) AzureProviderSpecBuilder {
+	m.zone = az
 	return m
 }
