@@ -665,11 +665,11 @@ func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger lo
 	var erroredReplacementMachineNames []string
 
 	for _, machines := range sortedIndexedMs {
-		machinesUpdated := updatedMachines(machines)
+		machinesPending := pendingMachines(machines)
 		machinesOutdated := needReplacementMachines(machines)
 
-		if hasAny(machinesOutdated) && hasAny(machinesUpdated) {
-			for _, m := range machinesUpdated {
+		if hasAny(machinesOutdated) && hasAny(machinesPending) {
+			for _, m := range machinesPending {
 				if m.ErrorMessage != "" {
 					erroredReplacementMachineNames = append(erroredReplacementMachineNames, m.MachineRef.ObjectMeta.Name)
 				}
