@@ -51,6 +51,8 @@ Tooling is vendored and executed using `go run` so no additional tooling should 
 * `make build`: Build the operator binary into `bin/manager`
 * `make test`: Run the project tests. Tests are written using ginkgo and the ginkgo tooling is used to execute the
 tests. In CI, this target outputs JUnit and code coverage reports. Depends on `generate`, `fmt` and `vet` tasks.
+* `make unit`: Run only the project tests, without the `generate`, `fmt`, or `vet` tasks. The `GINKGO_EXTRA_ARGS`
+environment variable can be used to pass more options to the ginkgo runner.
 * `make lint`: Runs `golangci-lint` based on the project linter configuration. It is recommend to run this target before
 committing any code changes.
 * `make vendor`: Update the vendor directory when there are changes to the `go.mod` file. Runs tidy, vendor and verify.

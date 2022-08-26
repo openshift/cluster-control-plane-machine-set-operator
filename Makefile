@@ -71,7 +71,10 @@ lint: ## Run golangci-lint over the codebase.
 	./hack/verify-log-keys.sh
 
 .PHONY: test
-test: generate fmt vet ## Run tests.
+test: generate fmt vet unit ## Run tests.
+
+.PHONY: unit
+unit: ## Run only the tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin)" ./hack/test.sh
 
 .PHONY: verify-%
