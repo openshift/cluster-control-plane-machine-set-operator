@@ -364,12 +364,12 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 		Spec: m.machineTemplate.Spec,
 	}
 
-	pc, err := m.providerConfig.InjectFailureDomain(m.indexToFailureDomain[index])
+	providerConfig, err := m.getProviderConfigForIndex(index)
 	if err != nil {
-		return fmt.Errorf("cannot inject failure domain in the provider config: %w", err)
+		return fmt.Errorf("could not get provider config for index %d: %w", index, err)
 	}
 
-	rawConfig, err := pc.RawConfig()
+	rawConfig, err := providerConfig.RawConfig()
 	if err != nil {
 		return fmt.Errorf("cannot fetch raw config from provider config: %w", err)
 	}
@@ -396,7 +396,7 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 		"Created machine",
 		"index", index,
 		"machineName", machine.Name,
-		"failureDomain", m.indexToFailureDomain[index].String(),
+		"failureDomain", providerConfig.ExtractFailureDomain().String(),
 	)
 
 	return nil
@@ -415,6 +415,22 @@ func (m *openshiftMachineProvider) getMachineName(index int32) (string, error) {
 	}
 
 	return fmt.Sprintf("%s-%s-%s-%d", clusterID, machineRole, rand.String(5), index), nil
+}
+
+// getProviderConfigForIndex returns the appropriate provider configuration for the index based on the failure domain
+// mapping in the machine provider.
+// If no failure domains are present it returns the base provider configuration.
+func (m *openshiftMachineProvider) getProviderConfigForIndex(index int32) (providerconfig.ProviderConfig, error) {
+	if len(m.indexToFailureDomain) == 0 {
+		return m.providerConfig, nil
+	}
+
+	providerConfig, err := m.providerConfig.InjectFailureDomain(m.indexToFailureDomain[index])
+	if err != nil {
+		return nil, fmt.Errorf("cannot inject failure domain in the provider config: %w", err)
+	}
+
+	return providerConfig, nil
 }
 
 // DeleteMachine deletes the Machine references in the machineRef provided.

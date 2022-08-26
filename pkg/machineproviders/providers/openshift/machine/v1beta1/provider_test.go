@@ -1191,6 +1191,30 @@ var _ = Describe("MachineProvider", func() {
 					Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", BeEmpty()))
 				})
 			})
+
+			Context("if the MachineProvider has no failure domains configure", func() {
+				usEast1aBuilder := providerConfigBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)
+
+				BeforeEach(func() {
+					template = resourcebuilder.OpenShiftMachineV1Beta1Template().
+						WithProviderSpecBuilder(usEast1aBuilder).
+						WithLabel(machinev1beta1.MachineClusterIDLabel, "cpms-aws-cluster-id").
+						BuildTemplate()
+
+					providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template.OpenShiftMachineV1Beta1Machine)
+					Expect(err).ToNot(HaveOccurred())
+
+					openshiftProvider, ok := provider.(*openshiftMachineProvider)
+					Expect(ok).To(BeTrue(), "provider should be an openshiftMachineProvider")
+
+					openshiftProvider.providerConfig = providerConfig
+					openshiftProvider.indexToFailureDomain = nil
+				})
+
+				assertCreatesMachine(0, usEast1aBuilder, "cpms-aws-cluster-id", "us-east-1a")
+				assertCreatesMachine(1, usEast1aBuilder, "cpms-aws-cluster-id", "us-east-1a")
+				assertCreatesMachine(2, usEast1aBuilder, "cpms-aws-cluster-id", "us-east-1a")
+			})
 		})
 
 	})
