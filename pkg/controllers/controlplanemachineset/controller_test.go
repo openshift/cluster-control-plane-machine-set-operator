@@ -1104,7 +1104,7 @@ var _ = Describe("validateClusterState", func() {
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {
 					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").WithNeedsUpdate(true).Build(),
-					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithErrorMessage("Could not create new instance").Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithErrorMessage("Could not create new instance").WithReady(false).Build(),
 				},
 				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").WithNeedsUpdate(true).Build()},
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").WithNeedsUpdate(true).Build()},
@@ -1140,11 +1140,11 @@ var _ = Describe("validateClusterState", func() {
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {
 					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").WithNeedsUpdate(true).Build(),
-					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithErrorMessage("Could not create new instance").Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithErrorMessage("Could not create new instance").WithReady(false).Build(),
 				},
 				1: {
 					updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").WithNeedsUpdate(true).Build(),
-					updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithErrorMessage("Could not create new instance").Build(),
+					updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").WithErrorMessage("Could not create new instance").WithReady(false).Build(),
 				},
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").WithNeedsUpdate(true).Build()},
 			},
