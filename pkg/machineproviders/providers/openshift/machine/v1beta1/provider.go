@@ -45,6 +45,9 @@ const (
 	// runningPhase defines the phase when the machine operates correctly.
 	runningPhase = "Running"
 
+	// deletingPhase defines the phase when the machine is being deleted.
+	deletingPhase = "Deleting"
+
 	// openshiftMachineRoleLabel is the OpenShift Machine API machine role label.
 	// This must be present on all OpenShift Machine API Machine templates.
 	openshiftMachineRoleLabel = "machine.openshift.io/cluster-api-machine-role"
@@ -252,10 +255,12 @@ func (m *openshiftMachineProvider) generateMachineInfo(logger logr.Logger, machi
 		return machineproviders.MachineInfo{}, fmt.Errorf("cannot compare provider configs: %w", err)
 	}
 
+	ready := m.isMachineReady(machine)
+
 	return machineproviders.MachineInfo{
 		MachineRef:   machineRef,
 		NodeRef:      nodeRef,
-		Ready:        pointer.StringDeref(machine.Status.Phase, "") == runningPhase,
+		Ready:        ready,
 		NeedsUpdate:  !configsEqual,
 		Index:        machineIndex,
 		ErrorMessage: pointer.StringDeref(machine.Status.ErrorMessage, ""),
@@ -305,6 +310,22 @@ func (m *openshiftMachineProvider) failureDomainToIndex(failureDomain failuredom
 	}
 
 	return 0, false
+}
+
+// isMachineReady determines whether a machine is ready or not.
+func (m *openshiftMachineProvider) isMachineReady(machine machinev1beta1.Machine) bool {
+	if pointer.StringDeref(machine.Status.Phase, "") == runningPhase {
+		// The machine is running so everything is working as expected.
+		return true
+	}
+
+	if pointer.StringDeref(machine.Status.Phase, "") == deletingPhase && machine.Status.NodeRef != nil {
+		// The machine was previously running but is now being deleted.
+		// The machine is still ready until the node is drained and removed from the cluster.
+		return true
+	}
+
+	return false
 }
 
 // getMachineNameIndex tries to fetch machine index from its name. If it's not possible,
