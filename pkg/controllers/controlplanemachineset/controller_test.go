@@ -1264,15 +1264,15 @@ var _ = Describe("isControlPlaneMachineSetDegraded", func() {
 	DescribeTable("should determine if the ControlPlaneMachineSet is degraded", func(cpms *machinev1.ControlPlaneMachineSet, expectDegraded bool) {
 		Expect(isControlPlaneMachineSetDegraded(cpms)).To(Equal(expectDegraded), "Degraded state of ControlPlaneMachineSet was not as expected")
 	},
-		PEntry("with a CPMS without a degraded condition",
+		Entry("with a CPMS without a degraded condition",
 			cpmsBuilder.WithConditions([]metav1.Condition{}).Build(),
 			false,
 		),
-		PEntry("with a CPMS with a degraded condition with status false",
+		Entry("with a CPMS with a degraded condition with status false",
 			cpmsBuilder.WithConditions([]metav1.Condition{degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build()}).Build(),
 			false,
 		),
-		PEntry("with a CPMS with a degraded condition with status true",
+		Entry("with a CPMS with a degraded condition with status true",
 			cpmsBuilder.WithConditions([]metav1.Condition{degradedConditionBuilder.WithStatus(metav1.ConditionTrue).Build()}).Build(),
 			true,
 		),
