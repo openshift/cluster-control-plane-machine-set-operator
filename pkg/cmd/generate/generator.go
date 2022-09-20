@@ -74,8 +74,9 @@ func NewGenerateCmd() *cobra.Command {
 	generateCmd.PersistentFlags().StringVar(&generateOpts.To, "to", "",
 		"User-defined destination file for the generated manifest, when omitted the result is emitted to stdout")
 
-	generateCmd.PersistentFlags().StringVar(&generateOpts.Kubeconfig, "kubeconfig", "",
-		"User-defined kubeconfig path for the cluster, when omitted it falls back to inClusterConfig, then to default config")
+	generateCmd.PersistentFlags().StringVar(&generateOpts.Kubeconfig, "kubeconfig", os.Getenv("KUBECONFIG"),
+		"User-defined kubeconfig path for the cluster, when omitted it uses the KUBECONFIG environment variable,"+
+			" if that's empty it uses the inClusterConfig, if that can't be found it uses the default config")
 
 	return generateCmd
 }
