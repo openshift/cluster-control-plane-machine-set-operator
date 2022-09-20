@@ -42,7 +42,7 @@ help: ## Display this help.
 
 .PHONY: generate-cpms
 generate-cpms: # generate the control plane machine set (cpms) K8s object manifest.
-	go run ./cmd/cpmsctl generate --kubeconfig=$$KUBECONFIG
+	@go run ./cmd/cpmsctl generate
 
 ##@ Development
 
