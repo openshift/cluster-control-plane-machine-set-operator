@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
-	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -62,10 +60,6 @@ var (
 
 	// errUpdateNilCPMS is an error when update is called with nil ControlPlaneMachineSet.
 	errUpdateNilCPMS = errors.New("cannot update nil control plane machine set")
-
-	// errInvalidDiscriminant is an error used when the discriminated union check cannot
-	// find the field named as the discriminant.
-	errInvalidDiscriminant = errors.New("invalid discriminant name")
 )
 
 // ControlPlaneMachineSetWebhook acts as a webhook validator for the
@@ -101,7 +95,7 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
-	errs = append(errs, validateSpec(field.NewPath("spec"), nil, cpms)...)
+	errs = append(errs, validateSpec(field.NewPath("spec"), cpms)...)
 	errs = append(errs, r.validateSpecOnCreate(ctx, field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
@@ -119,18 +113,13 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 		return errUpdateNilCPMS
 	}
 
-	oldCPMS, ok := oldObj.(*machinev1.ControlPlaneMachineSet)
-	if !ok {
-		return errObjNotCPMS
-	}
-
 	cpms, ok := newObj.(*machinev1.ControlPlaneMachineSet)
 	if !ok {
 		return errObjNotCPMS
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
-	errs = append(errs, validateSpec(field.NewPath("spec"), oldCPMS, cpms)...)
+	errs = append(errs, validateSpec(field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
@@ -156,9 +145,7 @@ func (r *ControlPlaneMachineSetWebhook) validateSpecOnCreate(ctx context.Context
 	errs := []error{}
 
 	// Ensure Control Plane Machine count matches the ControlPlaneMachineSet replicas
-	if cpms.Spec.Replicas == nil {
-		errs = append(errs, field.Required(parentPath.Child("replicas"), "replicas field is required"))
-	} else if int(*cpms.Spec.Replicas) != len(controlPlaneMachines) {
+	if cpms.Spec.Replicas != nil && int(*cpms.Spec.Replicas) != len(controlPlaneMachines) {
 		errs = append(errs, field.Forbidden(parentPath.Child("replicas"),
 			fmt.Sprintf("control plane machine set replicas (%d) does not match the current number of control plane machines (%d)", *cpms.Spec.Replicas, len(controlPlaneMachines))))
 	}
@@ -180,25 +167,10 @@ func validateMetadata(parentPath *field.Path, metadata metav1.ObjectMeta) []erro
 }
 
 // validateSpec validates that the spec of the ControlPlaneMachineSet resource is valid.
-func validateSpec(parentPath *field.Path, oldCPMS, cpms *machinev1.ControlPlaneMachineSet) []error {
+func validateSpec(parentPath *field.Path, cpms *machinev1.ControlPlaneMachineSet) []error {
 	errs := []error{}
 
 	errs = append(errs, validateTemplate(parentPath.Child("template"), cpms.Spec.Template, cpms.Spec.Selector)...)
-
-	// Validate immutability on update.
-	if oldCPMS != nil {
-		// Ensure spec.Replicas is immutable on update.
-		if oldCPMS.Spec.Replicas == nil || cpms.Spec.Replicas == nil {
-			errs = append(errs, field.Required(parentPath.Child("replicas"), "replicas field is required"))
-		} else if *oldCPMS.Spec.Replicas != *cpms.Spec.Replicas {
-			errs = append(errs, field.Forbidden(parentPath.Child("replicas"), "control plane machine set replicas cannot be changed"))
-		}
-
-		// Ensure selector is immutable on update.
-		if !reflect.DeepEqual(oldCPMS.Spec.Selector, cpms.Spec.Selector) {
-			errs = append(errs, field.Forbidden(parentPath.Child("selector"), "control plane machine set selector is immutable"))
-		}
-	}
 
 	return errs
 }
@@ -245,7 +217,6 @@ func validateOpenShiftMachineV1BetaTemplate(parentPath *field.Path, template mac
 	errs := []error{}
 
 	errs = append(errs, validateTemplateLabels(parentPath.Child("metadata", "labels"), template.ObjectMeta.Labels, selector)...)
-	errs = append(errs, validateOpenShiftFailureDomains(parentPath.Child("failureDomains"), template.FailureDomains)...)
 	errs = append(errs, validateOpenShiftProviderConfig(parentPath, template)...)
 
 	return errs
@@ -270,27 +241,6 @@ func validateOpenShiftMachineV1BetaTemplateOnCreate(parentPath *field.Path, temp
 func validateTemplateLabels(labelsPath *field.Path, templateLabels map[string]string, labelSelector metav1.LabelSelector) []error {
 	errs := []error{}
 
-	// Ensure machine template has all required labels, and where required, required values
-	requiredLabels := []struct {
-		label string
-		value string
-	}{
-		{label: machinev1beta1.MachineClusterIDLabel},
-		{label: openshiftMachineRoleLabel, value: masterMachineRole},
-		{label: openshiftMachineTypeLabel, value: masterMachineRole},
-	}
-
-	for _, required := range requiredLabels {
-		value, ok := templateLabels[required.label]
-		if !ok || value == "" {
-			errs = append(errs, field.Required(labelsPath, fmt.Sprintf("%s label is required", required.label)))
-		}
-
-		if required.value != "" && required.value != value {
-			errs = append(errs, field.Invalid(labelsPath, value, fmt.Sprintf("%s label must have value: %s", required.label, required.value)))
-		}
-	}
-
 	// Ensure labels are matched by the selector.
 	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
 	if err != nil {
@@ -299,40 +249,6 @@ func validateTemplateLabels(labelsPath *field.Path, templateLabels map[string]st
 
 	if selector != nil && !selector.Matches(labels.Set(templateLabels)) {
 		errs = append(errs, field.Invalid(labelsPath, templateLabels, "selector does not match template labels"))
-	}
-
-	return errs
-}
-
-// validateOpenShiftFailureDomains checks that the configuration of the failure domains is correct.
-// In particular, it checks the discriminated unions are valid and that the platform type is one of the supported
-// platform types.
-func validateOpenShiftFailureDomains(parentPath *field.Path, failureDomains machinev1.FailureDomains) []error {
-	errs := []error{}
-
-	// Check that the union is a valid discriminated union.
-	errs = append(errs, validateDiscriminatedUnion(parentPath, failureDomains, "Platform")...)
-
-	// AWS failure domains have extra validation.
-	if failureDomains.Platform == configv1.AWSPlatformType {
-		errs = append(errs, validateOpenShiftAWSFailureDomains(parentPath.Child("aws"), failureDomains.AWS)...)
-	}
-
-	return errs
-}
-
-// validateOpenShiftAWSFailureDomains checks that the subnet discriminated union of each AWS failure domain is valid.
-func validateOpenShiftAWSFailureDomains(parentPath *field.Path, failureDomains *[]machinev1.AWSFailureDomain) []error {
-	errs := []error{}
-
-	if failureDomains == nil {
-		// The validation of the discriminanted union should pick up this error.
-		// Don't duplicate the error here.
-		return []error{}
-	}
-
-	for i, failureDomain := range *failureDomains {
-		errs = append(errs, validateDiscriminatedUnion(parentPath.Index(i).Child("subnet"), failureDomain.Subnet, "Type")...)
 	}
 
 	return errs
@@ -506,65 +422,4 @@ func contains(in []failuredomain.FailureDomain, fd failuredomain.FailureDomain) 
 	}
 
 	return false
-}
-
-// validateDiscriminatedUnion checks that the discriminated union is valid.
-// That is, the the discriminant, if set, matches with the field that is configured, and no extra fields
-// are configured.
-func validateDiscriminatedUnion(parentPath *field.Path, union interface{}, discriminant string) []error {
-	errs := []error{}
-
-	if union == nil {
-		// The union is nil so nothing to check.
-		return []error{}
-	}
-
-	unionValue := reflect.ValueOf(union)
-
-	// If it's a pointer, dereference it before we continue.
-	if unionValue.Kind() == reflect.Pointer {
-		unionValue = unionValue.Elem()
-	}
-
-	discriminantStructField, ok := unionValue.Type().FieldByName(discriminant)
-	if !ok {
-		return []error{fmt.Errorf("%w: union does not contain a field %q", errInvalidDiscriminant, discriminant)}
-	}
-
-	discriminantJSONName := getJSONName(discriminantStructField)
-	discriminantValue := unionValue.FieldByName(discriminant).String()
-
-	// Check each field in the struct.
-	// Ignore the discriminant.
-	// Check only the field matching the discriminant value is non-nil.
-	for i := 0; i < unionValue.NumField(); i++ {
-		fieldValue := unionValue.Field(i)
-		fieldType := unionValue.Type().Field(i)
-
-		fieldJSONName := getJSONName(fieldType)
-
-		if fieldType.Name == discriminant {
-			continue
-		}
-
-		if fieldType.Name == discriminantValue {
-			if fieldValue.IsNil() {
-				errs = append(errs, field.Required(parentPath.Child(fieldJSONName), fmt.Sprintf("value required when %s is %q", discriminantJSONName, discriminantValue)))
-			}
-
-			continue
-		}
-
-		if !fieldValue.IsNil() {
-			errs = append(errs, field.Forbidden(parentPath.Child(fieldJSONName), fmt.Sprintf("value not allowed when %s is %q", discriminantJSONName, discriminantValue)))
-		}
-	}
-
-	return errs
-}
-
-// getJSONName gets the JSON name of the field from the struct tag.
-// This is used so that errors show the name as the end user would use.
-func getJSONName(structField reflect.StructField) string {
-	return strings.Split(structField.Tag.Get("json"), ",")[0]
 }
