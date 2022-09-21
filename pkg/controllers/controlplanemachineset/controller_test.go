@@ -919,7 +919,7 @@ var _ = Describe("validateClusterState", func() {
 		}
 
 		Expect(cpms.Status.Conditions).To(test.MatchConditions(in.expectedConditions))
-		Expect(in.expectedLogs).To(ConsistOf(in.expectedLogs))
+		Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
 	},
 		Entry("with a valid cluster state", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -1029,7 +1029,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{
 				{
-					Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: master-0, master-2"),
+					Error: fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, "master-0, master-2"),
 					KeysAndValues: []interface{}{
 						"unmanagedNodes", "master-0,master-2",
 					},
@@ -1063,7 +1063,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{
 				{
-					Error: errors.New("found unmanaged control plane nodes, the following node(s) do not have associated machines: master-3"),
+					Error: fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, "master-3"),
 					KeysAndValues: []interface{}{
 						"unmanagedNodes", "master-3",
 					},
@@ -1124,7 +1124,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{
 				{
-					Error: errors.New("found replacement control plane machines in an error state, the following machines(s) are currently reporting an error: machine-replacement-0"),
+					Error: fmt.Errorf("%w: %s", errFoundErroredReplacementControlPlaneMachine, "machine-replacement-0"),
 					KeysAndValues: []interface{}{
 						"failedReplacements", "machine-replacement-0",
 					},
@@ -1163,7 +1163,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{
 				{
-					Error: errors.New("found replacement control plane machines in an error state, the following machines(s) are currently reporting an error: machine-replacement-0,machine-replacement-1"),
+					Error: fmt.Errorf("%w: %s", errFoundErroredReplacementControlPlaneMachine, "machine-replacement-0, machine-replacement-1"),
 					KeysAndValues: []interface{}{
 						"failedReplacements", "machine-replacement-0,machine-replacement-1",
 					},
@@ -1246,9 +1246,9 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []test.LogEntry{
 				{
-					Error: errors.New("found an excessive number of indexes for the control plane machine set, 1 index(es) are in excess"),
+					Error: fmt.Errorf("%w: %s", errFoundExcessiveIndexes, "1 index(es) are in excess"),
 					KeysAndValues: []interface{}{
-						"excessIndexes", "1",
+						"excessIndexes", int32(1),
 					},
 					Message: "Observed an excessive number of control plane machine indexes",
 				},
