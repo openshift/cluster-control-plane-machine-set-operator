@@ -703,9 +703,10 @@ func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger lo
 	return true
 }
 
-// fetchControlPlaneNodes fetches a map of unique nodes that have the "control-plane" (and/or legacy "master") labels.
-func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Context) (map[string]corev1.Node, error) {
-	cpmsNodes := make(map[string]corev1.Node)
+// fetchControlPlaneNodes fetches a sorted list of unique nodes that have the "control-plane" (and/or legacy "master") labels.
+func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Context) ([]corev1.Node, error) {
+	cpmsNodesLookup := make(map[string]struct{})
+	sortedCpmsNodes := []corev1.Node{}
 
 	for _, label := range []string{masterNodeRoleLabel, controlPlaneNodeRoleLabel} {
 		nodesList := &corev1.NodeList{}
@@ -716,9 +717,13 @@ func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Co
 		}
 
 		for _, n := range nodesList.Items {
-			cpmsNodes[n.ObjectMeta.Name] = n
+			if _, exists := cpmsNodesLookup[n.ObjectMeta.Name]; !exists {
+				cpmsNodesLookup[n.ObjectMeta.Name] = struct{}{}
+
+				sortedCpmsNodes = append(sortedCpmsNodes, n)
+			}
 		}
 	}
 
-	return cpmsNodes, nil
+	return sortedCpmsNodes, nil
 }
