@@ -19,6 +19,7 @@ package controlplanemachineset
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
@@ -1762,6 +1763,40 @@ var _ = Describe("utils tests", func() {
 			[][]machineproviders.MachineInfo{
 				{updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 				{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+			},
+		),
+	)
+	DescribeTable("should convert an slice of MachineInfo into a slice sorted of MachineInfo sorted by Machine's CreationTimestamp",
+		func(input []machineproviders.MachineInfo, expected []machineproviders.MachineInfo) {
+			output := sortMachineInfoByCreationTimestamp(input)
+			Expect(output).To(Equal(expected))
+		},
+		Entry("when MachineInfo is not sorted by CreationTimestamp",
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+			},
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
+			},
+		),
+		Entry("when MachineInfo is already sorted by CreationTimestamp",
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
+			},
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
 			},
 		),
 	)

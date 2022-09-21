@@ -19,6 +19,7 @@ package controlplanemachineset
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1168,6 +1169,71 @@ var _ = Describe("validateClusterState", func() {
 						"failedReplacements", "machine-replacement-0,machine-replacement-1",
 					},
 					Message: "Observed failed replacement control plane machines",
+				},
+			},
+		}),
+		Entry("with multiple updated machines in a single index and RollingUpdate strategy", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}).WithReplicas(3),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
+				},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			},
+			expectedLogs: []test.LogEntry{},
+		}),
+		Entry("with multiple updated machines in a single index and OnDelete strategy", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+			}).WithReplicas(3).WithStrategyType(machinev1.OnDelete),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
+				},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonExcessUpdatedReplicas).WithMessage("Observed 1 updated machine(s) in excess for index 0").Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
+			},
+
+			expectedLogs: []test.LogEntry{
+				{
+					Error: fmt.Errorf("%w: %s", errFoundExcessiveUpdatedReplicas, "1 updated replica(s) are in excess for index 0"),
+					KeysAndValues: []interface{}{
+						"excessUpdatedReplicas", 1,
+					},
+					Message: "Observed an excessive number of updated replica(s) for a single index",
 				},
 			},
 		}),
