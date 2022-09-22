@@ -779,6 +779,79 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					}
 				},
 			}),
+			Entry("with an extra updated machine in a single index", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").WithNodeName("node-older-extra-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func() {
+					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").Build()
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
+				},
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 0,
+								"namespace", namespaceName,
+								"name", "machine-older-extra-0",
+							},
+							Message: removingOldMachine,
+						},
+					}
+				},
+			}),
+			Entry("with extra updated machines in multiple indexes", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").WithNodeName("node-older-extra-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					},
+					1: {
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-older-extra-1").WithNodeName("node-older-extra-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
+					},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func() {
+					machineInfo1 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-1").Build()
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo1.MachineRef).Times(1)
+					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").Build()
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
+				},
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 0,
+								"namespace", namespaceName,
+								"name", "machine-older-extra-0",
+							},
+							Message: removingOldMachine,
+						},
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-older-extra-1",
+							},
+							Message: removingOldMachine,
+						},
+					}
+				},
+			}),
 			Entry("with an index not starting at zero, and no updates required", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{

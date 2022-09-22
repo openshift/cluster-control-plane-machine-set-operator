@@ -1180,13 +1180,14 @@ var _ = Describe("validateClusterState", func() {
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {
 					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
-					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("master-replacement-0").Build(),
 				},
 				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
 			},
 			nodes: []*corev1.Node{
 				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-replacement-0").Build(),
 				masterNodeBuilder.WithName("master-1").Build(),
 				masterNodeBuilder.WithName("master-2").Build(),
 				workerNodeBuilder.WithName("worker-0").Build(),
@@ -1208,13 +1209,14 @@ var _ = Describe("validateClusterState", func() {
 			machineInfos: map[int32][]machineproviders.MachineInfo{
 				0: {
 					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
-					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("master-0").Build(),
+					updatedMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").WithNodeName("master-replacement-0").Build(),
 				},
 				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
 			},
 			nodes: []*corev1.Node{
 				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-replacement-0").Build(),
 				masterNodeBuilder.WithName("master-1").Build(),
 				masterNodeBuilder.WithName("master-2").Build(),
 				workerNodeBuilder.WithName("worker-0").Build(),
