@@ -93,7 +93,14 @@ crds-sync: ## Sync crds in install with the ones in the vendored openshift/api
 ##@ Build
 
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
+build: build-cpmsctl build-manager ## Build the manager and cpmsctl binary.
+
+.PHONY: build-cpmsctl
+build-cpmsctl: fmt vet ## Build the cpmsctl binary.
+	go build -o bin/cpmsctl ./cmd/cpmsctl
+
+.PHONY: build-manager
+build-manager: generate fmt vet ## Build the manager binary.
 	go build -o bin/manager ./cmd/control-plane-machine-set-operator
 
 define ensure-home
