@@ -124,6 +124,8 @@ Installation instructions for control plane machine set can be found in the [ins
 A failure domain defines a fault boundary within the infrastructure provider. Failure domains are also known as zones
 or availability zones depending on the infrastructure provider.
 
+Failure domains are explained in more detail in the [failure domains docs](./failure-domains.md).
+
 ### Index
 
 Each control plane machine is considered to exist within an index of the control plane.
