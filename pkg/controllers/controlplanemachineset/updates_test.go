@@ -19,6 +19,7 @@ package controlplanemachineset
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
@@ -774,6 +775,79 @@ var _ = Describe("reconcileMachineUpdates", func() {
 								"name", "machine-3",
 							},
 							Message: noCapacityForExpansion,
+						},
+					}
+				},
+			}),
+			Entry("with an extra updated machine in a single index", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").WithNodeName("node-older-extra-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func() {
+					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").Build()
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
+				},
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 0,
+								"namespace", namespaceName,
+								"name", "machine-older-extra-0",
+							},
+							Message: removingOldMachine,
+						},
+					}
+				},
+			}),
+			Entry("with extra updated machines in multiple indexes", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").WithNodeName("node-older-extra-0").Build(),
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build(),
+					},
+					1: {
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-older-extra-1").WithNodeName("node-older-extra-1").Build(),
+						updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build(),
+					},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func() {
+					machineInfo1 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-1").Build()
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo1.MachineRef).Times(1)
+					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").Build()
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
+				},
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 0,
+								"namespace", namespaceName,
+								"name", "machine-older-extra-0",
+							},
+							Message: removingOldMachine,
+						},
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", 1,
+								"namespace", namespaceName,
+								"name", "machine-older-extra-1",
+							},
+							Message: removingOldMachine,
 						},
 					}
 				},
@@ -1762,6 +1836,40 @@ var _ = Describe("utils tests", func() {
 			[][]machineproviders.MachineInfo{
 				{updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 				{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+			},
+		),
+	)
+	DescribeTable("should convert an slice of MachineInfo into a slice sorted of MachineInfo sorted by Machine's CreationTimestamp",
+		func(input []machineproviders.MachineInfo, expected []machineproviders.MachineInfo) {
+			output := sortMachineInfoByCreationTimestamp(input)
+			Expect(output).To(Equal(expected))
+		},
+		Entry("when MachineInfo is not sorted by CreationTimestamp",
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+			},
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
+			},
+		),
+		Entry("when MachineInfo is already sorted by CreationTimestamp",
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
+			},
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").
+					WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 02, 01, 01, 01, 01, 01, time.UTC))).Build(),
 			},
 		),
 	)
