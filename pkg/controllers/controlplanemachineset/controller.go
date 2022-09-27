@@ -73,9 +73,6 @@ var (
 
 	// errFoundExcessiveIndexes is used to inform users that an excessive number of indexes has been found.
 	errFoundExcessiveIndexes = errors.New("found an excessive number of indexes for the control plane machine set")
-
-	// errFoundExcessiveUpdatedReplicas is used to inform users that an excessive number of updated machines has been found for a single index.
-	errFoundExcessiveUpdatedReplicas = errors.New("found an excessive number of updated machines for a single index")
 )
 
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
@@ -457,11 +454,6 @@ func (r *ControlPlaneMachineSetReconciler) validateClusterState(ctx context.Cont
 		return nil
 	}
 
-	// Check that the number of Updated (Ready and with Up-to-date spec) Machines in an index is valid.
-	if ok := r.checkValidNumerOfUpdatedMachinesPerIndex(logger, cpms, sortedIndexedMs); !ok {
-		return nil
-	}
-
 	// Check that no replacement machines (one that doesn't need update but has an equivalent in the index that needs update)
 	// have an error.
 	if ok := r.checkNoErrorForReplacements(logger, cpms, sortedIndexedMs); !ok {
@@ -668,59 +660,6 @@ func (r *ControlPlaneMachineSetReconciler) checkCorrectNumberOfIndexes(logger lo
 	return true
 }
 
-// checkValidNumerOfUpdatedMachinesPerIndex checks that the number of updated machines in an index is valid.
-func (r *ControlPlaneMachineSetReconciler) checkValidNumerOfUpdatedMachinesPerIndex(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
-	for _, index := range sortedIndexedMs {
-		updatedMachinesCount := len(updatedMachines(index))
-
-		switch {
-		case updatedMachinesCount <= 1:
-			// Valid numer of Updated Machines. The cluster state is valid.
-		case updatedMachinesCount > 1:
-			switch cpms.Spec.Strategy.Type {
-			case machinev1.RollingUpdate:
-				// Even though there is an excess number of Updated Machines,
-				// with the RollingUpdate update strategy we consider this a valid state for the cluster.
-				// We carry on and let the RollingUpdate reconciliation handle the excess in Updated Machines.
-			case machinev1.Recreate:
-				// Even though there is an excess number of Updated Machines,
-				// with the Recreate update strategy we consider this a valid state for the cluster.
-				// We carry on and let the Recreate reconciliation handle the excess in Updated Machines.
-			case machinev1.OnDelete:
-				// Too many Updated Machines. With OnDelete update strategy,
-				// if there are an excess number of Updated Machines
-				// we set the operator to degraded and ask the user for manual intervention,
-				// to remove the excess replicas.
-				excessiveUpdatedReplicas := updatedMachinesCount - 1
-
-				logger.Error(
-					fmt.Errorf("%w: %d updated replica(s) are in excess for index %d",
-						errFoundExcessiveUpdatedReplicas, excessiveUpdatedReplicas, index[0].Index),
-					"Observed an excessive number of updated replica(s) for a single index",
-					"excessUpdatedReplicas", excessiveUpdatedReplicas,
-				)
-
-				meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
-					Type:   conditionProgressing,
-					Status: metav1.ConditionFalse,
-					Reason: reasonOperatorDegraded,
-				})
-
-				meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
-					Type:    conditionDegraded,
-					Status:  metav1.ConditionTrue,
-					Reason:  reasonExcessUpdatedReplicas,
-					Message: fmt.Sprintf("Observed %d updated machine(s) in excess for index %d", excessiveUpdatedReplicas, index[0].Index),
-				})
-
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
 // checkNoErrorForReplacements checks that there is no errored replacement machine.
 func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
 	var erroredReplacementMachineNames []string
@@ -764,10 +703,9 @@ func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger lo
 	return true
 }
 
-// fetchControlPlaneNodes fetches a sorted list of unique nodes that have the "control-plane" (and/or legacy "master") labels.
-func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Context) ([]corev1.Node, error) {
-	cpmsNodesLookup := make(map[string]struct{})
-	sortedCpmsNodes := []corev1.Node{}
+// fetchControlPlaneNodes fetches a map of unique nodes that have the "control-plane" (and/or legacy "master") labels.
+func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Context) (map[string]corev1.Node, error) {
+	cpmsNodes := make(map[string]corev1.Node)
 
 	for _, label := range []string{masterNodeRoleLabel, controlPlaneNodeRoleLabel} {
 		nodesList := &corev1.NodeList{}
@@ -778,13 +716,9 @@ func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Co
 		}
 
 		for _, n := range nodesList.Items {
-			if _, exists := cpmsNodesLookup[n.ObjectMeta.Name]; !exists {
-				cpmsNodesLookup[n.ObjectMeta.Name] = struct{}{}
-
-				sortedCpmsNodes = append(sortedCpmsNodes, n)
-			}
+			cpmsNodes[n.ObjectMeta.Name] = n
 		}
 	}
 
-	return sortedCpmsNodes, nil
+	return cpmsNodes, nil
 }

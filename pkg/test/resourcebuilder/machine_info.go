@@ -33,7 +33,6 @@ func MachineInfo() MachineInfoBuilder {
 // MachineInfoBuilder is used to build out a machineinfo object.
 type MachineInfoBuilder struct {
 	machineDeletiontimestamp *metav1.Time
-	machineCreationtimestamp metav1.Time
 	machineGVR               schema.GroupVersionResource
 	machineName              string
 	machineNamespace         string
@@ -63,7 +62,6 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 			GroupVersionResource: m.machineGVR,
 			ObjectMeta: metav1.ObjectMeta{
 				DeletionTimestamp: m.machineDeletiontimestamp,
-				CreationTimestamp: m.machineCreationtimestamp,
 				Labels:            m.machineLabels,
 				Name:              m.machineName,
 				Namespace:         m.machineNamespace,
@@ -82,12 +80,6 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 	}
 
 	return info
-}
-
-// WithMachineCreationTimestamp sets the machine creation timestamp for the machineinfo builder.
-func (m MachineInfoBuilder) WithMachineCreationTimestamp(creation metav1.Time) MachineInfoBuilder {
-	m.machineCreationtimestamp = creation
-	return m
 }
 
 // WithMachineDeletionTimestamp sets the machine deletion timestamp for the machineinfo builder.
