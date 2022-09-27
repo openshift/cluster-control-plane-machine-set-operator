@@ -1,0 +1,85 @@
+# Failure Domains
+
+Failure domains, within the control plane machine set, are used to spread the control plane machines out through
+the infrastructure failure domain/availability zones and are intended to be used to provide some fault tolerance should
+there be an issue within the backend infrastructure.
+
+## How are failure domains used within the control plane machine set?
+
+Failure domains are used within the control plane machine set when gathering information about, and creating new
+machines.
+
+While processing the control plane machine set, the controller, when defined, will map the failure domains to the
+existing machines based on their index. This mapping is then used to calculate whether or not a particular control plane
+machine requires an update.
+
+The mapped failure domain for the index is injected into the control plane machine set's machine template provider spec.
+The resulting provider spec is then compared with the existing control plane machine's provider spec.
+When a difference is detected, the machine is considered to need an update.
+
+It is important to map the failure domains based on the existing machines to prevent unnecessary updates.
+
+The mapping logic stabilises, within a given index, the failure domain unless there is an imbalance within the mapping.
+For example, if the cluster was originally created using only a single failure domain, and later additional failure
+domains were created, the control plane machine set will move one or more indexes over to the new failure domain(s) to
+ensure appropriate fault tolerance. Using each of the failure domains equally where possible.
+
+## What happens if I don't provide any failure domains?
+
+When no failure domains are configured, the control plane machine set assumes that all control plane machines should
+be within a single failure domain, and, that this failure domain is already configured within the provider spec within
+the control plane machine set's template provider spec.
+
+If failure domains are added at a later date, the control plane machine set will attempt to rebalance the control plane
+machines across the newly added failure domains.
+
+## Amazon Web Services (AWS)
+
+On Amazon Web Services (AWS), the failure domains represented in the control plane machine set can be considered to be
+analogous to the availability zones within an AWS region
+
+> An Availability Zone (AZ) is one or more discrete data centers with redundant power, networking, and connectivity in
+an AWS Region. AZs give customers the ability to operate production applications and databases that are more highly
+available, fault tolerant, and scalable than would be possible from a single data center.
+
+Amazon describes the availability zones as a discrete data center, providing a more fault tolerant deployment than a
+single data center.
+
+When configuring AWS failure domains in the control plane machine set, there are currently two options that must be
+selected; the availability zone name itself, and the subnet to use.
+
+AWS subnet configuration is linked to the availability zone, so the control plane machine set needs to know which
+subnet to use when creating a machine in the availability zone.
+
+An AWS failure domain will look something like the example below:
+```yaml
+- placement:
+    availabilityZone: <zone>
+  subnet:
+    type: Filters
+    filters:
+    - name: tag:Name
+      values:
+      - <subnet>
+```
+
+## Microsoft Azure
+
+On Microsoft Azure, the failure domains represented in the control plane machine set can be considered analogous to the
+Azure availability zones.
+
+> Azure availability zones are physically separate locations within each Azure region that are tolerant to local
+failures. Failures can range from software and hardware failures to events such as earthquakes, floods, and fires.
+Tolerance to failures is achieved because of redundancy and logical isolation of Azure services. To ensure resiliency,
+a minimum of three separate availability zones are present in all availability zone-enabled regions.
+
+Azure describes the availability zones as separate locations within each region, providing more tolerance to local
+failures.
+
+When configuring Azure failure domains in the control plane machine set, there is currently only one supported option,
+the availability zone name.
+
+An Azure failure domain will look something like the example below:
+```yaml
+- zone: "<zone>"
+```

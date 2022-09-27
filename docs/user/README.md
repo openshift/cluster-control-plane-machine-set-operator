@@ -124,6 +124,8 @@ Installation instructions for control plane machine set can be found in the [ins
 A failure domain defines a fault boundary within the infrastructure provider. Failure domains are also known as zones
 or availability zones depending on the infrastructure provider.
 
+Failure domains are explained in more detail in the [failure domains docs](./failure-domains.md).
+
 ### Index
 
 Each control plane machine is considered to exist within an index of the control plane.
@@ -150,3 +152,52 @@ replaced.
 There are currently two supported strategies, `RollingUpdate` (default) and `OnDelete`.
 
 The strategies are explained in more detail in the [update strategy docs](./update-strategies.md).
+
+## FAQs
+
+### How does a control plane machine set differ from a machine set?
+
+Control plane machine sets and machine sets are separate custom resources defined within the OpenShift Machine API.
+
+Machine sets are used for worker machines within OpenShift. They create a number of identical machines and are
+responsible for ensuring that, based on the desired replica count, the cluster always has a sufficient number of
+machines matching the machine set's template provider spec.
+
+Notably, machine sets should not be used with control plane machines and have no mechanism for updating machines if the
+desired provider spec changes.
+
+Control plane machine sets on the other hand, are intended for use specifically with control plane machines.
+Like a machine set, they keep a desired number of machines matching the desired provider spec.
+
+Unlike machine sets, control plane machine sets have the ability to spread machines across failure domains.
+This enables one control plane machine set to manage all control plane machines, while providing fault tolerance should
+the backend infrastructure degrade for some reason.
+
+Failure domains are explained in more detail in the [failure domains docs](./failure-domains.md).
+
+Control plane machine sets also provide the ability to update the control plane machines when the desired provide spec
+is changed. These are achieved through the `RollingUpdate` and `OnDelete` update strategies.
+This allows users a 1-click, opinionated upgrade process for changing their control plane machines backend
+infrastructure, for example, this allows vertically scaling the control plane machines in an automated fashion.
+
+The strategies are explained in more detail in the [update strategy docs](./update-strategies.md).
+
+The control plane machine set adds these features on top of machine sets due to the nature of the control plane machines
+having additional requirements as a part of their update process that mean they should be managed under one entity and
+not several machine sets.
+
+### How does this fit into the Cluster API ecosystem?
+
+Within Cluster API, a concept exists known as a control plane provider. This component, currently with a single
+upstream reference implementation based on KubeADM, is intended to instantiate and manage a control plane within for
+the Kubernetes guest cluster.
+
+The control plane provider is responsible not only for creating the infrastructure for the control plane machines but
+also etcd and the control plane Kubernetes components (API server, Controller Manager, Scheduler, Cloud Controller
+Manager).
+Within OpenShift, various different operators implement the management and responsibility of these components, however,
+to date we do not have a machine infrastructure operator that fits this role.
+
+In a future version of the control plane machine set, we expect to have it fulfil this role within the Cluster API
+project.
+A new template version will be introduced to allow the control plane machine set to use Cluster API as its backend.
