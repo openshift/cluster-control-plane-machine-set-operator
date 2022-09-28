@@ -161,9 +161,17 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 		errs = append(errs, fmt.Errorf("error updating control plane machine set status: %w", err))
 	}
 
-	if err := r.updateClusterOperatorStatus(ctx, logger, cpms); err != nil {
-		// Don't return an error here so we can aggregate the errors with previous updates.
-		errs = append(errs, fmt.Errorf("error updating control plane machine set status: %w", err))
+	if isActive(cpms) {
+		if err := r.updateClusterOperatorStatus(ctx, logger, cpms); err != nil {
+			// Don't return an error here so we can aggregate the errors with previous updates.
+			errs = append(errs, fmt.Errorf("error updating control plane machine set status: %w", err))
+		}
+	} else {
+		// When inactive, the status of the ControlPlaneMachineSet should not influence the
+		// the cluster health, so set the operator to available.
+		if err := r.setClusterOperatorAvailable(ctx, logger); err != nil {
+			return ctrl.Result{}, fmt.Errorf("unable to reconcile cluster operator status: %w", err)
+		}
 	}
 
 	if len(errs) > 0 {
@@ -221,10 +229,6 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context
 		return ctrl.Result{}, fmt.Errorf("error reconciling machine info with status: %w", err)
 	}
 
-	if err := r.ensureOwnerReferences(ctx, logger, cpms, machineInfos); err != nil {
-		return ctrl.Result{}, fmt.Errorf("error ensuring owner references: %w", err)
-	}
-
 	if err := r.validateClusterState(ctx, logger, cpms, machineInfos); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error validating cluster state: %w", err)
 	}
@@ -232,6 +236,15 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachines(ctx context.Context
 	if isControlPlaneMachineSetDegraded(cpms) {
 		logger.V(1).Info(degradedClusterState)
 		return ctrl.Result{}, nil
+	}
+
+	if !isActive(cpms) {
+		// When inactive, we don't want to modify the machines at all so stop processing here.
+		return ctrl.Result{}, nil
+	}
+
+	if err := r.ensureOwnerReferences(ctx, logger, cpms, machineInfos); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error ensuring owner references: %w", err)
 	}
 
 	result, err := r.reconcileMachineUpdates(ctx, logger, cpms, machineProvider, machineInfos)
@@ -721,4 +734,9 @@ func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Co
 	}
 
 	return cpmsNodes, nil
+}
+
+// isActive determines whether the ControlPlaneMachineSet is marked active.
+func isActive(cpms *machinev1.ControlPlaneMachineSet) bool {
+	return cpms.Spec.State == machinev1.ControlPlaneMachineSetStateActive
 }
