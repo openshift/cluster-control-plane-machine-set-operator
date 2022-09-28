@@ -173,49 +173,6 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
-		Context("With OpenStack failure domain configuration", func() {
-			var failureDomains []FailureDomain
-			var err error
-
-			BeforeEach(func() {
-				config := resourcebuilder.OpenStackFailureDomains().BuildFailureDomains()
-
-				failureDomains, err = NewFailureDomains(config)
-			})
-
-			It("should not error", func() {
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			It("should construct a list of failure domains", func() {
-				Expect(failureDomains).To(ConsistOf(
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:zone-1}"),
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:zone-2}"),
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:zone-3}"),
-				))
-			})
-		})
-
-		Context("With invalid OpenStack failure domain configuration", func() {
-			var failureDomains []FailureDomain
-			var err error
-
-			BeforeEach(func() {
-				config := resourcebuilder.OpenStackFailureDomains().BuildFailureDomains()
-				config.OpenStack = nil
-
-				failureDomains, err = NewFailureDomains(config)
-			})
-
-			It("returns an error", func() {
-				Expect(err).To(MatchError("missing failure domain configuration"))
-			})
-
-			It("returns an empty list of failure domains", func() {
-				Expect(failureDomains).To(BeEmpty())
-			})
-		})
-
 		Context("With an unsupported platform type", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -433,40 +390,6 @@ var _ = Describe("FailureDomains", func() {
 				fd2 = failureDomain{
 					platformType: configv1.GCPPlatformType,
 					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
-				}
-			})
-
-			It("returns false", func() {
-				Expect(fd1.Equal(fd2)).To(BeFalse())
-			})
-		})
-
-		Context("With two identical OpenStack failure domains", func() {
-			BeforeEach(func() {
-				fd1 = failureDomain{
-					platformType: configv1.OpenStackPlatformType,
-					openStack:    resourcebuilder.OpenStackFailureDomain().WithAvailabilityZone("zone-a").Build(),
-				}
-				fd2 = failureDomain{
-					platformType: configv1.OpenStackPlatformType,
-					openStack:    resourcebuilder.OpenStackFailureDomain().WithAvailabilityZone("zone-a").Build(),
-				}
-			})
-
-			It("returns true", func() {
-				Expect(fd1.Equal(fd2)).To(BeTrue())
-			})
-		})
-
-		Context("With two different Azure failure domains", func() {
-			BeforeEach(func() {
-				fd1 = failureDomain{
-					platformType: configv1.OpenStackPlatformType,
-					openStack:    resourcebuilder.OpenStackFailureDomain().WithAvailabilityZone("zone-a").Build(),
-				}
-				fd2 = failureDomain{
-					platformType: configv1.OpenStackPlatformType,
-					openStack:    resourcebuilder.OpenStackFailureDomain().WithAvailabilityZone("zone-b").Build(),
 				}
 			})
 
