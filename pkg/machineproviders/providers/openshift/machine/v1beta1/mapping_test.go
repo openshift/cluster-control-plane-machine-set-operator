@@ -178,7 +178,10 @@ var _ = Describe("Failure Domain Mapping", func() {
 
 			for _, machine := range in.machines {
 				machine.SetNamespace(namespaceName)
+				status := machine.Status.DeepCopy()
 				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+				machine.Status = *status
+				Expect(k8sClient.Status().Update(ctx, machine)).To(Succeed())
 			}
 
 			originalCPMS := cpms.DeepCopy()
@@ -560,6 +563,46 @@ var _ = Describe("Failure Domain Mapping", func() {
 							"index", 1,
 							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1b, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1b]}]}}",
 							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+						},
+						Message: "Failure domain changed for index",
+					},
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
+			Entry("with deleting machine and maximum replicas", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithPhase("Deleting").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"index", 2,
+							"oldFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1a, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1a]}]}}",
+							"newFailureDomain", "AWSFailureDomain{AvailabilityZone:us-east-1c, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[subnet-us-east-1c]}]}}",
 						},
 						Message: "Failure domain changed for index",
 					},
