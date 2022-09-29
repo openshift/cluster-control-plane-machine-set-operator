@@ -49,6 +49,51 @@ var _ = Describe("With a running controller", func() {
 
 	var co *configv1.ClusterOperator
 
+	usEast1aSubnet := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1a",
+				},
+			},
+		},
+	}
+
+	usEast1bSubnet := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1b",
+				},
+			},
+		},
+	}
+
+	usEast1cSubnet := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1c",
+				},
+			},
+		},
+	}
+
+	usEast1aProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+		WithAvailabilityZone("us-east-1a").
+		WithSubnet(usEast1aSubnet)
+
+	usEast1bProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+		WithAvailabilityZone("us-east-1b").
+		WithSubnet(usEast1bSubnet)
+
+	usEast1cProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+		WithAvailabilityZone("us-east-1c").
+		WithSubnet(usEast1cSubnet)
+
 	usEast1aFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1a").
 		WithSubnet(machinev1.AWSResourceReference{
@@ -92,6 +137,9 @@ var _ = Describe("With a running controller", func() {
 			usEast1cFailureDomainBuilder,
 		)).
 		WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec())
+
+	// Running phase for setting machines to running.
+	running := "Running"
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
@@ -161,6 +209,302 @@ var _ = Describe("With a running controller", func() {
 
 		It("should add the controlplanemachineset.machine.openshift.io finalizer", func() {
 			Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
+		})
+
+		Context("with updated and running machines", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(3))),
+				)))
+			})
+
+			It("should add an owner reference to each machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty())))), "No machine should not have an owner reference")
+			})
+		})
+
+		Context("with a machine needing an update", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(4))), // Replicas should be 4 once an updated replica is created.
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(2))),
+				)))
+			})
+
+			It("should add an owner reference to each machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty())))), "No machine should not have an owner reference")
+			})
+
+			It("should create a replacement for the machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", HaveLen(4)))
+			})
+		})
+
+		Context("with no running machines", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(0))),
+					HaveField("UpdatedReplicas", Equal(int32(0))),
+					HaveField("UnavailableReplicas", Equal(int32(3))),
+				)))
+			})
+
+			It("should not add owner references", func() {
+				Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", Not(BeEmpty()))))), "No machine should have an owner reference")
+			})
+
+			It("should be degraded", func() {
+				degradedCondition := resourcebuilder.StatusCondition().
+					WithType(conditionDegraded).
+					WithStatus(metav1.ConditionTrue).
+					WithReason(reasonNoReadyMachines).
+					WithMessage("No ready control plane machines found").
+					Build()
+
+				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(test.MatchCondition(degradedCondition))))
+			})
+
+			It("should mark the cluster operator as degraded", func() {
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+					{
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionFalse,
+						Reason:  reasonUnavailableReplicas,
+						Message: "Missing 3 available replica(s)",
+					},
+					{
+						Type:   configv1.OperatorProgressing,
+						Status: configv1.ConditionFalse,
+						Reason: reasonOperatorDegraded,
+					},
+					{
+						Type:    configv1.OperatorDegraded,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonNoReadyMachines,
+						Message: "No ready control plane machines found",
+					},
+					{
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionFalse,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is not upgradable",
+					},
+				})))
+			})
+		})
+	})
+
+	Context("when an Inactive Control Plane Machine Set is created", func() {
+		var cpms *machinev1.ControlPlaneMachineSet
+
+		// Create the CPMS just before each test so that we can set up
+		// various test cases in BeforeEach blocks.
+		JustBeforeEach(func() {
+			// The default CPMS should be sufficient for this test.
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithState(machinev1.ControlPlaneMachineSetStateInactive).WithMachineTemplateBuilder(tmplBuilder).Build()
+
+			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+		})
+
+		It("should add the controlplanemachineset.machine.openshift.io finalizer", func() {
+			Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
+		})
+
+		Context("with updated and running machines", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(3))),
+				)))
+			})
+
+			It("should not add owner references", func() {
+				Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", Not(BeEmpty()))))), "No machine should have an owner reference")
+			})
+		})
+
+		Context("with a machine needing an update", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(2))),
+				)))
+			})
+
+			It("should not add owner references", func() {
+				Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", Not(BeEmpty()))))))
+			})
+
+			It("should not create a replacement for the machine", func() {
+				Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", HaveLen(3)))
+			})
+		})
+
+		Context("with no running machines", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(0))),
+					HaveField("UpdatedReplicas", Equal(int32(0))),
+					HaveField("UnavailableReplicas", Equal(int32(3))),
+				)))
+			})
+
+			It("should not add owner references", func() {
+				Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", Not(BeEmpty()))))), "No machine should have an owner reference")
+			})
+
+			It("should be degraded", func() {
+				degradedCondition := resourcebuilder.StatusCondition().
+					WithType(conditionDegraded).
+					WithStatus(metav1.ConditionTrue).
+					WithReason(reasonNoReadyMachines).
+					WithMessage("No ready control plane machines found").
+					Build()
+
+				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(test.MatchCondition(degradedCondition))))
+			})
+
+			It("should set the cluster operator as available", func() {
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+					{
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is available",
+					},
+					{
+						Type:   configv1.OperatorProgressing,
+						Status: configv1.ConditionFalse,
+						Reason: reasonAsExpected,
+					},
+					{
+						Type:   configv1.OperatorDegraded,
+						Status: configv1.ConditionFalse,
+						Reason: reasonAsExpected,
+					},
+					{
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionTrue,
+						Reason:  reasonAsExpected,
+						Message: "cluster operator is upgradable",
+					},
+				})))
+			})
 		})
 	})
 

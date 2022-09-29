@@ -50,6 +50,7 @@ func ControlPlaneMachineSet() ControlPlaneMachineSetBuilder {
 		name:                   ControlPlaneMachineSetName,
 		namespace:              OpenshiftMachineAPINamespaceName,
 		replicas:               3,
+		state:                  machinev1.ControlPlaneMachineSetStateActive,
 		selector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				machineRoleLabelName:                 "master",
@@ -69,6 +70,7 @@ type ControlPlaneMachineSetBuilder struct {
 	namespace              string
 	replicas               int32
 	selector               metav1.LabelSelector
+	state                  machinev1.ControlPlaneMachineSetState
 	strategyType           machinev1.ControlPlaneMachineSetStrategyType
 	conditions             []metav1.Condition
 }
@@ -84,6 +86,7 @@ func (m ControlPlaneMachineSetBuilder) Build() *machinev1.ControlPlaneMachineSet
 		Spec: machinev1.ControlPlaneMachineSetSpec{
 			Replicas: int32Ptr(m.replicas),
 			Selector: m.selector,
+			State:    m.state,
 			Strategy: machinev1.ControlPlaneMachineSetStrategy{
 				Type: m.strategyType,
 			},
@@ -133,6 +136,12 @@ func (m ControlPlaneMachineSetBuilder) WithReplicas(replicas int32) ControlPlane
 // WithSelector sets the selector for the controlplanemachineset builder.
 func (m ControlPlaneMachineSetBuilder) WithSelector(selector metav1.LabelSelector) ControlPlaneMachineSetBuilder {
 	m.selector = selector
+	return m
+}
+
+// WithState sets the state for the controlplanemachineset builder.
+func (m ControlPlaneMachineSetBuilder) WithState(state machinev1.ControlPlaneMachineSetState) ControlPlaneMachineSetBuilder {
+	m.state = state
 	return m
 }
 
