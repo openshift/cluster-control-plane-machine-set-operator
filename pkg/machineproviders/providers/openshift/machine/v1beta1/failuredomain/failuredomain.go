@@ -59,9 +59,6 @@ type FailureDomain interface {
 	// GCP returns the GCPFailureDomain if the platform type is GCP.
 	GCP() machinev1.GCPFailureDomain
 
-	// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
-	OpenStack() machinev1.OpenStackFailureDomain
-
 	// Equal compares the underlying failure domain.
 	Equal(other FailureDomain) bool
 }
@@ -70,10 +67,9 @@ type FailureDomain interface {
 type failureDomain struct {
 	platformType configv1.PlatformType
 
-	aws       machinev1.AWSFailureDomain
-	azure     machinev1.AzureFailureDomain
-	gcp       machinev1.GCPFailureDomain
-	openStack machinev1.OpenStackFailureDomain
+	aws   machinev1.AWSFailureDomain
+	azure machinev1.AzureFailureDomain
+	gcp   machinev1.GCPFailureDomain
 }
 
 // String returns a string representation of the failure domain.
@@ -85,8 +81,6 @@ func (f failureDomain) String() string {
 		return azureFailureDomainToString(f.azure)
 	case configv1.GCPPlatformType:
 		return gcpFailureDomainToString(f.gcp)
-	case configv1.OpenStackPlatformType:
-		return openStackFailureDomainToString(f.openStack)
 	default:
 		return unknownFailureDomain
 	}
@@ -112,11 +106,6 @@ func (f failureDomain) GCP() machinev1.GCPFailureDomain {
 	return f.gcp
 }
 
-// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
-func (f failureDomain) OpenStack() machinev1.OpenStackFailureDomain {
-	return f.openStack
-}
-
 // Equal compares the underlying failure domain.
 func (f failureDomain) Equal(other FailureDomain) bool {
 	if other == nil {
@@ -134,8 +123,6 @@ func (f failureDomain) Equal(other FailureDomain) bool {
 		return f.azure == other.Azure()
 	case configv1.GCPPlatformType:
 		return f.gcp == other.GCP()
-	case configv1.OpenStackPlatformType:
-		return f.openStack == other.OpenStack()
 	}
 
 	return false
@@ -151,8 +138,6 @@ func NewFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain
 		return newAzureFailureDomains(failureDomains)
 	case configv1.GCPPlatformType:
 		return newGCPFailureDomains(failureDomains)
-	case configv1.OpenStackPlatformType:
-		return newOpenStackFailureDomains(failureDomains)
 	case configv1.PlatformType(""):
 		// An empty failure domains definition is allowed.
 		return nil, nil
@@ -203,20 +188,6 @@ func newGCPFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDom
 	return foundFailureDomains, nil
 }
 
-// newOpenStackFailureDomains constructs a slice of OpenStack FailureDomain from machinev1.FailureDomains.
-func newOpenStackFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
-	foundFailureDomains := []FailureDomain{}
-	if failureDomains.OpenStack == nil {
-		return foundFailureDomains, errMissingFailureDomain
-	}
-
-	for _, failureDomain := range *failureDomains.OpenStack {
-		foundFailureDomains = append(foundFailureDomains, NewOpenStackFailureDomain(failureDomain))
-	}
-
-	return foundFailureDomains, nil
-}
-
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
 // Note this is exported to allow other packages to construct individual failure domains
 // in tests.
@@ -240,14 +211,6 @@ func NewGCPFailureDomain(fd machinev1.GCPFailureDomain) FailureDomain {
 	return &failureDomain{
 		platformType: configv1.GCPPlatformType,
 		gcp:          fd,
-	}
-}
-
-// NewOpenStackFailureDomain creates an OpenStack failure domain from the machinev1.OpenStackFailureDomain.
-func NewOpenStackFailureDomain(fd machinev1.OpenStackFailureDomain) FailureDomain {
-	return &failureDomain{
-		platformType: configv1.OpenStackPlatformType,
-		openStack:    fd,
 	}
 }
 
@@ -304,15 +267,6 @@ func azureFailureDomainToString(fd machinev1.AzureFailureDomain) string {
 func gcpFailureDomainToString(fd machinev1.GCPFailureDomain) string {
 	if fd.Zone != "" {
 		return fmt.Sprintf("GCPFailureDomain{Zone:%s}", fd.Zone)
-	}
-
-	return unknownFailureDomain
-}
-
-// openStackFailureDomainToString converts the OpenStackFailureDomain into a string.
-func openStackFailureDomainToString(fd machinev1.OpenStackFailureDomain) string {
-	if fd.AvailabilityZone != "" {
-		return fmt.Sprintf("OpenStackFailureDomain{AvailabilityZone:%s}", fd.AvailabilityZone)
 	}
 
 	return unknownFailureDomain

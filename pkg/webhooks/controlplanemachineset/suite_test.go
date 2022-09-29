@@ -18,16 +18,22 @@ package controlplanemachineset
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -77,6 +83,19 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	// CEL requires Kube 1.25 and above, so check for the minimum server version.
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	Expect(err).ToNot(HaveOccurred())
+
+	serverVersion, err := discoveryClient.ServerVersion()
+	Expect(err).ToNot(HaveOccurred())
+
+	Expect(serverVersion.Major).To(Equal("1"))
+
+	minorInt, err := strconv.Atoi(serverVersion.Minor)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(minorInt).To(BeNumerically(">=", 25), fmt.Sprintf("This test suite requires a Kube API server of at least version 1.25, current version is 1.%s", serverVersion.Minor))
 
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
