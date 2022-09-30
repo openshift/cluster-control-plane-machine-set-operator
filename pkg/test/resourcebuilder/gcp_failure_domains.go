@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// nolint: dupl // Linter warns about duplicated code with OpenStack, GCP, and Azure FailureDomains builders.
+// Linter warns about duplicated code with OpenStack, GCP, and Azure FailureDomains builders.
 // While the builders are almost identical, we need to keep them separate because they build different objects.
+//nolint: dupl
 package resourcebuilder
 
 import (
