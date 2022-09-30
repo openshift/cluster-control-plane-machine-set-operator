@@ -237,7 +237,7 @@ var _ = Describe("Provider Config", func() {
 		)
 	})
 
-	Context("NewProviderConfigFromMachine", func() {
+	Context("NewProviderConfigFromMachineSpec", func() {
 		type providerConfigTableInput struct {
 			modifyMachine         func(tmpl *machinev1beta1.Machine)
 			providerSpecBuilder   resourcebuilder.RawExtensionBuilder
@@ -253,7 +253,7 @@ var _ = Describe("Provider Config", func() {
 				in.modifyMachine(machine)
 			}
 
-			providerConfig, err := NewProviderConfigFromMachine(*machine)
+			providerConfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return

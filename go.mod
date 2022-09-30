@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.3
+	github.com/go-test/deep v1.0.8
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.49.0
 	github.com/onsi/ginkgo/v2 v2.1.6

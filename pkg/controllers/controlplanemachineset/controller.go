@@ -28,6 +28,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -97,16 +98,16 @@ type ControlPlaneMachineSetReconciler struct {
 func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// All predicates are executed before the event handler is called
 	if err := ctrl.NewControllerManagedBy(mgr).
-		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(filterControlPlaneMachineSet(r.Namespace))).
+		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(util.FilterControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
 		Watches(
 			&source.Kind{Type: &machinev1beta1.Machine{}},
-			handler.EnqueueRequestsFromMapFunc(objToControlPlaneMachineSet(r.Namespace)),
-			builder.WithPredicates(filterControlPlaneMachines(r.Namespace)),
+			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
+			builder.WithPredicates(util.FilterControlPlaneMachines(r.Namespace)),
 		).
 		Watches(
 			&source.Kind{Type: &configv1.ClusterOperator{}},
-			handler.EnqueueRequestsFromMapFunc(objToControlPlaneMachineSet(r.Namespace)),
-			builder.WithPredicates(filterClusterOperator(r.OperatorName)),
+			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
+			builder.WithPredicates(util.FilterClusterOperator(r.OperatorName)),
 		).
 		// Override the default log constructor as it makes the logs very chatty.
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {

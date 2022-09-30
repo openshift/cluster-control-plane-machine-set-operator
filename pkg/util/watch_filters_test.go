@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controlplanemachineset
+package util
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -29,6 +29,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	// clusterControlPlaneMachineSetName is the name of the ControlPlaneMachineSet.
+	// As ControlPlaneMachineSets are singletons within the namespace, only ControlPlaneMachineSets
+	// with this name should be reconciled.
+	clusterControlPlaneMachineSetName = "cluster"
+)
+
 var _ = Describe("Watch Filters", func() {
 	Context("objToControlPlaneMachineSet", func() {
 		const testNamespace = "test"
@@ -37,7 +44,7 @@ var _ = Describe("Watch Filters", func() {
 		var clusterOperatorFilter func(client.Object) []reconcile.Request
 
 		BeforeEach(func() {
-			clusterOperatorFilter = objToControlPlaneMachineSet(testNamespace)
+			clusterOperatorFilter = ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, testNamespace)
 		})
 
 		It("returns a correct request for the cluster ControlPlaneMachineSet", func() {
@@ -86,7 +93,7 @@ var _ = Describe("Watch Filters", func() {
 		var clusterOperatorPredicate predicate.Predicate
 
 		BeforeEach(func() {
-			clusterOperatorPredicate = filterClusterOperator(operatorName)
+			clusterOperatorPredicate = FilterClusterOperator(operatorName)
 		})
 
 		It("Panics with the wrong object kind", func() {
@@ -135,7 +142,7 @@ var _ = Describe("Watch Filters", func() {
 		var cpmsPredicate predicate.Predicate
 
 		BeforeEach(func() {
-			cpmsPredicate = filterControlPlaneMachineSet(testNamespace)
+			cpmsPredicate = FilterControlPlaneMachineSet(clusterControlPlaneMachineSetName, testNamespace)
 		})
 
 		It("Panics with the wrong object kind", func() {
@@ -201,7 +208,7 @@ var _ = Describe("Watch Filters", func() {
 		var machinePredicate predicate.Predicate
 
 		BeforeEach(func() {
-			machinePredicate = filterControlPlaneMachines(testNamespace)
+			machinePredicate = FilterControlPlaneMachines(testNamespace)
 		})
 
 		It("Panics with the wrong object kind", func() {

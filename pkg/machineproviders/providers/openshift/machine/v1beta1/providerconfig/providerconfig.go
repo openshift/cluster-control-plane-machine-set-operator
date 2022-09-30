@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/go-test/deep"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -38,7 +39,7 @@ var (
 	// type is configured within the failure domain config.
 	errUnsupportedPlatformType = errors.New("unsupported platform type")
 
-	// errUnsupportedProviderConfigType is an error used when provider spec is nil.
+	// errNilProviderSpec is an error used when provider spec is nil.
 	errNilProviderSpec = errors.New("provider spec is nil")
 
 	// errNilFailureDomain is an error used when when nil value is present and failure domain is expected.
@@ -58,6 +59,10 @@ type ProviderConfig interface {
 
 	// Equal compares two ProviderConfigs to determine whether or not they are equal.
 	Equal(ProviderConfig) (bool, error)
+
+	// Diff compares two ProviderConfigs and returns a list of differences,
+	// or nil if there are none.
+	Diff(ProviderConfig) ([]string, error)
 
 	// RawConfig marshalls the configuration into a JSON byte slice.
 	RawConfig() ([]byte, error)
@@ -88,14 +93,14 @@ func NewProviderConfigFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1
 	return newProviderConfigFromProviderSpec(tmpl.Spec.ProviderSpec, platformType)
 }
 
-// NewProviderConfigFromMachine creates a new ProviderConfig from the provided machine object.
-func NewProviderConfigFromMachine(machine machinev1beta1.Machine) (ProviderConfig, error) {
-	platformType, err := getPlatformTypeFromProviderSpec(machine.Spec.ProviderSpec)
+// NewProviderConfigFromMachineSpec creates a new ProviderConfig from the provided machineSpec object.
+func NewProviderConfigFromMachineSpec(machineSpec machinev1beta1.MachineSpec) (ProviderConfig, error) {
+	platformType, err := getPlatformTypeFromProviderSpec(machineSpec.ProviderSpec)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine platform type: %w", err)
 	}
 
-	return newProviderConfigFromProviderSpec(machine.Spec.ProviderSpec, platformType)
+	return newProviderConfigFromProviderSpec(machineSpec.ProviderSpec, platformType)
 }
 
 func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType) (ProviderConfig, error) {
@@ -163,6 +168,31 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 		return nil
 	default:
 		return p.Generic().ExtractFailureDomain()
+	}
+}
+
+// Diff compares two ProviderConfigs and returns a list of differences,
+// or nil if there are none.
+func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
+	if other == nil {
+		return nil, nil
+	}
+
+	if p.platformType != other.Type() {
+		return nil, errMismatchedPlatformTypes
+	}
+
+	switch p.platformType {
+	case configv1.AWSPlatformType:
+		return deep.Equal(p.aws.providerConfig, other.AWS().providerConfig), nil
+	case configv1.AzurePlatformType:
+		return deep.Equal(p.azure.providerConfig, other.Azure().providerConfig), nil
+	case configv1.GCPPlatformType:
+		return deep.Equal(p.gcp.providerConfig, other.GCP().providerConfig), nil
+	case configv1.NonePlatformType:
+		return nil, errUnsupportedPlatformType
+	default:
+		return deep.Equal(p.generic.providerSpec, other.Generic().providerSpec), nil
 	}
 }
 
@@ -300,7 +330,7 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 	machineFailureDomains := []failuredomain.FailureDomain{}
 
 	for _, machine := range machines {
-		providerconfig, err := NewProviderConfigFromMachine(machine)
+		providerconfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 		}
@@ -313,10 +343,26 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 
 // ExtractFailureDomainFromMachine FailureDomain extracted from the provided machine.
 func ExtractFailureDomainFromMachine(machine machinev1beta1.Machine) (failuredomain.FailureDomain, error) {
-	providerConfig, err := NewProviderConfigFromMachine(machine)
+	providerConfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 	}
 
 	return providerConfig.ExtractFailureDomain(), nil
+}
+
+// ExtractFailureDomainsFromMachineSets creates list of FailureDomains extracted from the provided list of machineSets.
+func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSet) ([]failuredomain.FailureDomain, error) {
+	machineSetFailureDomains := []failuredomain.FailureDomain{}
+
+	for _, machineSet := range machineSets {
+		providerconfig, err := NewProviderConfigFromMachineSpec(machineSet.Spec.Template.Spec)
+		if err != nil {
+			return nil, fmt.Errorf("error getting failure domain from machineSet %s: %w", machineSet.Name, err)
+		}
+
+		machineSetFailureDomains = append(machineSetFailureDomains, providerconfig.ExtractFailureDomain())
+	}
+
+	return machineSetFailureDomains, nil
 }
