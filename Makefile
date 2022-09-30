@@ -20,6 +20,22 @@ ENVTEST = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-runtime/tools/setu
 GINKGO = go run ${PROJECT_DIR}/vendor/github.com/onsi/ginkgo/v2/ginkgo
 GOLANGCI_LINT = go run ${PROJECT_DIR}/vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
 
+VERSION     ?= $(shell git describe --always --abbrev=7)
+MUTABLE_TAG ?= latest
+IMAGE       ?= cluster-control-plane-machine-set-operator
+BUILD_IMAGE ?= registry.ci.openshift.org/openshift/release:golang-1.18
+
+ifeq ($(shell command -v podman > /dev/null 2>&1 ; echo $$? ), 0)
+	ENGINE=podman
+else ifeq ($(shell command -v docker > /dev/null 2>&1 ; echo $$? ), 0)
+	ENGINE=docker
+endif
+
+USE_DOCKER ?= 0
+ifeq ($(USE_DOCKER), 1)
+	ENGINE=docker
+endif
+
 .PHONY: all
 all: build
 
@@ -95,6 +111,15 @@ crds-sync: ## Sync crds in install with the ones in the vendored openshift/api
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager ./cmd/control-plane-machine-set-operator
+
+.PHONY: images
+images: ## Create images
+	$(ENGINE) build -t "$(IMAGE):$(VERSION)" -t "$(IMAGE):$(MUTABLE_TAG)" ./
+
+.PHONY: push
+push: ## Push images
+	$(ENGINE) push "$(IMAGE):$(VERSION)"
+	$(ENGINE) push "$(IMAGE):$(MUTABLE_TAG)"
 
 define ensure-home
 	@ export HOME=$${HOME:=/tmp/kubebuilder-testing}; \
