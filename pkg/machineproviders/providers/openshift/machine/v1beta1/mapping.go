@@ -29,6 +29,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
@@ -106,8 +107,6 @@ func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, fail
 // creates a mapping of their indexes (if available) to their failure domain to allow the mapping to be customised
 // to the state of the cluster.
 func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (map[int32]failuredomain.FailureDomain, error) {
-	out := make(map[int32]failuredomain.FailureDomain)
-
 	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert label selector to selector: %w", err)
@@ -118,11 +117,24 @@ func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Cli
 		return nil, fmt.Errorf("failed to list machines: %w", err)
 	}
 
+	return mapIndexesToFailureDomainsForMachines(logger, machineList)
+}
+
+// mapIndexesToFailureDomainsForMachines creates an index to failure domain mapping for machine in the list.
+func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *machinev1beta1.MachineList) (map[int32]failuredomain.FailureDomain, error) {
+	out := make(map[int32]failuredomain.FailureDomain)
+
 	// indexToMachine contains a mapping between the machine domain index in the newest machine
 	// for this particular index.
 	indexToMachine := make(map[int32]machinev1beta1.Machine)
 
 	for _, machine := range machineList.Items {
+		// When the machine is in deleting phase,
+		// we should not take it into account when calculating where to place the new machine.
+		if pointer.StringDeref(machine.Status.Phase, "") == "Deleting" {
+			continue
+		}
+
 		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(machine)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract failure domain from machine %s: %w", machine.Name, err)
