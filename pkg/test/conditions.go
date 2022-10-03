@@ -80,6 +80,7 @@ type matchCondition struct {
 }
 
 // Match checks for equality between the actual and expected objects.
+//
 //nolint:dupl
 func (m matchCondition) Match(actual interface{}) (success bool, err error) {
 	actualCondition, ok := actual.(metav1.Condition)
@@ -174,6 +175,7 @@ type matchClusterOperatorCondition struct {
 }
 
 // Match checks for equality between the actual and expected objects.
+//
 //nolint:dupl
 func (m matchClusterOperatorCondition) Match(actual interface{}) (success bool, err error) {
 	actualCondition, ok := actual.(configv1.ClusterOperatorStatusCondition)
