@@ -741,6 +741,68 @@ var _ = Describe("Failure Domain Mapping", func() {
 					},
 				},
 			}),
+			Entry("with three failure domains matching three machines indexed from 3 (a,b,c)", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-5").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
+			Entry("with three failure domains matching three machines that are not sequentially indexed (a,b,c)", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
 		)
 	})
 
@@ -1062,6 +1124,34 @@ var _ = Describe("Failure Domain Mapping", func() {
 				},
 				expectedLogs: []test.LogEntry{},
 			}),
+			Entry("with machines in three failure domains indexed from 3 (order a,b,c)", machineMappingTableInput{
+				cpmsBuilder: cpmsBuilder,
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-5").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{},
+			}),
+			Entry("with machines in three failure domains not sequentially indexed (order a,b,c)", machineMappingTableInput{
+				cpmsBuilder: cpmsBuilder,
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{},
+			}),
 		)
 	})
 
@@ -1310,7 +1400,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					},
 				},
 			}),
-			Entry("when a machine has a an index not present in the base mapping, ignores the additional index", reconcileMappingsTableInput{
+			Entry("when a machine has a an index not present in the base mapping, keeps the additional index", reconcileMappingsTableInput{
 				baseMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1326,8 +1416,158 @@ var _ = Describe("Failure Domain Mapping", func() {
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
 				expectedLogs: []test.LogEntry{},
+			}),
+			Entry("when a machines are indexed from 3, it shifts the mapping to match the machines", reconcileMappingsTableInput{
+				baseMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				machineMapping: map[int32]failuredomain.FailureDomain{
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{},
+			}),
+			Entry("when a machines are not sequentially indexed, it shifts the mapping to match the machines", reconcileMappingsTableInput{
+				baseMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				machineMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{},
+			}),
+		)
+	})
+
+	Context("reconcileIndexes", func() {
+		type reconcileIndexesTableInput struct {
+			reconciledMapping map[int32]failuredomain.FailureDomain
+			preferredMapping  map[int32]failuredomain.FailureDomain
+			expectedMapping   map[int32]failuredomain.FailureDomain
+		}
+
+		DescribeTable("should keep the machine indexes stable where possible", func(in reconcileIndexesTableInput) {
+			// Note the preferred mapping values don't matter, so can be nil for each test case.
+
+			// Run each test 10 times in an attempt to make sure the output is stable.
+			for i := 0; i < 10; i++ {
+				// Copy the mapping to avoid mutating the input state.
+				mapping := make(map[int32]failuredomain.FailureDomain)
+				for k, v := range in.reconciledMapping {
+					// Copy the pointer to avoid loop capture.
+					val := v
+					mapping[k] = val
+				}
+
+				reconcileIndexes(mapping, in.preferredMapping)
+
+				Expect(mapping).To(Equal(in.expectedMapping))
+			}
+		},
+			Entry("when the mappings match", reconcileIndexesTableInput{
+				reconciledMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				preferredMapping: map[int32]failuredomain.FailureDomain{
+					0: nil,
+					1: nil,
+					2: nil,
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+			}),
+			Entry("when the preferred mapping has additional values, does nothing", reconcileIndexesTableInput{
+				reconciledMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				preferredMapping: map[int32]failuredomain.FailureDomain{
+					0: nil,
+					1: nil,
+					2: nil,
+					3: nil,
+					4: nil,
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+			}),
+			Entry("when the preferred mapping is missing values", reconcileIndexesTableInput{
+				reconciledMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				preferredMapping: map[int32]failuredomain.FailureDomain{
+					0: nil,
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+			}),
+			Entry("when the preferred mapping is not aligned (3,4,5)", reconcileIndexesTableInput{
+				reconciledMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				preferredMapping: map[int32]failuredomain.FailureDomain{
+					3: nil,
+					4: nil,
+					5: nil,
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+			}),
+			Entry("when the preferred mapping is not aligned (0,2,3)", reconcileIndexesTableInput{
+				reconciledMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				preferredMapping: map[int32]failuredomain.FailureDomain{
+					0: nil,
+					2: nil,
+					3: nil,
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()), // 2 wasn't swapped so 3 ends up here
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
 			}),
 		)
 	})

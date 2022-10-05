@@ -239,6 +239,118 @@ var _ = Describe("With a running controller", func() {
 					HaveField("Replicas", Equal(int32(3))),
 					HaveField("ReadyReplicas", Equal(int32(3))),
 					HaveField("UpdatedReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+			})
+
+			It("should add an owner reference to each machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty())))), "No machine should not have an owner reference")
+			})
+		})
+
+		Context("with machines indexed 0, 1, 2", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+			})
+
+			It("should add an owner reference to each machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty())))), "No machine should not have an owner reference")
+			})
+		})
+
+		Context("with machines indexed 4, 0, 2", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+			})
+
+			It("should add an owner reference to each machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty())))), "No machine should not have an owner reference")
+			})
+		})
+
+		Context("with machines indexed 3, 4, 5", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-5").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+				By("Ensuring Machines are Running")
+				machines := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+
+				for _, machine := range machines.Items {
+					m := machine.DeepCopy()
+
+					Eventually(komega.UpdateStatus(m, func() {
+						m.Status.Phase = &running
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
 				)))
 			})
 
@@ -1105,11 +1217,13 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 var _ = Describe("machineInfosByIndex", func() {
 	i0m0 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-0").Build()
-	i0m1 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-1").Build()
-	i0m2 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-2").Build()
-	i1m0 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-1-0").Build()
+	i0m1 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-1-0").Build()
+	i0m2 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-2-0").Build()
+	i1m0 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-0-1").Build()
 	i1m1 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-1-1").Build()
-	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-2-0").Build()
+	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-0-2").Build()
+	i3m0 := resourcebuilder.MachineInfo().WithIndex(3).WithMachineName("machine-0-3").Build()
+	i4m0 := resourcebuilder.MachineInfo().WithIndex(4).WithMachineName("machine-0-4").Build()
 
 	type tableInput struct {
 		cpmsBuilder   resourcebuilder.ControlPlaneMachineSetInterface
@@ -1189,6 +1303,44 @@ var _ = Describe("machineInfosByIndex", func() {
 				0: {i0m0, i0m1, i0m2},
 				1: {},
 				2: {},
+			},
+		}),
+		Entry("with machines in indexes 0, 1 and 3", tableInput{
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i3m0},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0},
+				1: {i1m0},
+				3: {i3m0},
+			},
+		}),
+		Entry("with machines in indexes 0, 2 and 3", tableInput{
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			machineInfos: []machineproviders.MachineInfo{i0m0, i2m0, i3m0},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {i0m0},
+				2: {i2m0},
+				3: {i3m0},
+			},
+		}),
+		Entry("with machines in indexes 2, 3 and 4", tableInput{
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			machineInfos: []machineproviders.MachineInfo{i2m0, i3m0, i4m0},
+			expected: map[int32][]machineproviders.MachineInfo{
+				2: {i2m0},
+				3: {i3m0},
+				4: {i4m0},
+			},
+		}),
+		Entry("with machines in indexes 2, 3 and 4 with 5 replicas", tableInput{
+			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(5),
+			machineInfos: []machineproviders.MachineInfo{i2m0, i3m0, i4m0},
+			expected: map[int32][]machineproviders.MachineInfo{
+				0: {},
+				1: {},
+				2: {i2m0},
+				3: {i3m0},
+				4: {i4m0},
 			},
 		}),
 	)
