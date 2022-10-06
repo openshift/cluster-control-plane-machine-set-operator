@@ -82,7 +82,7 @@ func (f failureDomain) String() string {
 	case configv1.GCPPlatformType:
 		return gcpFailureDomainToString(f.gcp)
 	default:
-		return unknownFailureDomain
+		return fmt.Sprintf("%sFailureDomain{}", f.platformType)
 	}
 }
 
@@ -125,7 +125,7 @@ func (f failureDomain) Equal(other FailureDomain) bool {
 		return f.gcp == other.GCP()
 	}
 
-	return false
+	return true
 }
 
 // NewFailureDomains creates a set of FailureDomains representing the input failure
@@ -212,6 +212,11 @@ func NewGCPFailureDomain(fd machinev1.GCPFailureDomain) FailureDomain {
 		platformType: configv1.GCPPlatformType,
 		gcp:          fd,
 	}
+}
+
+// NewGenericFailureDomain creates a dummy failure domain for generic platforms that don't support failure domains.
+func NewGenericFailureDomain() FailureDomain {
+	return failureDomain{}
 }
 
 // azString formats AvailabilityZone for awsFailureDomainToString function.

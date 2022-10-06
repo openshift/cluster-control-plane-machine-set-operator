@@ -38,10 +38,6 @@ var (
 	// type is configured within the failure domain config.
 	errUnsupportedPlatformType = errors.New("unsupported platform type")
 
-	// errUnknownProviderConfigType is an error used when provider type
-	// cannot be deduced from providerSpec object kind.
-	errUnknownProviderConfigType = errors.New("unknown provider config type")
-
 	// errUnsupportedProviderConfigType is an error used when provider spec is nil.
 	errNilProviderSpec = errors.New("provider spec is nil")
 
@@ -77,6 +73,9 @@ type ProviderConfig interface {
 
 	// GCP returns the GCPProviderConfig if the platform type is GCP.
 	GCP() GCPProviderConfig
+
+	// Generic returns the GenericProviderConfig if we are on a platform that is using generic provider abstraction.
+	Generic() GenericProviderConfig
 }
 
 // NewProviderConfigFromMachineTemplate creates a new ProviderConfig from the provided machine template.
@@ -100,6 +99,10 @@ func NewProviderConfigFromMachine(machine machinev1beta1.Machine) (ProviderConfi
 }
 
 func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType) (ProviderConfig, error) {
+	if providerSpec.Value == nil {
+		return nil, errNilProviderSpec
+	}
+
 	switch platformType {
 	case configv1.AWSPlatformType:
 		return newAWSProviderConfig(providerSpec.Value)
@@ -107,8 +110,10 @@ func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec,
 		return newAzureProviderConfig(providerSpec.Value)
 	case configv1.GCPPlatformType:
 		return newGCPProviderConfig(providerSpec.Value)
-	default:
+	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platformType)
+	default:
+		return newGenericProviderConfig(providerSpec.Value, platformType)
 	}
 }
 
@@ -118,6 +123,7 @@ type providerConfig struct {
 	aws          AWSProviderConfig
 	azure        AzureProviderConfig
 	gcp          GCPProviderConfig
+	generic      GenericProviderConfig
 }
 
 // InjectFailureDomain is used to inject a failure domain into the ProviderConfig.
@@ -137,7 +143,7 @@ func (p providerConfig) InjectFailureDomain(fd failuredomain.FailureDomain) (Pro
 		newConfig.azure = p.Azure().InjectFailureDomain(fd.Azure())
 	case configv1.GCPPlatformType:
 		newConfig.gcp = p.GCP().InjectFailureDomain(fd.GCP())
-	default:
+	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, p.platformType)
 	}
 
@@ -153,8 +159,10 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 		return failuredomain.NewAzureFailureDomain(p.Azure().ExtractFailureDomain())
 	case configv1.GCPPlatformType:
 		return failuredomain.NewGCPFailureDomain(p.GCP().ExtractFailureDomain())
-	default:
+	case configv1.NonePlatformType:
 		return nil
+	default:
+		return p.Generic().ExtractFailureDomain()
 	}
 }
 
@@ -175,8 +183,10 @@ func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
 		return reflect.DeepEqual(p.azure.providerConfig, other.Azure().providerConfig), nil
 	case configv1.GCPPlatformType:
 		return reflect.DeepEqual(p.gcp.providerConfig, other.GCP().providerConfig), nil
-	default:
+	case configv1.NonePlatformType:
 		return false, errUnsupportedPlatformType
+	default:
+		return reflect.DeepEqual(p.generic.providerSpec, other.Generic().providerSpec), nil
 	}
 }
 
@@ -194,8 +204,10 @@ func (p providerConfig) RawConfig() ([]byte, error) {
 		rawConfig, err = json.Marshal(p.azure.providerConfig)
 	case configv1.GCPPlatformType:
 		rawConfig, err = json.Marshal(p.gcp.providerConfig)
-	default:
+	case configv1.NonePlatformType:
 		return nil, errUnsupportedPlatformType
+	default:
+		rawConfig, err = p.generic.providerSpec.Raw, nil
 	}
 
 	if err != nil {
@@ -225,18 +237,28 @@ func (p providerConfig) GCP() GCPProviderConfig {
 	return p.gcp
 }
 
+// Generic returns the GenericProviderConfig if the platform type is generic.
+func (p providerConfig) Generic() GenericProviderConfig {
+	return p.generic
+}
+
 // getPlatformTypeFromProviderSpecKind determines machine platform from providerSpec kind.
-func getPlatformTypeFromProviderSpecKind(kind string) (configv1.PlatformType, bool) {
+// When platform is unknown, it returns "UnknownPlatform".
+func getPlatformTypeFromProviderSpecKind(kind string) configv1.PlatformType {
 	var providerSpecKindToPlatformType = map[string]configv1.PlatformType{
-		"AWSMachineProviderConfig":     configv1.AWSPlatformType,
-		"AzureMachineProviderSpec":     configv1.AzurePlatformType,
-		"GCPMachineProviderSpec":       configv1.GCPPlatformType,
-		"OpenStackMachineProviderSpec": configv1.OpenStackPlatformType,
+		"AWSMachineProviderConfig": configv1.AWSPlatformType,
+		"AzureMachineProviderSpec": configv1.AzurePlatformType,
+		"GCPMachineProviderSpec":   configv1.GCPPlatformType,
 	}
 
 	platformType, ok := providerSpecKindToPlatformType[kind]
 
-	return platformType, ok
+	// Attempt to operate on unknown platforms. This should work if the platform does not require failure domains support.
+	if !ok {
+		return "UnknownPlatform"
+	}
+
+	return platformType
 }
 
 // getPlatformTypeFromMachineTemplate extracts the platform type from the Machine template.
@@ -255,7 +277,6 @@ func getPlatformTypeFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1Ma
 // getPlatformTypeFromProviderSpec determines machine platform from the providerSpec.
 // The providerSpec object's kind field is unmarshalled and the platform type is inferred from it.
 func getPlatformTypeFromProviderSpec(providerSpec machinev1beta1.ProviderSpec) (configv1.PlatformType, error) {
-	var platformType configv1.PlatformType
 	// Simple type for unmarshalling providerSpec kind.
 	type providerSpecKind struct {
 		metav1.TypeMeta `json:",inline"`
@@ -271,12 +292,7 @@ func getPlatformTypeFromProviderSpec(providerSpec machinev1beta1.ProviderSpec) (
 		return "", fmt.Errorf("could not unmarshal provider spec: %w", err)
 	}
 
-	var ok bool
-	if platformType, ok = getPlatformTypeFromProviderSpecKind(providerKind.Kind); !ok {
-		return "", fmt.Errorf("%w: %s", errUnknownProviderConfigType, providerKind.Kind)
-	}
-
-	return platformType, nil
+	return getPlatformTypeFromProviderSpecKind(providerKind.Kind), nil
 }
 
 // ExtractFailureDomainsFromMachines creates list of FailureDomains extracted from the provided list of machines.
