@@ -64,6 +64,10 @@ func (a AWSProviderConfig) Config() machinev1beta1.AWSMachineProviderConfig {
 // It should return an error if the provided RawExtension does not represent
 // an AWSMachineProviderConfig.
 func newAWSProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
+	if raw == nil {
+		return nil, errNilProviderSpec
+	}
+
 	awsMachineProviderConfig := machinev1beta1.AWSMachineProviderConfig{}
 	if err := json.Unmarshal(raw.Raw, &awsMachineProviderConfig); err != nil {
 		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
