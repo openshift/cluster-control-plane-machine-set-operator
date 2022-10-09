@@ -58,14 +58,14 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 		return nil, errNoFailureDomains
 	}
 
-	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomains)
-	if err != nil {
-		return nil, fmt.Errorf("could not construct base failure domain mapping: %w", err)
-	}
-
 	machineMapping, err := createMachineMapping(ctx, logger, cl, cpms)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct machine mapping: %w", err)
+	}
+
+	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomains, len(machineMapping))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct base failure domain mapping: %w", err)
 	}
 
 	out := reconcileMappings(logger, baseMapping, machineMapping)
@@ -79,14 +79,22 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 }
 
 // createBaseFailureDomainMapping is used to create the basic failure domain mapping based on the number of failure
-// domains provided and the number of replicas within the ControlPlaneMachineSet.
+// domains provided and the number of replicas within the ControlPlaneMachineSet or control plane Machine indexes.
 // To ensure consistency, we expect the function to create a stable output no matter the order of the input failure
 // domains.
-func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, failureDomains []failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
+// Create the output based on the longer of the number of Machines or replicas so that when we reconcile the machine
+// mappings we always have enough candidates which are balanced between the available failure domains.
+func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, failureDomains []failuredomain.FailureDomain, machineIndexCount int) (map[int32]failuredomain.FailureDomain, error) {
 	out := make(map[int32]failuredomain.FailureDomain)
 
 	if cpms.Spec.Replicas == nil || *cpms.Spec.Replicas < 1 {
 		return nil, errReplicasRequired
+	}
+
+	// Create a base mapping which account for the larger of the number of machines or
+	// the desired replica count.
+	if *cpms.Spec.Replicas > int32(machineIndexCount) {
+		machineIndexCount = int(*cpms.Spec.Replicas)
 	}
 
 	if len(failureDomains) == 0 {
@@ -96,7 +104,7 @@ func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, fail
 	// Sort failure domains alphabetically
 	sort.Slice(failureDomains, func(i, j int) bool { return failureDomains[i].String() < failureDomains[j].String() })
 
-	for i := int32(0); i < *cpms.Spec.Replicas; i++ {
+	for i := int32(0); i < int32(machineIndexCount); i++ {
 		out[i] = failureDomains[i%int32(len(failureDomains))]
 	}
 
@@ -188,16 +196,24 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *mach
 // from the Machine mapping is handled later in the unmatched index processing.
 // When processing the indexes, everything must be sorted to ensure the output is stable (note iterating over a map
 // is randomised by golang).
+// The base mapping should always be at least as long as the machine mapping for this to work.
 func reconcileMappings(logger logr.Logger, base, machines map[int32]failuredomain.FailureDomain) map[int32]failuredomain.FailureDomain {
+	if len(base) < len(machines) {
+		// This is a programming error since user input doesn't affect this.
+		panic("base must have at least as many indexes as machines")
+	}
+
 	// Create the initial output mapping based on the machines.
-	// Remove any extra indexes that aren't present in the base mapping.
-	// This might occur if the control plane has been scaled down horizontally.
 	out := copyMapping(machines)
-	removeExtraIndexes(out, base)
 
 	// Create the list of candidates based on the base mapping.
 	// These will be matched against the machine mapping.
 	candidates := copyMapping(base)
+
+	// Ensure that, if the machines aren't indexed from 0, the candidate mapping reflects
+	// the indexes present in the machine as opposed to the base mapping which will always
+	// index from 0.
+	reconcileIndexes(candidates, out)
 
 	// We need to keep track of the indexes we haven't yet matched.
 	// Create a list of unmatched indexes.
@@ -287,6 +303,31 @@ func handleUnmatchedIndex(logger logr.Logger, idx int32, out, base, candidates m
 		// This is likely to happen if the machine mapping is balanced using a
 		// different weighting to the base, eg aabbc vs abbcc.
 		useCandidate(candidates, unmatchedIndexes, idx)
+	}
+}
+
+// reconcileIndexes tries to adjust the output mapping based on a list of preferred
+// indexes. This is used so that when Machines aren't indexed exactly as in the base
+// mapping, we still respect their original mappings.
+// For example, if the output mapping starts as [0:a, 1:b, 2:c] and the preferred
+// mapping contains keys 2, 3, 4, then the output after this function would be
+// [3:a, 4:b, 2:c], note 2 in this case was fixed as there was overlap.
+func reconcileIndexes(reconciled, preferred map[int32]failuredomain.FailureDomain) {
+	nonPreferredIndexes := extraIndexes(reconciled, preferred)
+	nonReconciledIndexes := extraIndexes(preferred, reconciled)
+
+	// For each index that isn't in the preferred list, swap it for one
+	// that isn't in the reconciled list if there are any.
+	for _, idx := range nonPreferredIndexes {
+		if len(nonReconciledIndexes) == 0 {
+			break
+		}
+
+		var newIdx int32
+		newIdx, nonReconciledIndexes = pop(nonReconciledIndexes)
+
+		reconciled[newIdx] = reconciled[idx]
+		delete(reconciled, idx)
 	}
 }
 
@@ -393,15 +434,28 @@ func countForFailureDomain(mapping map[int32]failuredomain.FailureDomain, target
 	return count
 }
 
-// removeExtraIndexes removes any key in the mapping that isn't present in the target.
-func removeExtraIndexes(mapping, target map[int32]failuredomain.FailureDomain) {
-	for idx := range mapping {
-		if !indexExists(target, idx) {
-			// The machine mapping has additional indexes not present in the base.
-			// This would typically only happen when the control plane shrinks horizontally.
-			delete(mapping, idx)
+// extraIndexes returns a list of indexes in the set that are not present in the superset.
+// This is used to identify entries which are not mapped in the superset.
+// The output of this function is sorted in ascending order to provide stable output.
+func extraIndexes(set, superset map[int32]failuredomain.FailureDomain) []int32 {
+	out := []int32{}
+
+	for idx := range set {
+		if _, ok := superset[idx]; !ok {
+			out = append(out, idx)
 		}
 	}
+
+	sort.Slice(out, func(i int, j int) bool {
+		return out[i] < out[j]
+	})
+
+	return out
+}
+
+// pop removes the first entry from a slice and returns the remaining slice.
+func pop[V any](in []V) (V, []V) {
+	return in[0], in[1:]
 }
 
 // parseMachineNameIndex returns an integer suffix from the machine name. If there is no sufficient suffix, it

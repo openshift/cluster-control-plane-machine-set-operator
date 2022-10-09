@@ -502,13 +502,17 @@ func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []
 		return nil, errReplicasRequired
 	}
 
-	// Make sure that every expected index is accounted for.
-	for i := int32(0); i < *cpms.Spec.Replicas; i++ {
-		out[i] = []machineproviders.MachineInfo{}
-	}
-
 	for _, machineInfo := range machineInfos {
 		out[machineInfo.Index] = append(out[machineInfo.Index], machineInfo)
+	}
+
+	// If for any reason there aren't enough indexes to meet the replica count,
+	// populate empty indexes starting from index 0 until we have the correct
+	// number of indexes.
+	for i := int32(0); int32(len(out)) < *cpms.Spec.Replicas; i++ {
+		if _, ok := out[i]; !ok {
+			out[i] = []machineproviders.MachineInfo{}
+		}
 	}
 
 	return out, nil
