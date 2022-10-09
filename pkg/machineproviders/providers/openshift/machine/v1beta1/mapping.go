@@ -461,9 +461,10 @@ func pop[V any](in []V) (V, []V) {
 // parseMachineNameIndex returns an integer suffix from the machine name. If there is no sufficient suffix, it
 // returns "false" as a second value.
 // Example:
-//   machine-master-3 -> 3, true
-//   machine-master-a -> 0, false
-//   machine-master3  -> 0 , false
+//
+//	machine-master-3 -> 3, true
+//	machine-master-a -> 0, false
+//	machine-master3  -> 0 , false
 func parseMachineNameIndex(machineName string) (int, bool) {
 	machineNameIndex, err := strconv.ParseInt(machineName[strings.LastIndex(machineName, "-")+1:], 10, 32)
 	if err != nil {

@@ -65,12 +65,12 @@ func (r *ControlPlaneMachineSetReconciler) updateControlPlaneMachineSetStatus(ct
 // In particular, it will update the ObservedGeneration, Replicas, ReadyReplicas, UnavailableReplicas and UpdatedReplicas
 // fields based on the information gathered, and then set any relevant conditions if applicable.
 // It observes the following rules for setting the status:
-// - Replicas is the number of Machines present
-// - ReadyReplicas is the number of the above Replicas which are reporting as Ready
-// - UpdatedReplicas is the number of Ready Replicas that do not need an update (this should be at most 1 per index).
-// - UnavailableReplicas is the number of Machines required to satisfy the requirement of at least 1 Ready Replica per
-//   index. Eg. if one index has no ready replicas, this is 1, if an index has 2 ready replicas, this does not count as
-//   2 available replicas.
+//   - Replicas is the number of Machines present
+//   - ReadyReplicas is the number of the above Replicas which are reporting as Ready
+//   - UpdatedReplicas is the number of Ready Replicas that do not need an update (this should be at most 1 per index).
+//   - UnavailableReplicas is the number of Machines required to satisfy the requirement of at least 1 Ready Replica per
+//     index. Eg. if one index has no ready replicas, this is 1, if an index has 2 ready replicas, this does not count as
+//     2 available replicas.
 func reconcileStatusWithMachineInfo(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineInfosByIndex map[int32][]machineproviders.MachineInfo) error {
 	replicas := int32(0)
 	readyReplicas := int32(0)
