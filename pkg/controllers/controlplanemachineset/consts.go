@@ -141,6 +141,11 @@ const (
 	// This will typically occur when an old replica has not yet been removed.
 	reasonExcessReplicas = "ExcessReplicas"
 
+	// reasonExcessUpdatedReplicas denotes that the ControlPlaneMachineSet has a more than expected number
+	// of ready and up-to-date replicas.
+	// This will typically occur when extra replica(s) for an index have been created.
+	reasonExcessUpdatedReplicas = "ExcessUpdatedReplicas"
+
 	// reasonNeedsUpdateReplicas denotes that the ControlPlaneMachineSet has identified
 	// replicas under its management that are currently in need of an update.
 	reasonNeedsUpdateReplicas = "NeedsUpdateReplicas"
