@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/pointer"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -178,10 +179,15 @@ var _ = Describe("Failure Domain Mapping", func() {
 
 			for _, machine := range in.machines {
 				machine.SetNamespace(namespaceName)
+				machine.Finalizers = append(machine.Finalizers, "machine.machine.openshift.io")
 				status := machine.Status.DeepCopy()
 				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 				machine.Status = *status
 				Expect(k8sClient.Status().Update(ctx, machine)).To(Succeed())
+				// It is not possible to create machine with deletion timestamp directly. Create one without it first, then delete the machine.
+				if pointer.StringDeref(status.Phase, "") == "Deleting" {
+					Expect(k8sClient.Delete(ctx, machine)).To(Succeed())
+				}
 			}
 
 			originalCPMS := cpms.DeepCopy()

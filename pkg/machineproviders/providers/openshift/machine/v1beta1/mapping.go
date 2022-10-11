@@ -29,7 +29,6 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
@@ -129,9 +128,9 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *mach
 	indexToMachine := make(map[int32]machinev1beta1.Machine)
 
 	for _, machine := range machineList.Items {
-		// When the machine is in deleting phase,
+		// When the machine is being deleted,
 		// we should not take it into account when calculating where to place the new machine.
-		if pointer.StringDeref(machine.Status.Phase, "") == "Deleting" {
+		if machine.DeletionTimestamp != nil {
 			continue
 		}
 
