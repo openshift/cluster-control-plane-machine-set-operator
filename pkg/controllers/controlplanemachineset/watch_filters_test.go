@@ -30,14 +30,14 @@ import (
 )
 
 var _ = Describe("Watch Filters", func() {
-	Context("clusterOperatorToControlPlaneMachineSet", func() {
+	Context("objToControlPlaneMachineSet", func() {
 		const testNamespace = "test"
 		const operatorName = "control-plane-machine-set"
 
 		var clusterOperatorFilter func(client.Object) []reconcile.Request
 
 		BeforeEach(func() {
-			clusterOperatorFilter = clusterOperatorToControlPlaneMachineSet(testNamespace)
+			clusterOperatorFilter = objToControlPlaneMachineSet(testNamespace)
 		})
 
 		It("returns a correct request for the cluster ControlPlaneMachineSet", func() {
@@ -205,7 +205,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Panics with the wrong object kind", func() {
-			expectedMessage := "expected to get an of object of type machinev1beta1.Machine"
+			expectedMessage := "expected to get an of object of type machinev1beta1.Machine: got type *v1.ControlPlaneMachineSet"
 			cpms := resourcebuilder.ControlPlaneMachineSet().Build()
 
 			Expect(func() {

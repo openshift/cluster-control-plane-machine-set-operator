@@ -17,9 +17,12 @@ limitations under the License.
 package controlplanemachineset
 
 import (
+	"fmt"
+
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -39,10 +42,12 @@ const (
 	machineMasterTypeLabelName = "master"
 )
 
-// clusterOperatorToControlPlaneMachineSet maps the cluster operator to the control
-// plane machine set singleton in the namespace provided.
-func clusterOperatorToControlPlaneMachineSet(namespace string) func(client.Object) []reconcile.Request {
+// objToControlPlaneMachineSet maps any object to the control plane machine set singleton
+// in the namespace provided.
+func objToControlPlaneMachineSet(namespace string) func(client.Object) []reconcile.Request {
 	return func(obj client.Object) []reconcile.Request {
+		klog.V(4).Infof("reconcile triggered by object (%T) %s/%s", obj, obj.GetNamespace(), obj.GetName())
+
 		return []reconcile.Request{{
 			NamespacedName: client.ObjectKey{Namespace: namespace, Name: clusterControlPlaneMachineSetName},
 		}}
@@ -71,7 +76,13 @@ func filterControlPlaneMachineSet(namespace string) predicate.Predicate {
 			panic("expected to get an of object of type machinev1.ControlPlaneMachineSet")
 		}
 
-		return cpms.GetNamespace() == namespace && cpms.GetName() == clusterControlPlaneMachineSetName
+		shouldReconcile := cpms.GetNamespace() == namespace && cpms.GetName() == clusterControlPlaneMachineSetName
+
+		if shouldReconcile {
+			klog.V(4).Infof("reconcile triggered by control plane machine set %s/%s", obj.GetNamespace(), obj.GetName())
+		}
+
+		return shouldReconcile
 	})
 }
 
@@ -81,7 +92,7 @@ func filterControlPlaneMachines(namespace string) predicate.Predicate {
 	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		machine, ok := obj.(*machinev1beta1.Machine)
 		if !ok {
-			panic("expected to get an of object of type machinev1beta1.Machine")
+			panic(fmt.Sprintf("expected to get an of object of type machinev1beta1.Machine: got type %T", obj))
 		}
 
 		// Check namespace first
