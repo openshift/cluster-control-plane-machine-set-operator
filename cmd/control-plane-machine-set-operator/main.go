@@ -70,6 +70,7 @@ func main() { //nolint:funlen
 	var (
 		metricsAddr      string
 		probeAddr        string
+		webhookPort      int
 		managedNamespace string
 
 		leaderElectionConfig = config.LeaderElectionConfiguration{
@@ -80,6 +81,7 @@ func main() { //nolint:funlen
 
 	pflag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	pflag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	pflag.IntVar(&webhookPort, "webhook-port", 9443, "Webhook Server port, enabled by default at port 9443. Set to 0 to disable webhooks.")
 	pflag.StringVar(&managedNamespace, "namespace", "openshift-machine-api", "The namespace for managed objects, where the machines and control plane machine set will operate.")
 	options.BindLeaderElectionFlags(&leaderElectionConfig, pflag.CommandLine)
 
@@ -101,7 +103,7 @@ func main() { //nolint:funlen
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
-		Port:                    9443,
+		Port:                    webhookPort,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElectionNamespace: leaderElectionConfig.ResourceNamespace,
 		LeaderElection:          leaderElectionConfig.LeaderElect,
@@ -127,9 +129,11 @@ func main() { //nolint:funlen
 		os.Exit(1)
 	}
 
-	if err := (&cpmswebhook.ControlPlaneMachineSetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ControlPlaneMachineSet")
-		os.Exit(1)
+	if webhookPort != 0 {
+		if err := (&cpmswebhook.ControlPlaneMachineSetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ControlPlaneMachineSet")
+			os.Exit(1)
+		}
 	}
 
 	//+kubebuilder:scaffold:builder
