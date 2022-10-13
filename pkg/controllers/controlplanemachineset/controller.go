@@ -98,10 +98,14 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 	// All predicates are executed before the event handler is called
 	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(filterControlPlaneMachineSet(r.Namespace))).
-		Owns(&machinev1beta1.Machine{}, builder.WithPredicates(filterControlPlaneMachines(r.Namespace))).
+		Watches(
+			&source.Kind{Type: &machinev1beta1.Machine{}},
+			handler.EnqueueRequestsFromMapFunc(objToControlPlaneMachineSet(r.Namespace)),
+			builder.WithPredicates(filterControlPlaneMachines(r.Namespace)),
+		).
 		Watches(
 			&source.Kind{Type: &configv1.ClusterOperator{}},
-			handler.EnqueueRequestsFromMapFunc(clusterOperatorToControlPlaneMachineSet(r.Namespace)),
+			handler.EnqueueRequestsFromMapFunc(objToControlPlaneMachineSet(r.Namespace)),
 			builder.WithPredicates(filterClusterOperator(r.OperatorName)),
 		).
 		// Override the default log constructor as it makes the logs very chatty.
