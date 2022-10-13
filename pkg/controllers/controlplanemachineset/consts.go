@@ -43,6 +43,12 @@ const (
 	// detail with a reason and appropriate message.
 	conditionDegraded = "Degraded"
 
+	// conditionError is used to denote when the ControlPlaneMachineSet is repeatedly
+	// unable to operate in the manner expected of it. For example, if there are issues
+	// creating machines that are persisting over time, the operator should set this
+	// condition to true and add detail with a reason and appropriate message.
+	conditionError = "Error"
+
 	// conditionProgressing is used to denote when the ControlPlaneMachineSet is
 	// going through the process of making updates to the Machines within its
 	// management. Typically this condition is expected to be false.
@@ -110,6 +116,14 @@ const (
 	reasonExcessIndexes = "ExcessIndexes"
 
 	// END: Degraded reasons.
+
+	// BEGIN: Error reasons.
+
+	// reasonContinuousErrors denotes that the ControlPlaneMachineSet has encountered a
+	// specific error repeatedly over time.
+	reasonContinuousErrors = "ContinuousErrors"
+
+	// END: Error reasons.
 
 	// BEGIN: Progressing reasons.
 
