@@ -553,7 +553,7 @@ func isOwnedByCurrentCPMS(cpms *machinev1.ControlPlaneMachineSet, machineObjectM
 
 // checkControlPlaneNodesToMachinesMappings checks that all nodes in the cluster claiming to be control plane nodes are referenced by a control plane machine.
 func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappings(ctx context.Context, logger logr.Logger,
-	cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) (bool, error) {
+	cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs []indexToMachineInfos) (bool, error) {
 	var (
 		unmanagedNodeNames []string
 	)
@@ -566,7 +566,8 @@ func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappi
 	for _, node := range cpmsNodes {
 		found := false
 
-		for _, indexMachines := range sortedIndexedMs {
+		for _, indexToMachines := range sortedIndexedMs {
+			indexMachines := indexToMachines.machineInfos
 			for _, machineInfo := range indexMachines {
 				if machineInfo.NodeRef != nil && machineInfo.NodeRef.ObjectMeta.Name == node.ObjectMeta.Name {
 					found = true
@@ -607,10 +608,11 @@ func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappi
 }
 
 // checkReadyControlPlaneMachineExists checks that at least one ready control plane machine exists in the cluster.
-func (r *ControlPlaneMachineSetReconciler) checkReadyControlPlaneMachineExists(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
+func (r *ControlPlaneMachineSetReconciler) checkReadyControlPlaneMachineExists(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs []indexToMachineInfos) bool {
 	var nonReadyMachineNames []string
 
-	for _, indexMachines := range sortedIndexedMs {
+	for _, indexToMachines := range sortedIndexedMs {
+		indexMachines := indexToMachines.machineInfos
 		if len(indexMachines) > 0 && isEmpty(readyMachines(indexMachines)) {
 			nonReadyMachineNames = append(nonReadyMachineNames, indexMachines[0].MachineRef.ObjectMeta.Name)
 		}
@@ -643,7 +645,7 @@ func (r *ControlPlaneMachineSetReconciler) checkReadyControlPlaneMachineExists(l
 }
 
 // checkCorrectNumberOfIndexes checks that the number of control plane machine set indexes found in the cluster is valid.
-func (r *ControlPlaneMachineSetReconciler) checkCorrectNumberOfIndexes(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
+func (r *ControlPlaneMachineSetReconciler) checkCorrectNumberOfIndexes(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs []indexToMachineInfos) bool {
 	currentIndexesCount := int32(len(sortedIndexedMs))
 
 	switch {
@@ -682,10 +684,11 @@ func (r *ControlPlaneMachineSetReconciler) checkCorrectNumberOfIndexes(logger lo
 }
 
 // checkNoErrorForReplacements checks that there is no errored replacement machine.
-func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs [][]machineproviders.MachineInfo) bool {
+func (r *ControlPlaneMachineSetReconciler) checkNoErrorForReplacements(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs []indexToMachineInfos) bool {
 	var erroredReplacementMachineNames []string
 
-	for _, machines := range sortedIndexedMs {
+	for _, indexToMachines := range sortedIndexedMs {
+		machines := indexToMachines.machineInfos
 		machinesPending := pendingMachines(machines)
 		machinesOutdated := needReplacementMachines(machines)
 
