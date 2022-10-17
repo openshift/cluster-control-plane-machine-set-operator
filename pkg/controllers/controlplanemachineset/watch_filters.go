@@ -46,7 +46,12 @@ const (
 // in the namespace provided.
 func objToControlPlaneMachineSet(namespace string) func(client.Object) []reconcile.Request {
 	return func(obj client.Object) []reconcile.Request {
-		klog.V(4).Infof("reconcile triggered by object (%T) %s/%s", obj, obj.GetNamespace(), obj.GetName())
+		klog.V(4).Info(
+			"reconcile triggered by object",
+			"objectType", fmt.Sprintf("%T", obj),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
+		)
 
 		return []reconcile.Request{{
 			NamespacedName: client.ObjectKey{Namespace: namespace, Name: clusterControlPlaneMachineSetName},
@@ -79,7 +84,11 @@ func filterControlPlaneMachineSet(namespace string) predicate.Predicate {
 		shouldReconcile := cpms.GetNamespace() == namespace && cpms.GetName() == clusterControlPlaneMachineSetName
 
 		if shouldReconcile {
-			klog.V(4).Infof("reconcile triggered by control plane machine set %s/%s", obj.GetNamespace(), obj.GetName())
+			klog.V(4).Info(
+				"reconcile triggered by control plane machine set",
+				"namespace", obj.GetNamespace(),
+				"name", obj.GetName(),
+			)
 		}
 
 		return shouldReconcile
