@@ -165,7 +165,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -192,7 +192,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -220,7 +220,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 							"replacementName", "machine-replacement-1",
@@ -253,7 +253,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -288,7 +288,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Error: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -316,7 +316,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 						},
@@ -343,7 +343,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -353,7 +353,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -383,7 +383,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 								"replacementName", "machine-replacement-0",
@@ -394,7 +394,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -428,7 +428,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -438,7 +438,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -467,7 +467,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -477,7 +477,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -502,7 +502,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
-							"index", 2,
+							"index", int32(2),
 							"namespace", namespaceName,
 							"name", "<Unknown>",
 						},
@@ -527,7 +527,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
-							"index", 2,
+							"index", int32(2),
 							"namespace", namespaceName,
 							"name", "machine-replacement-2",
 						},
@@ -555,7 +555,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -565,7 +565,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "<Unknown>",
 							},
@@ -591,7 +591,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -601,7 +601,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "machine-replacement-2",
 							},
@@ -638,7 +638,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -648,7 +648,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -658,7 +658,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "<Unknown>",
 							},
@@ -692,7 +692,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -702,7 +702,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -712,7 +712,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "<Unknown>",
 							},
@@ -739,7 +739,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -749,7 +749,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -759,7 +759,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "machine-2",
 							},
@@ -769,7 +769,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 3,
+								"index", int32(3),
 								"namespace", namespaceName,
 								"name", "machine-3",
 							},
@@ -824,7 +824,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-replacement-0",
 							},
@@ -834,7 +834,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 0,
+								"index", int32(0),
 								"namespace", namespaceName,
 								"name", "machine-0",
 							},
@@ -844,7 +844,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -854,7 +854,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "machine-2",
 							},
@@ -883,7 +883,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -915,7 +915,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 								"replacementName", "machine-replacement-1",
@@ -945,7 +945,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1028,7 +1028,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 						},
@@ -1053,9 +1053,34 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
+						},
+						Message: createdReplacement,
+					},
+					}
+				},
+			}),
+			Entry("with updates required in a single index, and the machine has been deleted (with no standard machine indexes)", onDeleteUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					3: {updatedMachineBuilder.WithIndex(3).WithMachineName("machine-3").WithNodeName("node-3").Build()},
+					4: {updatedMachineBuilder.WithIndex(4).WithMachineName("machine-4").WithNodeName("node-4").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					5: {updatedMachineBuilder.WithIndex(5).WithMachineName("machine-5").WithNodeName("node-5").Build()},
+				},
+				setupMock: func() {
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(4)).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				},
+				expectedLogsBuilder: func() []test.LogEntry {
+					return []test.LogEntry{{
+						Level: 2,
+						KeysAndValues: []interface{}{
+							"updateStrategy", machinev1.OnDelete,
+							"index", int32(4),
+							"namespace", namespaceName,
+							"name", "machine-4",
 						},
 						Message: createdReplacement,
 					},
@@ -1079,7 +1104,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 						},
@@ -1107,7 +1132,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 							"replacementName", "machine-replacement-1",
@@ -1136,7 +1161,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 						},
@@ -1161,7 +1186,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1171,7 +1196,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1197,7 +1222,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1207,7 +1232,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1232,7 +1257,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1242,7 +1267,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1268,7 +1293,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1278,7 +1303,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1306,7 +1331,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1316,7 +1341,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 								"replacementName", "machine-replacement-1",
@@ -1348,7 +1373,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 							"replacementName", "machine-replacement-0",
@@ -1359,7 +1384,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 								"replacementName", "machine-replacement-1",
@@ -1388,7 +1413,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1398,7 +1423,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1429,7 +1454,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 							"replacementName", "machine-replacement-0",
@@ -1440,7 +1465,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1471,7 +1496,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 0,
+							"index", int32(0),
 							"namespace", namespaceName,
 							"name", "machine-0",
 						},
@@ -1481,7 +1506,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 1,
+								"index", int32(1),
 								"namespace", namespaceName,
 								"name", "machine-1",
 							},
@@ -1506,7 +1531,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 2,
+							"index", int32(2),
 							"namespace", namespaceName,
 							"name", "<Unknown>",
 						},
@@ -1531,7 +1556,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 2,
+							"index", int32(2),
 							"namespace", namespaceName,
 							"name", "machine-replacement-2",
 						},
@@ -1556,7 +1581,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 						},
@@ -1566,7 +1591,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "<Unknown>",
 							},
@@ -1591,7 +1616,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
-							"index", 1,
+							"index", int32(1),
 							"namespace", namespaceName,
 							"name", "machine-1",
 						},
@@ -1601,7 +1626,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "machine-replacement-2",
 							},
@@ -1627,7 +1652,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Level: 2,
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
-								"index", 2,
+								"index", int32(2),
 								"namespace", namespaceName,
 								"name", "machine-2",
 							},
@@ -1726,7 +1751,7 @@ var _ = Describe("utils tests", func() {
 		WithNeedsUpdate(false)
 
 	DescribeTable("should convert an indexed map of MachineInfo into a slice sorted by index",
-		func(input map[int32][]machineproviders.MachineInfo, expected [][]machineproviders.MachineInfo) {
+		func(input map[int32][]machineproviders.MachineInfo, expected []indexToMachineInfos) {
 			output := sortMachineInfosByIndex(input)
 			Expect(output).To(Equal(expected))
 		},
@@ -1736,10 +1761,10 @@ var _ = Describe("utils tests", func() {
 				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 			},
-			[][]machineproviders.MachineInfo{
-				{updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-				{updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
-				{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+			[]indexToMachineInfos{
+				{index: 0, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()}},
+				{index: 1, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()}},
+				{index: 2, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()}},
 			},
 		),
 		Entry("when index starts at 1",
@@ -1748,10 +1773,10 @@ var _ = Describe("utils tests", func() {
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 			},
-			[][]machineproviders.MachineInfo{
-				{updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
-				{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
-				{updatedMachineBuilder.WithIndex(3).WithMachineName("machine-3").WithNodeName("node-3").Build()},
+			[]indexToMachineInfos{
+				{index: 1, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()}},
+				{index: 2, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()}},
+				{index: 3, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(3).WithMachineName("machine-3").WithNodeName("node-3").Build()}},
 			},
 		),
 		Entry("when one index is missing",
@@ -1759,9 +1784,9 @@ var _ = Describe("utils tests", func() {
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 			},
-			[][]machineproviders.MachineInfo{
-				{updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
-				{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+			[]indexToMachineInfos{
+				{index: 0, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()}},
+				{index: 2, machineInfos: []machineproviders.MachineInfo{updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()}},
 			},
 		),
 	)
