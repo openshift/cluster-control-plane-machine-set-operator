@@ -15,7 +15,7 @@ status:
     name: openshift-machine-api
     resource: namespaces
   - group: machine.openshift.io
-    name: cluster
+    name: ""
     resource: controlplanemachinesets
   - group: machine.openshift.io
     name: ""
