@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
+	cpmsgeneratorcontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachinesetgenerator"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	cpmswebhook "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/webhooks/controlplanemachineset"
 
@@ -126,6 +127,15 @@ func main() { //nolint:funlen
 		ReleaseVersion: getReleaseVersion(setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
+		os.Exit(1)
+	}
+
+	if err := (&cpmsgeneratorcontroller.ControlPlaneMachineSetGeneratorReconciler{
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Namespace: managedNamespace,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSetGenerator")
 		os.Exit(1)
 	}
 

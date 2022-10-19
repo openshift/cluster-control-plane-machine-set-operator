@@ -31,7 +31,6 @@ rules:
   - apiGroups:
       - machine.openshift.io
     resources:
-      - controlplanemachinesets
       - controlplanemachinesets/status
       - controlplanemachinesets/finalizers
     verbs:
@@ -40,6 +39,28 @@ rules:
       - watch
       - update
       - patch
+
+  - apiGroups:
+      - machine.openshift.io
+    resources:
+      - controlplanemachinesets
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - create
+      - delete
+
+  - apiGroups:
+      - machine.openshift.io
+    resources:
+      - machinesets
+    verbs:
+      - get
+      - list
+      - watch
 
   - apiGroups:
       - coordination.k8s.io
@@ -68,6 +89,15 @@ rules:
       - create
       - get
       - update
+      - list
+      - watch
+
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - infrastructures
+    verbs:
+      - get
       - list
       - watch
 

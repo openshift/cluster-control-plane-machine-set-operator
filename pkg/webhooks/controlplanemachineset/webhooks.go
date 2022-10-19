@@ -144,8 +144,11 @@ func (r *ControlPlaneMachineSetWebhook) validateSpecOnCreate(ctx context.Context
 
 	errs := []error{}
 
-	// Ensure Control Plane Machine count matches the ControlPlaneMachineSet replicas
-	if cpms.Spec.Replicas != nil && int(*cpms.Spec.Replicas) != len(controlPlaneMachines) {
+	// If the CPMS is Active, ensure the Control Plane Machine count
+	// matches the ControlPlaneMachineSet replicas.
+	if cpms.Spec.State == machinev1.ControlPlaneMachineSetStateActive &&
+		cpms.Spec.Replicas != nil &&
+		int(*cpms.Spec.Replicas) != len(controlPlaneMachines) {
 		errs = append(errs, field.Forbidden(parentPath.Child("replicas"),
 			fmt.Sprintf("control plane machine set replicas (%d) does not match the current number of control plane machines (%d)", *cpms.Spec.Replicas, len(controlPlaneMachines))))
 	}

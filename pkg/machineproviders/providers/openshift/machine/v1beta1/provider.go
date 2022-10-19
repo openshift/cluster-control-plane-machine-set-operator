@@ -228,7 +228,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(logger logr.Logger, machi
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not determine machine index: %w", err)
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfigFromMachine(machine)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machine.Spec)
 	if err != nil {
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not compare existing and desired provider configs: %w", err)
 	}

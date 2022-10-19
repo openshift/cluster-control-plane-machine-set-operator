@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controlplanemachineset
+package util
 
 import (
 	"fmt"
@@ -40,11 +40,14 @@ const (
 
 	// machineMasterTypeLabelName is the label value to identify the type of a control plane machine.
 	machineMasterTypeLabelName = "master"
+
+	// machineControlPlaneTypeLabelName is the label value to identify the type of a control plane machine.
+	machineControlPlaneTypeLabelName = "control-plane"
 )
 
-// objToControlPlaneMachineSet maps any object to the control plane machine set singleton
+// ObjToControlPlaneMachineSet maps any object to the control plane machine set singleton
 // in the namespace provided.
-func objToControlPlaneMachineSet(namespace string) func(client.Object) []reconcile.Request {
+func ObjToControlPlaneMachineSet(controlPlaneMachineSetName, namespace string) func(client.Object) []reconcile.Request {
 	return func(obj client.Object) []reconcile.Request {
 		klog.V(4).Info(
 			"reconcile triggered by object",
@@ -54,14 +57,14 @@ func objToControlPlaneMachineSet(namespace string) func(client.Object) []reconci
 		)
 
 		return []reconcile.Request{{
-			NamespacedName: client.ObjectKey{Namespace: namespace, Name: clusterControlPlaneMachineSetName},
+			NamespacedName: client.ObjectKey{Namespace: namespace, Name: controlPlaneMachineSetName},
 		}}
 	}
 }
 
-// filterClusterOperator filters cluster operator requests
+// FilterClusterOperator filters cluster operator requests
 // to just the one with the name provided.
-func filterClusterOperator(name string) predicate.Predicate {
+func FilterClusterOperator(name string) predicate.Predicate {
 	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		co, ok := obj.(*configv1.ClusterOperator)
 		if !ok {
@@ -72,16 +75,16 @@ func filterClusterOperator(name string) predicate.Predicate {
 	})
 }
 
-// filterControlPlaneMachineSet filters control plane machine set requests
+// FilterControlPlaneMachineSet filters control plane machine set requests
 // to just the singleton within the namespace provided.
-func filterControlPlaneMachineSet(namespace string) predicate.Predicate {
+func FilterControlPlaneMachineSet(controlPlaneMachineSetName, namespace string) predicate.Predicate {
 	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		cpms, ok := obj.(*machinev1.ControlPlaneMachineSet)
 		if !ok {
 			panic("expected to get an of object of type machinev1.ControlPlaneMachineSet")
 		}
 
-		shouldReconcile := cpms.GetNamespace() == namespace && cpms.GetName() == clusterControlPlaneMachineSetName
+		shouldReconcile := cpms.GetNamespace() == namespace && cpms.GetName() == controlPlaneMachineSetName
 
 		if shouldReconcile {
 			klog.V(4).Info(
@@ -95,9 +98,9 @@ func filterControlPlaneMachineSet(namespace string) predicate.Predicate {
 	})
 }
 
-// filterControlPlaneMachines filters machine requests to just the machines that present as control plane machines,
+// FilterControlPlaneMachines filters machine requests to just the machines that present as control plane machines,
 // i.e. they are labelled with the correct labels to identify them as control plane machines.
-func filterControlPlaneMachines(namespace string) predicate.Predicate {
+func FilterControlPlaneMachines(namespace string) predicate.Predicate {
 	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		machine, ok := obj.(*machinev1beta1.Machine)
 		if !ok {
@@ -112,6 +115,8 @@ func filterControlPlaneMachines(namespace string) predicate.Predicate {
 		// Ensuring that this is a master machine by checking required labels
 		labels := machine.GetLabels()
 
-		return labels[machineRoleLabelName] == machineMasterRoleLabelName && labels[machineTypeLabelName] == machineMasterTypeLabelName
+		return labels[machineRoleLabelName] == machineMasterRoleLabelName &&
+			(labels[machineTypeLabelName] == machineMasterTypeLabelName ||
+				labels[machineTypeLabelName] == machineControlPlaneTypeLabelName)
 	})
 }

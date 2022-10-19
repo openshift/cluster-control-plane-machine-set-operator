@@ -5,12 +5,13 @@ go 1.18
 require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.3
+	github.com/go-test/deep v1.0.8
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.49.0
 	github.com/onsi/ginkgo/v2 v2.1.6
 	github.com/onsi/gomega v1.20.1
-	github.com/openshift/api v0.0.0-20220929023536-18c298295790
-	github.com/openshift/client-go v0.0.0-20220915152853-9dfefb19db2e
+	github.com/openshift/api v0.0.0-20221004120407-c46852673d03
+	github.com/openshift/client-go v0.0.0-20221006134153-58ea193f9d20
 	github.com/openshift/library-go v0.0.0-20220922140741-7772048e4447
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5

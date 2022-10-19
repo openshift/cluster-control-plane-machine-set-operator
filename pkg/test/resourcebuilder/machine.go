@@ -38,6 +38,7 @@ type MachineBuilder struct {
 	name                string
 	namespace           string
 	labels              map[string]string
+	creationTimestamp   metav1.Time
 	providerSpecBuilder RawExtensionBuilder
 
 	// status fields
@@ -50,10 +51,11 @@ type MachineBuilder struct {
 func (m MachineBuilder) Build() *machinev1beta1.Machine {
 	machine := &machinev1beta1.Machine{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: m.generateName,
-			Name:         m.name,
-			Namespace:    m.namespace,
-			Labels:       m.labels,
+			GenerateName:      m.generateName,
+			CreationTimestamp: m.creationTimestamp,
+			Name:              m.name,
+			Namespace:         m.namespace,
+			Labels:            m.labels,
 		},
 		Status: machinev1beta1.MachineStatus{
 			ErrorMessage: m.errorMessage,
@@ -83,6 +85,12 @@ func (m MachineBuilder) AsMaster() MachineBuilder {
 	return m.
 		WithLabel(machineRoleLabelName, "master").
 		WithLabel(machineTypeLabelName, "master")
+}
+
+// WithCreationTimestamp sets the creationTimestamp for the machine builder.
+func (m MachineBuilder) WithCreationTimestamp(time metav1.Time) MachineBuilder {
+	m.creationTimestamp = time
+	return m
 }
 
 // WithGenerateName sets the generateName for the machine builder.
