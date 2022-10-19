@@ -32,6 +32,14 @@ const (
 	// updatingStatus is a log message used to inform users that the ControlPlaneMachineSet status is being updated.
 	updatingStatus = "Updating control plane machine set status"
 
+	// maxContinuousErrors is the maximum number of identical consecutive errors that may occur before an error condition is
+	// set on the ControlPlaneMachineSet status.
+	// Choose 15 as the limit because, using the default backoff which is 5ms*2^x, where x is the number of consecutive errors,
+	// the delay between the first error and the 15th error (14 errors) is approximately 2x5ms*2^14 = 163840ms = 2.6 minutes.
+	// However, because we update the status on the first error, that adds another event, so we only actually backoff for 13 errors.
+	// This means that the real delay between the first error and the 15th error is approximately 2x5ms*2^13 = 81920ms = 1.3 minutes.
+	maxContinuousErrors = 15
+
 	// notUpdatingStatus is a log message used to inform users that the ControlPlaneMachineSet status is not being updated.
 	notUpdatingStatus = "No update to control plane machine set status required"
 )
@@ -176,6 +184,26 @@ func getDegradedCondition(cpms *machinev1.ControlPlaneMachineSet) metav1.Conditi
 		Type:               conditionDegraded,
 		Status:             metav1.ConditionFalse,
 		Reason:             reasonAsExpected,
+		ObservedGeneration: cpms.Generation,
+	}
+}
+
+// getErrorCondition returns an error condition based on the given error and the status of the tracked last errors.
+func getErrorCondition(cpms *machinev1.ControlPlaneMachineSet, lastError *lastErrorTracker) metav1.Condition {
+	if lastError == nil || lastError.count < maxContinuousErrors {
+		return metav1.Condition{
+			Type:               conditionError,
+			Status:             metav1.ConditionFalse,
+			Reason:             reasonAsExpected,
+			ObservedGeneration: cpms.Generation,
+		}
+	}
+
+	return metav1.Condition{
+		Type:               conditionError,
+		Status:             metav1.ConditionTrue,
+		Reason:             reasonContinuousErrors,
+		Message:            fmt.Sprintf("The control plane machine set has experienced the following error more than %d consecutive times since %s: %v", maxContinuousErrors, lastError.lastErrorTime, lastError.lastError),
 		ObservedGeneration: cpms.Generation,
 	}
 }

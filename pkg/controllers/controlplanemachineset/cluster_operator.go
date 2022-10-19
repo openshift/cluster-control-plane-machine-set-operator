@@ -59,12 +59,16 @@ func (r *ControlPlaneMachineSetReconciler) updateClusterOperatorStatus(ctx conte
 
 	// Copying status conditions from control plane machine set to cluster operator
 	conds := []configv1.ClusterOperatorStatusCondition{}
+
 	for _, c := range cpms.Status.Conditions {
-		conds = append(conds, newClusterOperatorStatusCondition(
-			configv1.ClusterStatusConditionType(c.Type),
-			configv1.ConditionStatus(c.Status),
-			c.Reason,
-			c.Message))
+		switch c.Type {
+		case conditionAvailable, conditionDegraded, conditionProgressing:
+			conds = append(conds, newClusterOperatorStatusCondition(
+				configv1.ClusterStatusConditionType(c.Type),
+				configv1.ConditionStatus(c.Status),
+				c.Reason,
+				c.Message))
+		}
 	}
 
 	// Define upgradable condition

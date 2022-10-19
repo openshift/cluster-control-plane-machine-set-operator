@@ -410,7 +410,7 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 			"version", machinev1beta1.GroupVersion.Version,
 		)
 
-		return fmt.Errorf("cannot create machine %s in namespace %s: %w", machine.Name, machine.Namespace, err)
+		return fmt.Errorf("cannot create machine: %w", err)
 	}
 
 	logger.V(2).Info(

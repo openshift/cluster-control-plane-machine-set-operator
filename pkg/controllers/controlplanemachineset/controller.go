@@ -91,6 +91,21 @@ type ControlPlaneMachineSetReconciler struct {
 
 	// ReleaseVersion is the version of current cluster operator release.
 	ReleaseVersion string
+
+	// lastError allows us to track the last error that occurred during reconciliation.
+	lastError *lastErrorTracker
+}
+
+// lastErrorTracker tracks the last error that occurred during reconciliation.
+type lastErrorTracker struct {
+	// lastError is the last error that occurred during reconciliation.
+	lastError error
+
+	// lastErrorTime is the time at which the last error occurred.
+	lastErrorTime metav1.Time
+
+	// count is the number of times we've observed the same error in a row.
+	count int
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -159,6 +174,9 @@ func (r *ControlPlaneMachineSetReconciler) Reconcile(ctx context.Context, req ct
 		// Don't return an error here so that we have an opportunity to update the status and cluster operator status.
 		errs = append(errs, fmt.Errorf("error reconciling control plane machine set: %w", err))
 	}
+
+	// Track the reconcile error as our last error.
+	r.setLastError(logger, cpms, err)
 
 	if err := r.updateControlPlaneMachineSetStatus(ctx, logger, cpms, patchBase); err != nil {
 		// Don't return an error here so that we have an opportunity to update the cluster operator status.
@@ -318,6 +336,38 @@ func (r *ControlPlaneMachineSetReconciler) reconcileDelete(ctx context.Context, 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// setLastError handles the reconcile error and tracks similar errors so that we can set a condition
+// when the reconciler is repeatedly failing with the same error.
+func (r *ControlPlaneMachineSetReconciler) setLastError(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, err error) {
+	switch {
+	case err == nil:
+		// When no error occurred, stop tracking the last error.
+		r.lastError = nil
+	case r.lastError != nil && err.Error() == r.lastError.lastError.Error():
+		// When the error is the same as the last error, increment the count.
+		r.lastError.count++
+	default:
+		// Either the last error is nil or the error is different from the last error.
+		// Track the new error and reset the count.
+		r.lastError = &lastErrorTracker{
+			lastError:     err,
+			lastErrorTime: metav1.Now(),
+			count:         1,
+		}
+	}
+
+	if r.lastError != nil && r.lastError.count > 1 {
+		logger.V(4).Info(
+			"Reconciler returned error repeatedly",
+			"count", r.lastError.count,
+			"error", r.lastError.lastError.Error(),
+		)
+	}
+
+	errorCondition := getErrorCondition(cpms, r.lastError)
+	meta.SetStatusCondition(&cpms.Status.Conditions, errorCondition)
 }
 
 // hasOwnerRef returns true if target has an ownerRef to owner.
