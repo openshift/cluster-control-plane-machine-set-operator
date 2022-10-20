@@ -3,7 +3,6 @@ module github.com/openshift/cluster-control-plane-machine-set-operator
 go 1.18
 
 require (
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-test/deep v1.0.8
 	github.com/golang/mock v1.6.0
@@ -13,7 +12,6 @@ require (
 	github.com/openshift/api v0.0.0-20221004120407-c46852673d03
 	github.com/openshift/client-go v0.0.0-20221006134153-58ea193f9d20
 	github.com/openshift/library-go v0.0.0-20220922140741-7772048e4447
-	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.25.1
 	k8s.io/apimachinery v0.25.1
@@ -184,6 +182,7 @@ require (
 	github.com/sourcegraph/go-diff v0.6.1 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
+	github.com/spf13/cobra v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
