@@ -26,11 +26,120 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
 var _ = Describe("MachineProviders", func() {
+	usEast1aSubnet := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1a",
+				},
+			},
+		},
+	}
+
+	usEast1bSubnet := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1b",
+				},
+			},
+		},
+	}
+
+	usEast1cSubnet := machinev1beta1.AWSResourceReference{
+		Filters: []machinev1beta1.Filter{
+			{
+				Name: "tag:Name",
+				Values: []string{
+					"subnet-us-east-1c",
+				},
+			},
+		},
+	}
+
+	usEast1aProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+		WithAvailabilityZone("us-east-1a").
+		WithSecurityGroups([]machinev1beta1.AWSResourceReference{
+			{
+				Filters: []machinev1beta1.Filter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1a"},
+					},
+				},
+			},
+		}).WithSubnet(usEast1aSubnet)
+
+	usEast1bProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+		WithAvailabilityZone("us-east-1b").
+		WithSecurityGroups([]machinev1beta1.AWSResourceReference{
+			{
+				Filters: []machinev1beta1.Filter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1b"},
+					},
+				},
+			},
+		}).WithSubnet(usEast1bSubnet)
+
+	usEast1cProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+		WithAvailabilityZone("us-east-1c").
+		WithSecurityGroups([]machinev1beta1.AWSResourceReference{
+			{
+				Filters: []machinev1beta1.Filter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1c"},
+					},
+				},
+			},
+		}).WithSubnet(usEast1cSubnet)
+
+	usEast1aFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+		WithAvailabilityZone("us-east-1a").
+		WithSubnet(machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"subnet-us-east-1a"},
+				},
+			},
+		})
+
+	usEast1bFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+		WithAvailabilityZone("us-east-1b").
+		WithSubnet(machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"subnet-us-east-1b"},
+				},
+			},
+		})
+
+	usEast1cFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+		WithAvailabilityZone("us-east-1c").
+		WithSubnet(machinev1.AWSResourceReference{
+			Type: machinev1.AWSFiltersReferenceType,
+			Filters: &[]machinev1.AWSResourceFilter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"subnet-us-east-1c"},
+				},
+			},
+		})
+
 	Context("NewMachineProvider", func() {
 		var cpmsBuilder resourcebuilder.ControlPlaneMachineSetBuilder
 		var logger test.TestLogger
@@ -81,9 +190,17 @@ var _ = Describe("MachineProviders", func() {
 
 		Context("With an OpenShift Machine v1beta1 machine type", func() {
 			BeforeEach(func() {
+				awsProviderSpec := resourcebuilder.AWSProviderSpec()
+
 				cpmsBuilder = cpmsBuilder.WithMachineTemplateBuilder(
 					resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(
-						resourcebuilder.AWSProviderSpec(),
+						awsProviderSpec,
+					).WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+							usEast1aFailureDomainBuilder,
+							usEast1bFailureDomainBuilder,
+							usEast1cFailureDomainBuilder,
+						),
 					),
 				)
 
@@ -91,8 +208,8 @@ var _ = Describe("MachineProviders", func() {
 				// More detailed error cases will happen in the machine provider tests themselves.
 				By("Creating some master machines")
 				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-				for i := 0; i < 3; i++ {
-					machine := machineBuilder.WithName(fmt.Sprintf("master-%d", i)).Build()
+				for i, ps := range []resourcebuilder.AWSProviderSpecBuilder{usEast1aProviderSpecBuilder, usEast1bProviderSpecBuilder, usEast1cProviderSpecBuilder} {
+					machine := machineBuilder.WithName(fmt.Sprintf("master-%d", i)).WithProviderSpecBuilder(ps).Build()
 					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 				}
 			})
@@ -102,21 +219,32 @@ var _ = Describe("MachineProviders", func() {
 				var err error
 
 				BeforeEach(func() {
+
 					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpmsBuilder.Build())
 				})
 
-				PIt("does not error", func() {
+				It("does not error", func() {
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				PIt("returns an OpenShift Machine v1beta1 implementation of the machine provider", func() {
+				It("returns an OpenShift Machine v1beta1 implementation of the machine provider", func() {
 					typ := reflect.TypeOf(provider)
 					Expect(typ.String()).To(Equal("*v1beta1.openshiftMachineProvider"))
 				})
 
-				PIt("logs based on the machine info mappings", func() {
+				It("logs based on the machine info mappings", func() {
 					Expect(logger.Entries()).To(ConsistOf(
-						test.LogEntry{Message: "TODO"},
+						test.LogEntry{
+							Level: 4,
+							KeysAndValues: []interface{}{
+								"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+									0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+									1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+									2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+								}),
+							},
+							Message: "Mapped provided failure domains",
+						},
 					))
 				})
 			})
