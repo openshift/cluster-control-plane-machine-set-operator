@@ -327,7 +327,7 @@ func getPlatformTypeFromProviderSpec(providerSpec machinev1beta1.ProviderSpec) (
 
 // ExtractFailureDomainsFromMachines creates list of FailureDomains extracted from the provided list of machines.
 func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]failuredomain.FailureDomain, error) {
-	machineFailureDomains := []failuredomain.FailureDomain{}
+	machineFailureDomains := failuredomain.NewSet()
 
 	for _, machine := range machines {
 		providerconfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
@@ -335,10 +335,10 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 		}
 
-		machineFailureDomains = append(machineFailureDomains, providerconfig.ExtractFailureDomain())
+		machineFailureDomains.Insert(providerconfig.ExtractFailureDomain())
 	}
 
-	return machineFailureDomains, nil
+	return machineFailureDomains.List(), nil
 }
 
 // ExtractFailureDomainFromMachine FailureDomain extracted from the provided machine.
@@ -353,7 +353,7 @@ func ExtractFailureDomainFromMachine(machine machinev1beta1.Machine) (failuredom
 
 // ExtractFailureDomainsFromMachineSets creates list of FailureDomains extracted from the provided list of machineSets.
 func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSet) ([]failuredomain.FailureDomain, error) {
-	machineSetFailureDomains := []failuredomain.FailureDomain{}
+	machineSetFailureDomains := failuredomain.NewSet()
 
 	for _, machineSet := range machineSets {
 		providerconfig, err := NewProviderConfigFromMachineSpec(machineSet.Spec.Template.Spec)
@@ -361,8 +361,8 @@ func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSe
 			return nil, fmt.Errorf("error getting failure domain from machineSet %s: %w", machineSet.Name, err)
 		}
 
-		machineSetFailureDomains = append(machineSetFailureDomains, providerconfig.ExtractFailureDomain())
+		machineSetFailureDomains.Insert(providerconfig.ExtractFailureDomain())
 	}
 
-	return machineSetFailureDomains, nil
+	return machineSetFailureDomains.List(), nil
 }

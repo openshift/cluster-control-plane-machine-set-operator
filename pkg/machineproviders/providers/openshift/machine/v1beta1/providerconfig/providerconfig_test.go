@@ -335,6 +335,22 @@ var _ = Describe("Provider Config", func() {
 					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
 				},
 			}),
+			Entry("with machines that duplicate failure domains", extractFailureDomainsFromMachinesTableInput{
+				machines: []machinev1beta1.Machine{
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
+					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
+				},
+				expectedError: nil,
+				expectedFailureDomains: []failuredomain.FailureDomain{
+					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
+				},
+			}),
 		)
 
 	})
