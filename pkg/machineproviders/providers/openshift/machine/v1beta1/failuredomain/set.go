@@ -49,12 +49,12 @@ func (s *Set) Has(item FailureDomain) bool {
 }
 
 // Insert adds the item to the set.
-func (s *Set) Insert(item FailureDomain) {
-	if s.Has(item) {
-		return
+func (s *Set) Insert(items ...FailureDomain) {
+	for _, item := range items {
+		if !s.Has(item) {
+			s.items = append(s.items, item)
+		}
 	}
-
-	s.items = append(s.items, item)
 }
 
 // List returns the items in the set as a sorted slice.
