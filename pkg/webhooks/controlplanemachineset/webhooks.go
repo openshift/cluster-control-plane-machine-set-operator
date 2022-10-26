@@ -350,7 +350,7 @@ func checkOpenShiftProviderSpecFailureDomainMatchesMachines(parentPath *field.Pa
 func checkOpenShiftFailureDomainsMatchMachines(parentPath *field.Path, failureDomains machinev1.FailureDomains, machines []machinev1beta1.Machine) []error {
 	errs := []error{}
 
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
+	machineFailureDomains, err := getMachineFailureDomains(machines)
 	if err != nil {
 		return append(errs, field.InternalError(parentPath.Child("platform"), fmt.Errorf("could not get failure domains from cluster machines on platform %s: %w", failureDomains.Platform, err)))
 	}
@@ -373,6 +373,24 @@ func checkOpenShiftFailureDomainsMatchMachines(parentPath *field.Path, failureDo
 	}
 
 	return errs
+}
+
+// getMachineFailureDomains returns a list of failure domains used by the control plane machines.
+// We use this instead of providerconfig.ExtractFailureDomainsFromMachines because we want to
+// keep all machines and the providerconfig util deduplicates the failure domains.
+func getMachineFailureDomains(machines []machinev1beta1.Machine) ([]failuredomain.FailureDomain, error) {
+	machineFailureDomains := []failuredomain.FailureDomain{}
+
+	for _, machine := range machines {
+		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(machine)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract failure domain from machine: %w", err)
+		}
+
+		machineFailureDomains = append(machineFailureDomains, failureDomain)
+	}
+
+	return machineFailureDomains, nil
 }
 
 // missingFailureDomains returns failure domains from list1 that are not in list2.

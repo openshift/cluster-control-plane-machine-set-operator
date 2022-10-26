@@ -173,6 +173,14 @@ var (
 					WithAvailabilityZone("us-east-1e").
 					WithSubnet(usEast1eSubnet)
 
+	cpms5FailureDomainsBuilder = resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+		usEast1aFailureDomainBuilder,
+		usEast1bFailureDomainBuilder,
+		usEast1cFailureDomainBuilder,
+		usEast1dFailureDomainBuilder,
+		usEast1eFailureDomainBuilder,
+	)
+
 	cpmsInactiveOutdatedBuilder = resourcebuilder.ControlPlaneMachineSet().
 					WithState(machinev1.ControlPlaneMachineSetStateInactive).
 					WithMachineTemplateBuilder(
@@ -224,13 +232,7 @@ var (
 				WithProviderSpecBuilder(
 					usEast1aProviderSpecBuilder.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.2xlarge"),
 				).
-				WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilder,
-					usEast1bFailureDomainBuilder,
-					usEast1cFailureDomainBuilder,
-					usEast1dFailureDomainBuilder,
-					usEast1eFailureDomainBuilder,
-				)),
+				WithFailureDomainsBuilder(cpms5FailureDomainsBuilder),
 		)
 )
 
@@ -265,17 +267,24 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 		<-mgrDone
 	}
 
-	create5MachineSets := func() {
+	create3MachineSets := func() {
 		machineSetBuilder := resourcebuilder.MachineSet().WithNamespace(namespaceName)
-		machineSet0 = machineSetBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).WithName("machineset-useast1a").Build()
-		machineSet1 = machineSetBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).WithName("machineset-useast1b").Build()
-		machineSet2 = machineSetBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).WithName("machineset-useast1c").Build()
-		machineSet3 = machineSetBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilder).WithName("machineset-useast1d").Build()
-		machineSet4 = machineSetBuilder.WithProviderSpecBuilder(usEast1eProviderSpecBuilder).WithName("machineset-useast1e").Build()
+		machineSet0 = machineSetBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).WithGenerateName("machineset-us-east-1a-").Build()
+		machineSet1 = machineSetBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).WithGenerateName("machineset-us-east-1b-").Build()
+		machineSet2 = machineSetBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).WithGenerateName("machineset-us-east-1c-").Build()
 
 		Expect(k8sClient.Create(ctx, machineSet0)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet1)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet2)).To(Succeed())
+	}
+
+	create5MachineSets := func() {
+		create3MachineSets()
+
+		machineSetBuilder := resourcebuilder.MachineSet().WithNamespace(namespaceName)
+		machineSet3 = machineSetBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilder).WithGenerateName("machineset-us-east-1d-").Build()
+		machineSet4 = machineSetBuilder.WithProviderSpecBuilder(usEast1eProviderSpecBuilder).WithGenerateName("machineset-us-east-1e-").Build()
+
 		Expect(k8sClient.Create(ctx, machineSet3)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet4)).To(Succeed())
 	}
@@ -342,6 +351,16 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 		)
 	})
 
+	JustBeforeEach(func() {
+		By("Starting the manager")
+		mgrCancel, mgrDone = startManager(&mgr)
+	})
+
+	JustAfterEach(func() {
+		By("Stopping the manager")
+		stopManager()
+	})
+
 	Context("when a Control Plane Machine Set doesn't exist", func() {
 		BeforeEach(func() {
 			cpms = &machinev1.ControlPlaneMachineSet{
@@ -359,15 +378,6 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 
 				By("Creating Control Plane Machines")
 				create3CPMachines()
-
-				By("Starting the manager")
-				mgrCancel, mgrDone = startManager(&mgr)
-
-			})
-
-			AfterEach(func() {
-				By("Stopping the manager")
-				stopManager()
 			})
 
 			It("should create the ControlPlaneMachineSet with the expected fields", func() {
@@ -397,6 +407,19 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				Expect(cpmsProviderSpec.AWS().Config()).To(Equal(awsMachineProviderConfig))
 			})
 
+			Context("With additional MachineSets duplicating failure domains", func() {
+				BeforeEach(func() {
+					By("Creating additional MachineSets")
+					create3MachineSets()
+				})
+
+				It("should create the ControlPlaneMachineSet with only one copy of each failure domain", func() {
+					By("Checking the Control Plane Machine Set has been created")
+					Eventually(komega.Get(cpms)).Should(Succeed())
+
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilder.BuildFailureDomains()))
+				})
+			})
 		})
 
 		Context("with only 1 existing control plane machine", func() {
@@ -482,14 +505,6 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				// doesn't match the one of the youngest control plane machine (i.e. it's outdated).
 				cpms = cpmsInactiveOutdatedBuilder.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
-
-				By("Starting the manager")
-				mgrCancel, mgrDone = startManager(&mgr)
-			})
-
-			AfterEach(func() {
-				By("Stopping the manager")
-				stopManager()
 			})
 
 			It("should recreate ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
@@ -523,6 +538,16 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 					"The control plane machine set UID should differ with the old one, as it should've been deleted and recreated")
 			})
 
+			Context("With additional MachineSets duplicating failure domains", func() {
+				BeforeEach(func() {
+					By("Creating additional MachineSets")
+					create3MachineSets()
+				})
+
+				It("should update, but not duplicate the failure domains on the ControlPlaneMachineSet", func() {
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilder.BuildFailureDomains())))
+				})
+			})
 		})
 
 		Context("with state Inactive and up to date", func() {
@@ -532,14 +557,6 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				// match the youngest control plane machine (i.e. it's up to date).
 				cpms = cpmsInactiveUpToDateBuilder.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
-
-				By("Starting the manager")
-				mgrCancel, mgrDone = startManager(&mgr)
-			})
-
-			AfterEach(func() {
-				By("Stopping the manager")
-				stopManager()
 			})
 
 			It("should keep the ControlPlaneMachineSet up to date and not change it", func() {
@@ -556,14 +573,6 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				// doesn't match the one of the youngest control plane machine (i.e. it's outdated).
 				cpms = cpmsActiveOutdatedBuilder.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
-
-				By("Starting the manager")
-				mgrCancel, mgrDone = startManager(&mgr)
-			})
-
-			AfterEach(func() {
-				By("Stopping the manager")
-				stopManager()
 			})
 
 			It("should keep the CPMS unchanged", func() {
@@ -579,14 +588,6 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				// doesn't match the one of the youngest control plane machine (i.e. it's up to date).
 				cpms = cpmsActiveUpToDateBuilder.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
-
-				By("Starting the manager")
-				mgrCancel, mgrDone = startManager(&mgr)
-			})
-
-			AfterEach(func() {
-				By("Stopping the manager")
-				stopManager()
 			})
 
 			It("should keep the ControlPlaneMachineSet unchanged", func() {
