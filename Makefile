@@ -93,6 +93,14 @@ test: generate fmt vet unit ## Run tests.
 unit: ## Run only the tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin)" ./hack/test.sh
 
+.PHONY: e2e-presubmit
+e2e-presubmit:
+	GINKGO_EXTRA_ARGS=--label-filter=PreSubmit ./hack/e2e.sh
+
+.PHONY: e2e-periodic
+e2e-periodic:
+	GINKGO_EXTRA_ARGS=--label-filter=Periodic ./hack/e2e.sh
+
 .PHONY: verify-%
 verify-%: ## Ensure no diff after running some other target
 	make $*
