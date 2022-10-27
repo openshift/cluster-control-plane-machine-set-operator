@@ -24,16 +24,22 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
-// CheckForActiveControlPlaneMachineSet checks that there is an active control plane machine set
-// installed within the cluster.
-func CheckForActiveControlPlaneMachineSet(testFramework framework.Framework) {
-	It("should have an active control plane machine set", func() {
-		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
-		k8sClient := testFramework.GetClient()
-
-		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
-
-		Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateActive), "control plane machine set should be active")
+// ItShouldHaveAnActiveControlPlaneMachineSet returns an It that checks
+// there is an active control plane machine set installed within the cluster.
+func ItShouldHaveAnActiveControlPlaneMachineSet(testFramework framework.Framework) {
+	It("should have an active control plane machine set", Offset(1), func() {
+		ExpectControlPlaneMachineSetToBeActive(testFramework)
 	})
+}
+
+// ExpectControlPlaneMachineSetToBeActive gets the control plane machine set and
+// checks that it is active.
+func ExpectControlPlaneMachineSetToBeActive(testFramework framework.Framework) {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	k8sClient := testFramework.GetClient()
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+	Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateActive), "control plane machine set should be active")
 }

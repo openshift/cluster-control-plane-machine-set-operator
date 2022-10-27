@@ -34,7 +34,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), framew
 		})
 
 		Context("upon install", func() {
-			common.CheckForActiveControlPlaneMachineSet(testFramework)
+			common.ItShouldHaveAnActiveControlPlaneMachineSet(testFramework)
 		})
 	})
 })
