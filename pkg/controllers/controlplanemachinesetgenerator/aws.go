@@ -27,6 +27,7 @@ import (
 	machinev1beta1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 )
 
@@ -39,7 +40,7 @@ const (
 
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
 func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAWSFailureDomains(machineSets)
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAWSFailureDomains(machineSets, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS failure domains: %w", err)
 	}
@@ -56,15 +57,25 @@ func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, ma
 	return controlPlaneMachineSetApplyConfigSpec, nil
 }
 
-// buildAWSFailureDomains builds an AWSFailureDomain config for the ControlPlaneMachineSet from cluster's MachineSets.
-func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
-	failureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
+// buildAWSFailureDomains builds an AWSFailureDomain config for the ControlPlaneMachineSet from cluster's Machines and MachineSets.
+func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
+	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build aws failure domains config: %w", err)
+		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
 	}
 
+	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
+	}
+
+	// Use a failure domain set to deduplicate the failure domains.
+	// Ensure we cover the superset of both machine and machine set failure domains.
+	failureDomains := failuredomain.NewSet(machineFailureDomains...)
+	failureDomains.Insert(machineSetFailureDomains...)
+
 	awsFailureDomains := []machinev1.AWSFailureDomain{}
-	for _, fd := range failureDomains {
+	for _, fd := range failureDomains.List() {
 		awsFailureDomains = append(awsFailureDomains, fd.AWS())
 	}
 

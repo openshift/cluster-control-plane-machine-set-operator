@@ -87,11 +87,33 @@ var _ = Describe("Set suite", func() {
 				}))
 			})
 
-			Context("when adding additional failure domains", func() {
+			Context("when adding additional failure domains (separately)", func() {
 				Context("that are not already in the set", func() {
 					BeforeEach(func() {
 						set.Insert(usEast1bFailureDomain)
 						set.Insert(usEast1dFailureDomain)
+					})
+
+					It("should have the initial failure domains and the new failure domains", func() {
+						Expect(set.Has(usEast1aFailureDomain)).To(BeTrue(), "Set should contain the us-east-1a failure domain")
+						Expect(set.Has(usEast1bFailureDomain)).To(BeTrue(), "Set should contain the us-east-1b failure domain")
+						Expect(set.Has(usEast1cFailureDomain)).To(BeTrue(), "Set should contain the us-east-1c failure domain")
+						Expect(set.Has(usEast1dFailureDomain)).To(BeTrue(), "Set should contain the us-east-1d failure domain")
+					})
+
+					It("should return a sorted list of the failure domains without duplicates", func() {
+						Expect(set.List()).To(Equal([]FailureDomain{
+							usEast1aFailureDomain,
+							usEast1bFailureDomain,
+							usEast1cFailureDomain,
+							usEast1dFailureDomain,
+						}))
+					})
+				})
+
+				Context("that are not already in the set (together)", func() {
+					BeforeEach(func() {
+						set.Insert(usEast1bFailureDomain, usEast1dFailureDomain)
 					})
 
 					It("should have the initial failure domains and the new failure domains", func() {
