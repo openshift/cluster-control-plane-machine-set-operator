@@ -3,59 +3,36 @@
 The Control Plane Machine Set Operator (CPMSO) enables users to automate management of the Control Plane Machine
 resources within an OpenShift 4 cluster.
 
+## Installation
+
+Installation instructions for control plane machine set can be found in the [installation docs](./installation.md).
+
 ## Overview
 
 The CPMSO is an operator driven by `ControlPlaneMachineSet` resources. Each cluster will have a single control plane machine set in the `openshift-machine-api` namespace. The control plane machine set will be called `cluster`.
 
-For clusters created before OpenShift version 4.12, this resource may not exist, though it can be created post-
-installation. For clusters created from OpenShift version 4.12 onwards, this resource may exist, dependent on the
-platform.
+The control plane machine set can be in one of the following two states, `Active` or `Inactive` .
+The `state` is defined on the control plane machine set's spec.
 
-The `ControlPlaneMachineSet` resource should look something like below:
+This state determines the behavior of the control plane machine set.
 
-```yaml
-apiVersion: machine.openshift.io/v1
-kind: ControlPlaneMachineSet
-metadata:
-  name: cluster
-  namespace: openshift-machine-api
-spec:
-  replicas: 3 [1]
-  strategy:
-    type: RollingUpdate [2]
-  selector:
-    matchLabels:
-      machine.openshift.io/cluster-api-machine-role: master
-      machine.openshift.io/cluster-api-machine-type: master
-  template:
-    machineType: machines_v1beta1_machine_openshift_io
-    machines_v1beta1_machine_openshift_io:
-      failureDomains:
-        platform: <platform> [3]
-        <platform failure domains> [4]
-      metadata:
-        labels:
-          machine.openshift.io/cluster-api-machine-role: master
-          machine.openshift.io/cluster-api-machine-type: master
-          machine.openshift.io/cluster-api-cluster: <cluster-id> [5]
-      spec:
-        providerSpec:
-          value:
-            <platform provider spec> [6]
+- when `Inactive`, the control plane machine set will not take any action on the state of the control plane machines within the cluster.
+The operator will monitor the state of the cluster and keep the `ControlPlaneMachineSet` resource up to date.
+
+- when `Active`, the control plane machine set will reconcile the control plane machines and will update them as necessary.
+
+Once `Active`, a control plane machine set cannot be made `Inactive` again.
+To prevent further action on the control plane machines, users may remove the `ControlPlaneMachineSet` resource from the cluster,
+using the following command:
+```
+oc delete controlplanemachineset.machine.openshift.io --namespace openshift-machine-api cluster
 ```
 
-1. Replicas is 3 in most cases. Support exceptions may allow this to be 5 replicas in certain circumstances.
-Horizontal scaling is not currently supported and so this field is currently immutable.
-This may change in a future release.
-2. The strategy defaults to `RollingUpdate`. `OnDelete` is also supported.
-3. The ControlPlaneMachineSet spreads Machines across multiple failure domains where possible.
-This field must be set to the platform name.
-4. The failure domains vary on their configuration per platform, see below for how to configure a failure domain on
-each platform.
-5. The cluster ID is required here. You should be able to find this label on existing Machines in the cluster.
-Alternatively, it can be found on the infrastructure resource: `oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster`
-6. The provider spec must match that of the Control Plane Machines created by the installer, except, you can omit any
-field set in the failure domains.
+Once the control plane machine set operator has performed the necessary clean up operations to disable the control plane machine set, the `ControlPlaneMachineSet` resource will be removed from the cluster.
+A new `Inactive` control plane machine set will be created in its place which may be activated later should the user desire.
+
+An overview of a `ControlPlaneMachineSet` resource manifest can be found in
+[anatomy of a ControlPlaneMachineSet resource](installation.md#anatomy-of-a-controlplanemachineset).
 
 ## Features
 
@@ -108,14 +85,26 @@ Please ensure that you have 3 (or 5) control plane machines before creating the 
 
 ### Supported platforms
 
-The control plane machine set is currently only supported on Amazon Web Services (AWS) and Microsoft Azure.
-Other platforms may be supported at a later date.
+The control plane machine set is currently supported for a number of platforms and OpenShift versions.
+The matrix shows in detail the support for each specific combination.
 
-Google Cloud Platform and OpenStack are planned for inclusion from OpenShift version 4.13 onwards.
+| Platform \ OpenShift version |      <=4.11    |      4.12           |
+|------------------------------|:---------------|:--------------------|
+| AWS                          |  Not Supported | Full                |
+| Azure                        |  Not Supported | Manual              |
+| VSphere                      |  Not Supported | Manual (Single Zone)|
+| Other Platforms              |  Not Supported | Not Supported       |
 
-## Installation
+> Note: Google Cloud Platform and OpenStack are planned for inclusion from OpenShift version 4.13 onwards.
 
-Installation instructions for control plane machine set can be found in the [installation docs](./installation.md).
+#### Keys
+
+`Full`: The control plane machine set is fully supported for this combination.\
+`Manual`: The control plane machine set is supported for this combination and has to be manually configured and installed.\
+`Manual (Single Zone)`: The same as `Manual`, however for this combination only a single failure domain configuration is supported. The failure domain configuration must be embedded within the providerSpec and may not vary between control plane machine indexes.\
+`Not Supported`: The control plane machine set is not yet supported for this combination.
+
+For more details on how to install the  control plane machine set for specific combinations, check [installation docs](./installation.md).
 
 ## Glossary
 
