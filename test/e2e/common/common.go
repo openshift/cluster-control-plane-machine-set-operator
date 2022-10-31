@@ -17,6 +17,8 @@ limitations under the License.
 package common
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -25,6 +27,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -69,4 +72,51 @@ func EventuallyClusterOperatorsShouldStabilise(args ...interface{}) {
 			ContainElement(And(HaveField("Type", Equal(configv1.OperatorDegraded)), HaveField("Status", Equal(configv1.ConditionFalse)))),
 		),
 	))), "cluster operators should all be available, not progressing and not degraded")
+}
+
+// EnsureActiveControlPlaneMachineSet ensures that there is an active control plane machine set
+// within the cluster. For fully supported clusters, this means waiting for the control plane machine set
+// to be created and checking that it is active. For manually supported clusters, this means creating the
+// control plane machine set, checking its status and then activating it.
+func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, args ...interface{}) {
+	switch testFramework.GetPlatformSupportLevel() {
+	case framework.Full:
+		ensureActiveControlPlaneMachineSet(args...)
+	case framework.Manual:
+		Fail("manual support for the control plane machine set not yet implemented")
+	case framework.Unsupported:
+		Fail(fmt.Sprintf("control plane machine set does not support platform %s", testFramework.GetPlatformType()))
+	}
+}
+
+// ensureActiveControlPlaneMachineSet checks that a CPMS exists and then, if it is not active, activates it.
+func ensureActiveControlPlaneMachineSet(args ...interface{}) {
+	cpms := &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      framework.ControlPlaneMachineSetKey().Name,
+			Namespace: framework.ControlPlaneMachineSetKey().Namespace,
+		},
+	}
+
+	By("Checking the control plane machine set exists")
+
+	checkExistsArgs := append([]interface{}{komega.Get(cpms)}, args...)
+	Eventually(checkExistsArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	if cpms.Spec.State != machinev1.ControlPlaneMachineSetStateActive {
+		By("Activating the control plane machine set")
+
+		updateStateArgs := append([]interface{}{
+			komega.Update(cpms, func() {
+				cpms.Spec.State = machinev1.ControlPlaneMachineSetStateActive
+			}),
+		}, args...)
+
+		Eventually(updateStateArgs...).Should(Succeed(), "control plane machine set should be able to be actived")
+	}
+
+	By("Checking the control plane machine set is active")
+
+	checkStateArgs := append([]interface{}{komega.Object(cpms)}, args...)
+	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateActive)), "control plane machine set should be active")
 }
