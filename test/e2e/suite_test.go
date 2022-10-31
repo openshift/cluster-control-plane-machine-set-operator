@@ -49,4 +49,9 @@ var _ = BeforeSuite(func() {
 
 	komega.SetClient(testFramework.GetClient())
 	komega.SetContext(testFramework.GetContext())
+
+	SetDefaultEventuallyTimeout(framework.DefaultTimeout)
+	SetDefaultEventuallyPollingInterval(framework.DefaultInterval)
+	SetDefaultConsistentlyDuration(framework.DefaultTimeout)
+	SetDefaultConsistentlyPollingInterval(framework.DefaultInterval)
 })
