@@ -29,4 +29,11 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 	BeforeEach(func() {
 		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
 	})
+
+	Context("With an active ControlPlaneMachineSet", func() {
+		BeforeEach(func() {
+			common.EnsureActiveControlPlaneMachineSet(testFramework)
+		})
+
+	})
 })
