@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 
@@ -26,6 +27,10 @@ import (
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), framework.PreSubmit(), func() {
+	BeforeEach(func() {
+		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
+	})
+
 	Context("on a fully supported cluster", func() {
 		BeforeEach(func() {
 			if testFramework.GetPlatformSupportLevel() != framework.Full {

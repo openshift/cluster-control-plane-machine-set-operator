@@ -17,9 +17,19 @@ limitations under the License.
 package framework
 
 import (
+	"time"
+
 	"github.com/onsi/ginkgo/v2"
 
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	// DefaultTimeout is the default timeout for eventually and consistently assertions.
+	DefaultTimeout = 60 * time.Second
+
+	// DefaultInterval is the default interval for eventually and consistently assertions.
+	DefaultInterval = 5 * time.Second
 )
 
 // ControlPlaneMachineSetKey is the object key for fetching a control plane
