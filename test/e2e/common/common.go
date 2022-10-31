@@ -19,6 +19,7 @@ package common
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -50,6 +51,9 @@ func ExpectControlPlaneMachineSetToBeActive(testFramework framework.Framework) {
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
 func EventuallyClusterOperatorsShouldStabilise(args ...interface{}) {
+	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
+	defer format.UnregisterCustomFormatter(key)
+
 	// The following assertion checks:
 	// The list "Items", all (ConsistOf) have a field "Status.Conditions",
 	// that contain elements that are both "Type" something and "Status" something.
