@@ -23,6 +23,7 @@ import (
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/periodic"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func() {
@@ -33,6 +34,14 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			common.EnsureActiveControlPlaneMachineSet(testFramework)
+		})
+
+		Context("and the instance type is changed", func() {
+			BeforeEach(func() {
+				periodic.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
+			})
+
+			periodic.ItShouldPerformARollingUpdate(testFramework)
 		})
 
 	})
