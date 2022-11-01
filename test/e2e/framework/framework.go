@@ -18,18 +18,38 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+)
+
+var (
+	// errUnsupportedPlatform is returned when the platform is not supported.
+	errUnsupportedPlatform = errors.New("unsupported platform")
+
+	// errUnsupportedInstanceSize is returned when the instance size did not match the expected format.
+	// Each platform will have it's own format for the instance size, and if we do not recognise the instance
+	// size we cannot increase it.
+	errInstanceTypeUnsupportedFormat = errors.New("instance type did not match expected format")
+
+	// errUnsupportedInstanceSize is returned when the instance size is not supported.
+	// This means that even though the format is correct, we haven't implemented the logic to increase
+	// this instance size.
+	errInstanceTypeNotSupported = errors.New("instance type is not supported")
 )
 
 // Framework is an interface for getting clients and information
@@ -49,6 +69,11 @@ type Framework interface {
 
 	// GetScheme returns the scheme.
 	GetScheme() *runtime.Scheme
+
+	// IncreaseProviderSpecInstanceSize increases the instance size of the
+	// providerSpec passed. This is used to trigger updates to the Machines
+	// managed by the control plane machine set.
+	IncreaseProviderSpecInstanceSize(providerSpec *runtime.RawExtension) error
 }
 
 // PlatformSupportLevel is used to identify which tests should run
@@ -127,6 +152,26 @@ func (f *framework) GetScheme() *runtime.Scheme {
 	return f.scheme
 }
 
+// IncreaseProviderSpecInstanceSize increases the instance size of the instance on the providerSpec
+// that is passed.
+func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.RawExtension) error {
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machinev1beta1.MachineSpec{
+		ProviderSpec: machinev1beta1.ProviderSpec{
+			Value: rawProviderSpec,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get provider config: %w", err)
+	}
+
+	switch f.platform {
+	case configv1.AWSPlatformType:
+		return increaseAWSInstanceSize(rawProviderSpec, providerConfig)
+	default:
+		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
+	}
+}
+
 // loadClient returns a new controller-runtime client.
 func loadClient(sch *runtime.Scheme) (runtimeclient.Client, error) {
 	cfg, err := config.GetConfig()
@@ -190,4 +235,76 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	default:
 		return Unsupported, platformType, nil
 	}
+}
+
+// increaseAWSInstanceSize increases the instance size of the instance on the providerSpec for an AWS providerSpec.
+func increaseAWSInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.AWS().Config()
+
+	var err error
+
+	cfg.InstanceType, err = nextAWSInstanceSize(cfg.InstanceType)
+	if err != nil {
+		return fmt.Errorf("failed to get next instance size: %w", err)
+	}
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// nextAWSInstanceSize returns the next AWS instance size in the series.
+// In AWS terms this normally means doubling the size of the underlying instance.
+// For example:
+// - m6i.large -> m6i.xlarge
+// - m6i.xlarge -> m6i.2xlarge
+// - m6i.2xlarge -> m6i.4xlarge
+// This should mean we do not need to update this when the installer changes the default instance size.
+func nextAWSInstanceSize(current string) (string, error) {
+	// Regex to match the AWS instance type string.
+	re := regexp.MustCompile(`(?P<family>[a-z0-9]+)\.(?P<multiplier>\d)?(?P<size>[a-z]+)`)
+
+	values := re.FindStringSubmatch(current)
+	if len(values) != 4 {
+		return "", fmt.Errorf("%w: %s", errInstanceTypeUnsupportedFormat, current)
+	}
+
+	family := values[1]
+	size := values[3]
+
+	if multiplier := values[2]; multiplier == "" {
+		switch size {
+		case "large":
+			return fmt.Sprintf("%s.xlarge", family), nil
+		case "xlarge":
+			return fmt.Sprintf("%s.2xlarge", family), nil
+		default:
+			return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+		}
+	}
+
+	multiplierInt, err := strconv.Atoi(values[2])
+	if err != nil {
+		// This is a panic because the multiplier should always be a number.
+		panic("failed to convert multiplier to int")
+	}
+
+	return fmt.Sprintf("%s.%d%s", family, multiplierInt*2, size), nil
+}
+
+// setProviderSpecValue sets the value of the provider spec to the value that is passed.
+func setProviderSpecValue(rawProviderSpec *runtime.RawExtension, value interface{}) error {
+	providerSpecValue, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&value)
+	if err != nil {
+		return fmt.Errorf("failed to convert provider spec to unstructured: %w", err)
+	}
+
+	rawProviderSpec.Object = &unstructured.Unstructured{
+		Object: providerSpecValue,
+	}
+	rawProviderSpec.Raw = nil
+
+	return nil
 }

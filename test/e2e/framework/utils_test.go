@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework_test
+package framework
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 var _ = Describe("Async utils", func() {
@@ -43,12 +42,12 @@ var _ = Describe("Async utils", func() {
 			// during the execution of RunCheckUntil.
 			RegisterFailHandler(fail)
 
-			runCheckResult := framework.RunCheckUntil(
+			runCheckResult := RunCheckUntil(
 				ctx,
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(true).Should(BeTrue())
 				},
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(time.Now().After(deadline)).Should(BeTrue())
 				},
 			)
@@ -80,12 +79,12 @@ var _ = Describe("Async utils", func() {
 				close(signal)
 			}()
 
-			runCheckResult := framework.RunCheckUntil(
+			runCheckResult := RunCheckUntil(
 				ctx,
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(signal).ShouldNot(BeClosed())
 				},
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(signal).Should(BeClosed())
 				},
 			)
@@ -117,12 +116,12 @@ var _ = Describe("Async utils", func() {
 				close(signal)
 			}()
 
-			runCheckResult := framework.RunCheckUntil(
+			runCheckResult := RunCheckUntil(
 				ctx,
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(signal).ShouldNot(BeClosed())
 				},
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(true).Should(BeFalse())
 				},
 			)
@@ -150,12 +149,12 @@ var _ = Describe("Async utils", func() {
 			// during the execution of RunCheckUntil.
 			RegisterFailHandler(fail)
 
-			runCheckResult := framework.RunCheckUntil(
+			runCheckResult := RunCheckUntil(
 				ctx,
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(true).Should(BeTrue())
 				},
-				func(ctx context.Context, g framework.GomegaAssertions) bool {
+				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(true).Should(BeFalse())
 				},
 			)
