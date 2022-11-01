@@ -58,6 +58,15 @@ func ControlPlaneMachineSetKey() runtimeclient.ObjectKey {
 	}
 }
 
+// ControlPlaneMachineSetSelectorLabels are the set of labels use to select
+// control plane machines within the cluster.
+func ControlPlaneMachineSetSelectorLabels() map[string]string {
+	return map[string]string{
+		"machine.openshift.io/cluster-api-machine-role": "master",
+		"machine.openshift.io/cluster-api-machine-type": "master",
+	}
+}
+
 // Periodic is a periodic ginkgo label.
 func Periodic() ginkgo.Labels {
 	return ginkgo.Label("Periodic")
