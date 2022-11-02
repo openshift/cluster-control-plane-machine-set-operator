@@ -42,7 +42,7 @@ func generateControlPlaneMachineSetAzureSpec(machines []machinev1beta1.Machine, 
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's Azure spec: %w", err)
 	}
 
-	// We want to work with the newest machine
+	// We want to work with the newest machine.
 	controlPlaneMachineSetApplyConfigSpec := genericControlPlaneMachineSetSpec(replicas, machines[0].ObjectMeta.Labels[clusterIDLabelKey])
 	controlPlaneMachineSetApplyConfigSpec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = controlPlaneMachineSetMachineFailureDomainsApplyConfig
 	controlPlaneMachineSetApplyConfigSpec.Template.OpenShiftMachineV1Beta1Machine.Spec = controlPlaneMachineSetMachineSpecApplyConfig
@@ -67,7 +67,7 @@ func buildAzureFailureDomains(machineSets []machinev1beta1.MachineSet, machines 
 	// We have to get rid of duplicates from the failure domains.
 	// We construct a set from the failure domains, since a set can't have duplicates.
 	failureDomains := failuredomain.NewSet(machineFailureDomains...)
-	// Construction of a union of failure domains of machines and machineSets
+	// Construction of a union of failure domains of machines and machineSets.
 	failureDomains.Insert(machineSetFailureDomains...)
 
 	azureFailureDomains := []machinev1.AzureFailureDomain{}
@@ -98,7 +98,7 @@ func buildControlPlaneMachineSetAzureMachineSpec(machines []machinev1beta1.Machi
 	}
 
 	azureProviderSpec := providerConfig.Azure().Config()
-	// Remove field related to the faliure domain
+	// Remove field related to the faliure domain.
 	azureProviderSpec.Zone = nil
 
 	rawBytes, err := json.Marshal(azureProviderSpec)
