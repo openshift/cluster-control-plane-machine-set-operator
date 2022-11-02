@@ -223,6 +223,11 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
+	case configv1.AzurePlatformType:
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAzureSpec(machines, machineSets)
+		if err != nil {
+			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
+		}
 	default:
 		logger.V(1).WithValues("platform", platformType).Info(unsupportedPlatform)
 		return nil, errUnsupportedPlatform
