@@ -30,7 +30,6 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -39,12 +38,7 @@ import (
 // This should trigger the control plane machine set to update the machines based on the
 // update strategy.
 func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, args ...interface{}) machinev1beta1.ProviderSpec {
-	cpms := &machinev1.ControlPlaneMachineSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      framework.ControlPlaneMachineSetKey().Name,
-			Namespace: framework.ControlPlaneMachineSetKey().Namespace,
-		},
-	}
+	cpms := framework.NewEmptyControlPlaneMachineSet()
 
 	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, args...)
 	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
