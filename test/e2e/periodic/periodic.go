@@ -37,10 +37,10 @@ import (
 // IncreaseControlPlaneMachineSetInstanceSize increases the instance size of the control plane machine set.
 // This should trigger the control plane machine set to update the machines based on the
 // update strategy.
-func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, args ...interface{}) machinev1beta1.ProviderSpec {
+func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
 	cpms := framework.NewEmptyControlPlaneMachineSet()
 
-	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, args...)
+	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
 	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
 
 	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
@@ -52,7 +52,7 @@ func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framewor
 
 	updateCPMSArgs := append([]interface{}{komega.Update(cpms, func() {
 		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
-	})}, args...)
+	})}, gomegaArgs...)
 	Eventually(updateCPMSArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
 
 	return originalProviderSpec

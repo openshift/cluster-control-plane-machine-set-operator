@@ -52,7 +52,7 @@ func ExpectControlPlaneMachineSetToBeActive(testFramework framework.Framework) {
 
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
-func EventuallyClusterOperatorsShouldStabilise(args ...interface{}) {
+func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
 	defer format.UnregisterCustomFormatter(key)
 
@@ -60,11 +60,11 @@ func EventuallyClusterOperatorsShouldStabilise(args ...interface{}) {
 	// The list "Items", all (ConsistOf) have a field "Status.Conditions",
 	// that contain elements that are both "Type" something and "Status" something.
 	clusterOperators := &configv1.ClusterOperatorList{}
-	args = append([]interface{}{komega.ObjectList(clusterOperators)}, args...)
+	gomegaArgs = append([]interface{}{komega.ObjectList(clusterOperators)}, gomegaArgs...)
 
 	By("Waiting for the cluster operators to stabilise")
 
-	Eventually(args...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
+	Eventually(gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
 		SatisfyAll(
 			ContainElement(And(HaveField("Type", Equal(configv1.OperatorAvailable)), HaveField("Status", Equal(configv1.ConditionTrue)))),
 			ContainElement(And(HaveField("Type", Equal(configv1.OperatorProgressing)), HaveField("Status", Equal(configv1.ConditionFalse)))),
@@ -77,10 +77,10 @@ func EventuallyClusterOperatorsShouldStabilise(args ...interface{}) {
 // within the cluster. For fully supported clusters, this means waiting for the control plane machine set
 // to be created and checking that it is active. For manually supported clusters, this means creating the
 // control plane machine set, checking its status and then activating it.
-func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, args ...interface{}) {
+func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, gomegaArgs ...interface{}) {
 	switch testFramework.GetPlatformSupportLevel() {
 	case framework.Full:
-		ensureActiveControlPlaneMachineSet(args...)
+		ensureActiveControlPlaneMachineSet(gomegaArgs...)
 	case framework.Manual:
 		Fail("manual support for the control plane machine set not yet implemented")
 	case framework.Unsupported:
@@ -89,12 +89,12 @@ func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, args 
 }
 
 // ensureActiveControlPlaneMachineSet checks that a CPMS exists and then, if it is not active, activates it.
-func ensureActiveControlPlaneMachineSet(args ...interface{}) {
+func ensureActiveControlPlaneMachineSet(gomegaArgs ...interface{}) {
 	cpms := framework.NewEmptyControlPlaneMachineSet()
 
 	By("Checking the control plane machine set exists")
 
-	checkExistsArgs := append([]interface{}{komega.Get(cpms)}, args...)
+	checkExistsArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
 	Eventually(checkExistsArgs...).Should(Succeed(), "control plane machine set should exist")
 
 	if cpms.Spec.State != machinev1.ControlPlaneMachineSetStateActive {
@@ -104,13 +104,13 @@ func ensureActiveControlPlaneMachineSet(args ...interface{}) {
 			komega.Update(cpms, func() {
 				cpms.Spec.State = machinev1.ControlPlaneMachineSetStateActive
 			}),
-		}, args...)
+		}, gomegaArgs...)
 
 		Eventually(updateStateArgs...).Should(Succeed(), "control plane machine set should be able to be actived")
 	}
 
 	By("Checking the control plane machine set is active")
 
-	checkStateArgs := append([]interface{}{komega.Object(cpms)}, args...)
+	checkStateArgs := append([]interface{}{komega.Object(cpms)}, gomegaArgs...)
 	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateActive)), "control plane machine set should be active")
 }
