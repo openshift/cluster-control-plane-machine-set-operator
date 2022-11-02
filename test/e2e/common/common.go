@@ -27,7 +27,6 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -91,12 +90,7 @@ func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, args 
 
 // ensureActiveControlPlaneMachineSet checks that a CPMS exists and then, if it is not active, activates it.
 func ensureActiveControlPlaneMachineSet(args ...interface{}) {
-	cpms := &machinev1.ControlPlaneMachineSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      framework.ControlPlaneMachineSetKey().Name,
-			Namespace: framework.ControlPlaneMachineSetKey().Namespace,
-		},
-	}
+	cpms := framework.NewEmptyControlPlaneMachineSet()
 
 	By("Checking the control plane machine set exists")
 

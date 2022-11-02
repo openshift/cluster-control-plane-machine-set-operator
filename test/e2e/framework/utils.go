@@ -25,6 +25,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	machinev1 "github.com/openshift/api/machine/v1"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -34,6 +37,12 @@ const (
 
 	// DefaultInterval is the default interval for eventually and consistently assertions.
 	DefaultInterval = 5 * time.Second
+
+	// MachineAPINamespace is the name of the openshift-machine-api namespace.
+	MachineAPINamespace = "openshift-machine-api"
+
+	// ControlPlaneMachineSetName is the name of the control plane machine set in all clusters.
+	ControlPlaneMachineSetName = "cluster"
 )
 
 var (
@@ -53,8 +62,8 @@ type GomegaAssertions interface {
 // machine set.
 func ControlPlaneMachineSetKey() runtimeclient.ObjectKey {
 	return runtimeclient.ObjectKey{
-		Namespace: "openshift-machine-api",
-		Name:      "cluster",
+		Namespace: MachineAPINamespace,
+		Name:      ControlPlaneMachineSetName,
 	}
 }
 
@@ -64,6 +73,17 @@ func ControlPlaneMachineSetSelectorLabels() map[string]string {
 	return map[string]string{
 		"machine.openshift.io/cluster-api-machine-role": "master",
 		"machine.openshift.io/cluster-api-machine-type": "master",
+	}
+}
+
+// NewEmptyControlPlaneMachineSet returns a new control plane machine set with
+// just the name and namespace set.
+func NewEmptyControlPlaneMachineSet() *machinev1.ControlPlaneMachineSet {
+	return &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ControlPlaneMachineSetName,
+			Namespace: MachineAPINamespace,
+		},
 	}
 }
 
