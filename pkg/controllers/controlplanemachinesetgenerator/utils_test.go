@@ -103,6 +103,39 @@ var _ = Describe("mergeMachineSlices tests", func() {
 })
 
 var _ = Describe("compareControlPlaneMachineSets tests", func() {
+
+	var (
+		usEast1aSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
+				{
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1a",
+					},
+				},
+			},
+		}
+
+		usEast1bSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
+				{
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1b",
+					},
+				},
+			},
+		}
+
+		usEast1aProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1a").
+						WithSubnet(usEast1aSubnetAWS)
+
+		usEast1bProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1b").
+						WithSubnet(usEast1bSubnetAWS)
+	)
+
 	type compareControlPlaneMachineSetsTableInput struct {
 		platformType  configv1.PlatformType
 		cpmsABuilder  resourcebuilder.ControlPlaneMachineSetInterface
@@ -110,14 +143,6 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 		expectedError error
 		expectedDiff  []string
 	}
-
-	usEast1aProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-		WithAvailabilityZone("us-east-1a").
-		WithSubnet(usEast1aSubnet)
-
-	usEast1bProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-		WithAvailabilityZone("us-east-1b").
-		WithSubnet(usEast1bSubnet)
 
 	DescribeTable("when comparing two ControlPlaneMachineSets",
 		func(in compareControlPlaneMachineSetsTableInput) {
@@ -140,11 +165,11 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 			platformType: configv1.AWSPlatformType,
 			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder,
+					usEast1aProviderSpecBuilderAWS,
 				)),
 			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
-					usEast1bProviderSpecBuilder,
+					usEast1bProviderSpecBuilderAWS,
 				)),
 			expectedError: nil,
 			expectedDiff: []string{
@@ -156,11 +181,11 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 			platformType: configv1.AWSPlatformType,
 			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithInstanceType("c5.large"),
+					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.large"),
 				)),
 			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithInstanceType("c5.xlarge"),
+					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge"),
 				)),
 			expectedError: nil,
 			expectedDiff: []string{
@@ -175,7 +200,7 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 				)),
 			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithInstanceType("c5.xlarge"),
+					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge"),
 				)),
 			expectedError: fmt.Errorf("failed to extract providerSpec from MachineSpec: %w",
 				fmt.Errorf("could not determine platform type: %w", errNilProviderSpec)),
@@ -185,7 +210,7 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 			platformType: configv1.AWSPlatformType,
 			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithInstanceType("c5.xlarge"),
+					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge"),
 				)),
 			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
