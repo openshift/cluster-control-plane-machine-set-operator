@@ -37,212 +37,213 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-var (
-	usEast1aSubnet = machinev1beta1.AWSResourceReference{
-		Filters: []machinev1beta1.Filter{
-			{
-				Name: "tag:Name",
-				Values: []string{
-					"subnet-us-east-1a",
-				},
-			},
-		},
-	}
+var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 
-	usEast1bSubnet = machinev1beta1.AWSResourceReference{
-		Filters: []machinev1beta1.Filter{
-			{
-				Name: "tag:Name",
-				Values: []string{
-					"subnet-us-east-1b",
-				},
-			},
-		},
-	}
-
-	usEast1cSubnet = machinev1beta1.AWSResourceReference{
-		Filters: []machinev1beta1.Filter{
-			{
-				Name: "tag:Name",
-				Values: []string{
-					"subnet-us-east-1c",
-				},
-			},
-		},
-	}
-
-	usEast1dSubnet = machinev1beta1.AWSResourceReference{
-		Filters: []machinev1beta1.Filter{
-			{
-				Name: "tag:Name",
-				Values: []string{
-					"subnet-us-east-1d",
-				},
-			},
-		},
-	}
-
-	usEast1eSubnet = machinev1beta1.AWSResourceReference{
-		Filters: []machinev1beta1.Filter{
-			{
-				Name: "tag:Name",
-				Values: []string{
-					"subnet-us-east-1e",
-				},
-			},
-		},
-	}
-
-	usEast1aFailureDomainBuilder = resourcebuilder.AWSFailureDomain().
-					WithAvailabilityZone("us-east-1a").
-					WithSubnet(machinev1.AWSResourceReference{
-			Type: machinev1.AWSFiltersReferenceType,
-			Filters: &[]machinev1.AWSResourceFilter{
+	var (
+		usEast1aSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
 				{
-					Name:   "tag:Name",
-					Values: []string{"subnet-us-east-1a"},
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1a",
+					},
 				},
 			},
-		})
+		}
 
-	usEast1bFailureDomainBuilder = resourcebuilder.AWSFailureDomain().
-					WithAvailabilityZone("us-east-1b").
-					WithSubnet(machinev1.AWSResourceReference{
-			Type: machinev1.AWSFiltersReferenceType,
-			Filters: &[]machinev1.AWSResourceFilter{
+		usEast1bSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
 				{
-					Name:   "tag:Name",
-					Values: []string{"subnet-us-east-1b"},
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1b",
+					},
 				},
 			},
-		})
+		}
 
-	usEast1cFailureDomainBuilder = resourcebuilder.AWSFailureDomain().
-					WithAvailabilityZone("us-east-1c").
-					WithSubnet(machinev1.AWSResourceReference{
-			Type: machinev1.AWSFiltersReferenceType,
-			Filters: &[]machinev1.AWSResourceFilter{
+		usEast1cSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
 				{
-					Name:   "tag:Name",
-					Values: []string{"subnet-us-east-1c"},
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1c",
+					},
 				},
 			},
-		})
+		}
 
-	usEast1dFailureDomainBuilder = resourcebuilder.AWSFailureDomain().
-					WithAvailabilityZone("us-east-1d").
-					WithSubnet(machinev1.AWSResourceReference{
-			Type: machinev1.AWSFiltersReferenceType,
-			Filters: &[]machinev1.AWSResourceFilter{
+		usEast1dSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
 				{
-					Name:   "tag:Name",
-					Values: []string{"subnet-us-east-1d"},
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1d",
+					},
 				},
 			},
-		})
+		}
 
-	usEast1eFailureDomainBuilder = resourcebuilder.AWSFailureDomain().
-					WithAvailabilityZone("us-east-1e").
-					WithSubnet(machinev1.AWSResourceReference{
-			Type: machinev1.AWSFiltersReferenceType,
-			Filters: &[]machinev1.AWSResourceFilter{
+		usEast1eSubnetAWS = machinev1beta1.AWSResourceReference{
+			Filters: []machinev1beta1.Filter{
 				{
-					Name:   "tag:Name",
-					Values: []string{"subnet-us-east-1e"},
+					Name: "tag:Name",
+					Values: []string{
+						"subnet-us-east-1e",
+					},
 				},
 			},
-		})
+		}
 
-	usEast1aProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-					WithAvailabilityZone("us-east-1a").
-					WithSubnet(usEast1aSubnet)
+		usEast1aFailureDomainBuilderAWS = resourcebuilder.AWSFailureDomain().
+						WithAvailabilityZone("us-east-1a").
+						WithSubnet(machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1a"},
+					},
+				},
+			})
 
-	usEast1bProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-					WithAvailabilityZone("us-east-1b").
-					WithSubnet(usEast1bSubnet)
+		usEast1bFailureDomainBuilderAWS = resourcebuilder.AWSFailureDomain().
+						WithAvailabilityZone("us-east-1b").
+						WithSubnet(machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1b"},
+					},
+				},
+			})
 
-	usEast1cProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-					WithAvailabilityZone("us-east-1c").
-					WithSubnet(usEast1cSubnet)
+		usEast1cFailureDomainBuilderAWS = resourcebuilder.AWSFailureDomain().
+						WithAvailabilityZone("us-east-1c").
+						WithSubnet(machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1c"},
+					},
+				},
+			})
 
-	usEast1dProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-					WithAvailabilityZone("us-east-1d").
-					WithSubnet(usEast1dSubnet)
+		usEast1dFailureDomainBuilderAWS = resourcebuilder.AWSFailureDomain().
+						WithAvailabilityZone("us-east-1d").
+						WithSubnet(machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1d"},
+					},
+				},
+			})
 
-	usEast1eProviderSpecBuilder = resourcebuilder.AWSProviderSpec().
-					WithAvailabilityZone("us-east-1e").
-					WithSubnet(usEast1eSubnet)
+		usEast1eFailureDomainBuilderAWS = resourcebuilder.AWSFailureDomain().
+						WithAvailabilityZone("us-east-1e").
+						WithSubnet(machinev1.AWSResourceReference{
+				Type: machinev1.AWSFiltersReferenceType,
+				Filters: &[]machinev1.AWSResourceFilter{
+					{
+						Name:   "tag:Name",
+						Values: []string{"subnet-us-east-1e"},
+					},
+				},
+			})
 
-	cpms3FailureDomainsBuilder = resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-		usEast1aFailureDomainBuilder,
-		usEast1bFailureDomainBuilder,
-		usEast1cFailureDomainBuilder,
+		usEast1aProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1a").
+						WithSubnet(usEast1aSubnetAWS)
+
+		usEast1bProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1b").
+						WithSubnet(usEast1bSubnetAWS)
+
+		usEast1cProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1c").
+						WithSubnet(usEast1cSubnetAWS)
+
+		usEast1dProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1d").
+						WithSubnet(usEast1dSubnetAWS)
+
+		usEast1eProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+						WithAvailabilityZone("us-east-1e").
+						WithSubnet(usEast1eSubnetAWS)
+
+		cpms3FailureDomainsBuilderAWS = resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+			usEast1aFailureDomainBuilderAWS,
+			usEast1bFailureDomainBuilderAWS,
+			usEast1cFailureDomainBuilderAWS,
+		)
+
+		cpms5FailureDomainsBuilderAWS = resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+			usEast1aFailureDomainBuilderAWS,
+			usEast1bFailureDomainBuilderAWS,
+			usEast1cFailureDomainBuilderAWS,
+			usEast1dFailureDomainBuilderAWS,
+			usEast1eFailureDomainBuilderAWS,
+		)
+
+		cpmsInactive3FDsBuilderAWS = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateInactive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAWS.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.8xlarge"),
+					).
+					WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						usEast1aFailureDomainBuilderAWS,
+						usEast1bFailureDomainBuilderAWS,
+						usEast1cFailureDomainBuilderAWS,
+					)),
+			)
+
+		cpmsInactive5FDsBuilderAWS = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateInactive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAWS.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.2xlarge"),
+					).
+					WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						usEast1aFailureDomainBuilderAWS,
+						usEast1bFailureDomainBuilderAWS,
+						usEast1cFailureDomainBuilderAWS,
+						usEast1dFailureDomainBuilderAWS,
+						usEast1eFailureDomainBuilderAWS,
+					)),
+			)
+
+		cpmsActiveOutdatedBuilderAWS = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateActive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAWS.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.8xlarge"),
+					).
+					WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						usEast1aFailureDomainBuilderAWS,
+						usEast1bFailureDomainBuilderAWS,
+						usEast1cFailureDomainBuilderAWS,
+					)),
+			)
+
+		cpmsActiveUpToDateBuilderAWS = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateActive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAWS.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.2xlarge"),
+					).
+					WithFailureDomainsBuilder(cpms5FailureDomainsBuilderAWS),
+			)
 	)
 
-	cpms5FailureDomainsBuilder = resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-		usEast1aFailureDomainBuilder,
-		usEast1bFailureDomainBuilder,
-		usEast1cFailureDomainBuilder,
-		usEast1dFailureDomainBuilder,
-		usEast1eFailureDomainBuilder,
-	)
-
-	cpmsInactive3FDsBuilder = resourcebuilder.ControlPlaneMachineSet().
-				WithState(machinev1.ControlPlaneMachineSetStateInactive).
-				WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.8xlarge"),
-				).
-				WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilder,
-					usEast1bFailureDomainBuilder,
-					usEast1cFailureDomainBuilder,
-				)),
-		)
-
-	cpmsInactive5FDsBuilder = resourcebuilder.ControlPlaneMachineSet().
-				WithState(machinev1.ControlPlaneMachineSetStateInactive).
-				WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.2xlarge"),
-				).
-				WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilder,
-					usEast1bFailureDomainBuilder,
-					usEast1cFailureDomainBuilder,
-					usEast1dFailureDomainBuilder,
-					usEast1eFailureDomainBuilder,
-				)),
-		)
-
-	cpmsActiveOutdatedBuilder = resourcebuilder.ControlPlaneMachineSet().
-					WithState(machinev1.ControlPlaneMachineSetStateActive).
-					WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.8xlarge"),
-				).
-				WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilder,
-					usEast1bFailureDomainBuilder,
-					usEast1cFailureDomainBuilder,
-				)),
-		)
-
-	cpmsActiveUpToDateBuilder = resourcebuilder.ControlPlaneMachineSet().
-					WithState(machinev1.ControlPlaneMachineSetStateActive).
-					WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilder.WithAvailabilityZone("").WithSubnet(machinev1beta1.AWSResourceReference{}).WithInstanceType("c5.2xlarge"),
-				).
-				WithFailureDomainsBuilder(cpms5FailureDomainsBuilder),
-		)
-)
-
-var _ = Describe("controlplanemachinesetgenerator controller", func() {
 	var mgrCancel context.CancelFunc
 	var mgrDone chan struct{}
 	var mgr manager.Manager
@@ -275,9 +276,9 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 
 	create3MachineSets := func() {
 		machineSetBuilder := resourcebuilder.MachineSet().WithNamespace(namespaceName)
-		machineSet0 = machineSetBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).WithGenerateName("machineset-us-east-1a-").Build()
-		machineSet1 = machineSetBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).WithGenerateName("machineset-us-east-1b-").Build()
-		machineSet2 = machineSetBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).WithGenerateName("machineset-us-east-1c-").Build()
+		machineSet0 = machineSetBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilderAWS).WithGenerateName("machineset-us-east-1a-").Build()
+		machineSet1 = machineSetBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilderAWS).WithGenerateName("machineset-us-east-1b-").Build()
+		machineSet2 = machineSetBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilderAWS).WithGenerateName("machineset-us-east-1c-").Build()
 
 		Expect(k8sClient.Create(ctx, machineSet0)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet1)).To(Succeed())
@@ -288,8 +289,8 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 		create3MachineSets()
 
 		machineSetBuilder := resourcebuilder.MachineSet().WithNamespace(namespaceName)
-		machineSet3 = machineSetBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilder).WithGenerateName("machineset-us-east-1d-").Build()
-		machineSet4 = machineSetBuilder.WithProviderSpecBuilder(usEast1eProviderSpecBuilder).WithGenerateName("machineset-us-east-1e-").Build()
+		machineSet3 = machineSetBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilderAWS).WithGenerateName("machineset-us-east-1d-").Build()
+		machineSet4 = machineSetBuilder.WithProviderSpecBuilder(usEast1eProviderSpecBuilderAWS).WithGenerateName("machineset-us-east-1e-").Build()
 
 		Expect(k8sClient.Create(ctx, machineSet3)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet4)).To(Succeed())
@@ -299,9 +300,9 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 		// Create 3 control plane machines with differing Provider Specs,
 		// so then we can reliably check which machine Provider Spec is picked for the ControlPlaneMachineSet.
 		machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-		machine0 = machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("c5.xlarge")).WithName("master-0").Build()
-		machine1 = machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder.WithInstanceType("c5.2xlarge")).WithName("master-1").Build()
-		machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder.WithInstanceType("c5.4xlarge")).WithName("master-2").Build()
+		machine0 = machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge")).WithName("master-0").Build()
+		machine1 = machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilderAWS.WithInstanceType("c5.2xlarge")).WithName("master-1").Build()
+		machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilderAWS.WithInstanceType("c5.4xlarge")).WithName("master-2").Build()
 
 		// Create Machines with some wait time between them
 		// to achieve staggered CreationTimestamp(s).
@@ -314,7 +315,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 
 	createUsEast1dMachine := func() *machinev1beta1.Machine {
 		machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-		machine := machineBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilder.WithInstanceType("c5.xlarge")).WithName("master-3").Build()
+		machine := machineBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilderAWS.WithInstanceType("c5.xlarge")).WithName("master-3").Build()
 
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 
@@ -323,7 +324,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 
 	createUsEast1eMachine := func() *machinev1beta1.Machine {
 		machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-		machine := machineBuilder.WithProviderSpecBuilder(usEast1eProviderSpecBuilder.WithInstanceType("c5.xlarge")).WithName("master-4").Build()
+		machine := machineBuilder.WithProviderSpecBuilder(usEast1eProviderSpecBuilderAWS.WithInstanceType("c5.xlarge")).WithName("master-4").Build()
 
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 
@@ -444,7 +445,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilder.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains()))
 					})
 				})
 			})
@@ -493,7 +494,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms3FailureDomainsBuilder.BuildFailureDomains()))
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains()))
 				})
 
 				Context("With additional Machines adding additional failure domains", func() {
@@ -507,7 +508,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilder.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains()))
 					})
 				})
 			})
@@ -520,7 +521,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 			BeforeEach(func() {
 				By("Creating 1 Control Plane Machine")
 				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-				machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder.WithInstanceType("c5.4xlarge")).WithName("master-2").Build()
+				machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilderAWS.WithInstanceType("c5.4xlarge")).WithName("master-2").Build()
 				Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
 				machines := []machinev1beta1.Machine{*machine2}
 
@@ -594,7 +595,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				By("Creating an outdated and Inactive Control Plane Machine Set")
 				// Create an Inactive ControlPlaneMachineSet with a Provider Spec that
 				// doesn't match the one of the youngest control plane machine (i.e. it's outdated).
-				cpms = cpmsInactive3FDsBuilder.WithNamespace(namespaceName).Build()
+				cpms = cpmsInactive3FDsBuilderAWS.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
 
@@ -636,7 +637,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				})
 
 				It("should update, but not duplicate the failure domains on the ControlPlaneMachineSet", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilder.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
 				})
 			})
 		})
@@ -646,7 +647,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				By("Creating an up to date and Inactive Control Plane Machine Set")
 				// Create an Inactive ControlPlaneMachineSet with a Provider Spec that
 				// match the youngest control plane machine (i.e. it's up to date).
-				cpms = cpmsInactive5FDsBuilder.WithNamespace(namespaceName).Build()
+				cpms = cpmsInactive5FDsBuilderAWS.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
 
@@ -662,7 +663,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				By("Creating an outdated and Active Control Plane Machine Set")
 				// Create an Active ControlPlaneMachineSet with a Provider Spec that
 				// doesn't match the one of the youngest control plane machine (i.e. it's outdated).
-				cpms = cpmsActiveOutdatedBuilder.WithNamespace(namespaceName).Build()
+				cpms = cpmsActiveOutdatedBuilderAWS.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
 
@@ -677,7 +678,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				By("Creating an up to date and Active Control Plane Machine Set")
 				// Create an Active ControlPlaneMachineSet with a Provider Spec that
 				// doesn't match the one of the youngest control plane machine (i.e. it's up to date).
-				cpms = cpmsActiveUpToDateBuilder.WithNamespace(namespaceName).Build()
+				cpms = cpmsActiveUpToDateBuilderAWS.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
 
@@ -702,12 +703,12 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				By("Creating an outdated and Inactive Control Plane Machine Set")
 				// Create an Inactive ControlPlaneMachineSet with a Provider Spec that
 				// doesn't match the failure domains configured.
-				cpms = cpmsInactive5FDsBuilder.WithNamespace(namespaceName).Build()
+				cpms = cpmsInactive5FDsBuilderAWS.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
 
 			It("should update ControlPlaneMachineSet with the expected failure domains", func() {
-				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms3FailureDomainsBuilder.BuildFailureDomains())))
+				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains())))
 			})
 
 			Context("With additional Machines adding additional failure domains", func() {
@@ -718,104 +719,105 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 				})
 
 				It("should include additional failure domains from Machines, not present in the Machine Sets", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilder.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
 				})
 			})
 		})
 	})
 })
 
-var (
-	usEast1aFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1a")
+var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 
-	usEast1bFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1b")
+	var (
+		usEast1aFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1a")
 
-	usEast1cFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1c")
+		usEast1bFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1b")
 
-	usEast1dFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1d")
+		usEast1cFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1c")
 
-	usEast1eFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1e")
+		usEast1dFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1d")
 
-	usEast1aProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1a")
+		usEast1eFailureDomainBuilderAzure = resourcebuilder.AzureFailureDomain().WithZone("us-east-1e")
 
-	usEast1bProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1b")
+		usEast1aProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1a")
 
-	usEast1cProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1c")
+		usEast1bProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1b")
 
-	usEast1dProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1d")
+		usEast1cProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1c")
 
-	usEast1eProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1e")
+		usEast1dProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1d")
 
-	cpms3FailureDomainsBuilderAzure = resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
-		usEast1aFailureDomainBuilderAzure,
-		usEast1bFailureDomainBuilderAzure,
-		usEast1cFailureDomainBuilderAzure,
+		usEast1eProviderSpecBuilderAzure = resourcebuilder.AzureProviderSpec().WithZone("us-east-1e")
+
+		cpms3FailureDomainsBuilderAzure = resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+			usEast1aFailureDomainBuilderAzure,
+			usEast1bFailureDomainBuilderAzure,
+			usEast1cFailureDomainBuilderAzure,
+		)
+
+		cpms5FailureDomainsBuilderAzure = resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+			usEast1aFailureDomainBuilderAzure,
+			usEast1bFailureDomainBuilderAzure,
+			usEast1cFailureDomainBuilderAzure,
+			usEast1dFailureDomainBuilderAzure,
+			usEast1eFailureDomainBuilderAzure,
+		)
+
+		cpmsInactive3FDsBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateInactive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
+					).
+					WithFailureDomainsBuilder(resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						usEast1aFailureDomainBuilderAzure,
+						usEast1bFailureDomainBuilderAzure,
+						usEast1cFailureDomainBuilderAzure,
+					)),
+			)
+
+		cpmsInactive5FDsBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateInactive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
+					).
+					WithFailureDomainsBuilder(resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						usEast1aFailureDomainBuilderAzure,
+						usEast1bFailureDomainBuilderAzure,
+						usEast1cFailureDomainBuilderAzure,
+						usEast1dFailureDomainBuilderAzure,
+						usEast1eFailureDomainBuilderAzure,
+					)),
+			)
+
+		cpmsActiveOutdatedBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateActive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
+					).
+					WithFailureDomainsBuilder(resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						usEast1aFailureDomainBuilderAzure,
+						usEast1bFailureDomainBuilderAzure,
+						usEast1cFailureDomainBuilderAzure,
+					)),
+			)
+
+		cpmsActiveUpToDateBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
+						WithState(machinev1.ControlPlaneMachineSetStateActive).
+						WithMachineTemplateBuilder(
+				resourcebuilder.OpenShiftMachineV1Beta1Template().
+					WithProviderSpecBuilder(
+						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
+					).
+					WithFailureDomainsBuilder(cpms5FailureDomainsBuilderAzure),
+			)
 	)
 
-	cpms5FailureDomainsBuilderAzure = resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
-		usEast1aFailureDomainBuilderAzure,
-		usEast1bFailureDomainBuilderAzure,
-		usEast1cFailureDomainBuilderAzure,
-		usEast1dFailureDomainBuilderAzure,
-		usEast1eFailureDomainBuilderAzure,
-	)
-
-	cpmsInactive3FDsBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
-					WithState(machinev1.ControlPlaneMachineSetStateInactive).
-					WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
-				).
-				WithFailureDomainsBuilder(resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilderAzure,
-					usEast1bFailureDomainBuilderAzure,
-					usEast1cFailureDomainBuilderAzure,
-				)),
-		)
-
-	cpmsInactive5FDsBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
-					WithState(machinev1.ControlPlaneMachineSetStateInactive).
-					WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
-				).
-				WithFailureDomainsBuilder(resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilderAzure,
-					usEast1bFailureDomainBuilderAzure,
-					usEast1cFailureDomainBuilderAzure,
-					usEast1dFailureDomainBuilderAzure,
-					usEast1eFailureDomainBuilderAzure,
-				)),
-		)
-
-	cpmsActiveOutdatedBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
-					WithState(machinev1.ControlPlaneMachineSetStateActive).
-					WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
-				).
-				WithFailureDomainsBuilder(resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
-					usEast1aFailureDomainBuilderAzure,
-					usEast1bFailureDomainBuilderAzure,
-					usEast1cFailureDomainBuilderAzure,
-				)),
-		)
-
-	cpmsActiveUpToDateBuilderAzure = resourcebuilder.ControlPlaneMachineSet().
-					WithState(machinev1.ControlPlaneMachineSetStateActive).
-					WithMachineTemplateBuilder(
-			resourcebuilder.OpenShiftMachineV1Beta1Template().
-				WithProviderSpecBuilder(
-					usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
-				).
-				WithFailureDomainsBuilder(cpms5FailureDomainsBuilderAzure),
-		)
-)
-
-var _ = Describe("controlplanemachinesetgenerator controller", func() {
 	var mgrCancel context.CancelFunc
 	var mgrDone chan struct{}
 	var mgr manager.Manager
@@ -1091,7 +1093,7 @@ var _ = Describe("controlplanemachinesetgenerator controller", func() {
 			BeforeEach(func() {
 				By("Creating 1 Control Plane Machine")
 				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-				machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder.WithInstanceType("c5.4xlarge")).WithName("master-2").Build()
+				machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilderAzure.WithVMSize("defaultinstancetype")).WithName("master-2").Build()
 				Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
 				machines := []machinev1beta1.Machine{*machine2}
 
