@@ -14,62 +14,82 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package periodic
+package presubmit
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"golang.org/x/net/context"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
-// IncreaseControlPlaneMachineSetInstanceSize increases the instance size of the control plane machine set.
-// This should trigger the control plane machine set to update the machines based on the
-// update strategy.
-func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
-	cpms := framework.NewEmptyControlPlaneMachineSet()
+// IncreaseControlPlaneMachineInstanceSize increases the instance size of the control plane machine
+// in the given index. This should trigger the control plane machine set to update the machine in
+// this index based on the update strategy.
+func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, index int, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+	machineList := &machinev1beta1.MachineList{}
 
-	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
-	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
 
-	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
+	Expect(k8sClient.List(ctx, machineList, machineSelector)).Should(Succeed(), "control plane machines should be able to be listed")
+
+	var indexMachine *machinev1beta1.Machine
+
+	for _, machine := range machineList.Items {
+		if !strings.HasSuffix(machine.Name, fmt.Sprintf("-%d", index)) {
+			continue
+		}
+
+		if indexMachine != nil {
+			Fail(fmt.Sprintf("more than one control plane machine with index %d: %s and %s", index, indexMachine.GetName(), machine.GetName()))
+		}
+
+		indexMachine = machine.DeepCopy()
+	}
+
+	originalProviderSpec := indexMachine.Spec.ProviderSpec
 
 	updatedProviderSpec := originalProviderSpec.DeepCopy()
 	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
 
-	By("Increasing the control plane machine set instance size")
+	By("Updating the control plane machine provider spec")
 
-	updateCPMSArgs := append([]interface{}{komega.Update(cpms, func() {
-		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
+	updateMachineArgs := append([]interface{}{komega.Update(indexMachine, func() {
+		indexMachine.Spec.ProviderSpec = *updatedProviderSpec
 	})}, gomegaArgs...)
-	Eventually(updateCPMSArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
 
 	return originalProviderSpec
 }
 
-// ItShouldPerformARollingUpdate checks that the control plane machine set performs a rolling update
-// in the manner desired.
-func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
-	It("should perform a rolling update", Offset(1), func() {
+// ItShouldRollingUpdateReplaceTheOutdatedMachine checks that the control plane machine set replaces, via a rolling update,
+// the outdated machine in the given index.
+func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Framework, index int) {
+	It("should rolling update replace the outdated machine", func() {
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
 		cpms := &machinev1.ControlPlaneMachineSet{}
 		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-		// We give the rollout an hour to complete.
+		// We give the rollout 30 minutes to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check
 		// until they pass or until the timeout is reached.
-		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 1*time.Hour)
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
 		defer cancel()
 
 		wg := &sync.WaitGroup{}
@@ -83,34 +103,17 @@ func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return checkRolloutProgress(testFramework, rolloutCtx)
+			return common.CheckRolloutForIndex(testFramework, rolloutCtx, 1)
 		})
 
 		wg.Wait()
 
 		// If there's an error in the context, either it timed out or one of the async checks failed.
 		Expect(rolloutCtx.Err()).ToNot(HaveOccurred(), "rollout should have completed successfully")
-		By("Control plane machine replacement completed successfully")
+		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
 		common.EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
-}
-
-// checkRolloutProgress monitors the progress of each index in the rollout in turn.
-func checkRolloutProgress(testFramework framework.Framework, ctx context.Context) bool {
-	if ok := common.CheckRolloutForIndex(testFramework, ctx, 0); !ok {
-		return false
-	}
-
-	if ok := common.CheckRolloutForIndex(testFramework, ctx, 1); !ok {
-		return false
-	}
-
-	if ok := common.CheckRolloutForIndex(testFramework, ctx, 2); !ok {
-		return false
-	}
-
-	return true
 }
