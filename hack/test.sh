@@ -8,7 +8,7 @@ REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
 OPENSHIFT_CI=${OPENSHIFT_CI:-""}
 ARTIFACT_DIR=${ARTIFACT_DIR:-""}
 GINKGO=${GINKGO:-"go run ${REPO_ROOT}/vendor/github.com/onsi/ginkgo/v2/ginkgo"}
-GINKGO_ARGS=${GINKGO_ARGS:-"-r -v --randomize-all --randomize-suites --keep-going --race --trace --timeout=5m"}
+GINKGO_ARGS=${GINKGO_ARGS:-"-v --randomize-all --randomize-suites --keep-going --race --trace --timeout=5m"}
 GINKGO_EXTRA_ARGS=${GINKGO_EXTRA_ARGS:-""}
 
 # Ensure that some home var is set and that it's not the root.
@@ -22,9 +22,13 @@ if [ "$OPENSHIFT_CI" == "true" ] && [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DI
   GINKGO_ARGS="${GINKGO_ARGS} --junit-report=junit_control_plane_machine_set_operator.xml --cover --coverprofile=test-unit-coverage.out --output-dir=${ARTIFACT_DIR}"
 fi
 
+# Exclude the specific E2E package as this is not a unit test.
+# This regex should allow packages under the e2e dir to still be tested.
+TEST_PACKAGES=$(go list -f "{{ .Dir }}" ./... | grep -v cluster-control-plane-machine-set-operator/test/e2e$)
+
 # Print the command we are going to run as Make would.
-echo ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} ./pkg/...
-${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} ./pkg/...
+echo ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} "<omitted>"
+${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} ${TEST_PACKAGES}
 # Capture the test result to exit on error after coverage.
 TEST_RESULT=$?
 

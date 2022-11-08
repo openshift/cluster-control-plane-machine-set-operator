@@ -17,11 +17,16 @@ limitations under the License.
 package e2e
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func() {
-
+	BeforeEach(func() {
+		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
+	})
 })
