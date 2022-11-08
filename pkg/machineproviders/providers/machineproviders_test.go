@@ -188,6 +188,68 @@ var _ = Describe("MachineProviders", func() {
 			})
 		})
 
+		Context("With duplicate failure domains", func() {
+			BeforeEach(func() {
+				awsProviderSpec := resourcebuilder.AWSProviderSpec()
+
+				cpmsBuilder = cpmsBuilder.WithMachineTemplateBuilder(
+					resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(
+						awsProviderSpec,
+					).WithFailureDomainsBuilder(
+						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders( // here is the duplication of the failure domains
+							usEast1aFailureDomainBuilder,
+							usEast1aFailureDomainBuilder,
+							usEast1bFailureDomainBuilder,
+							usEast1cFailureDomainBuilder,
+						),
+					),
+				)
+
+				// We create a happy path so that the construction is successful.
+				// More detailed error cases will happen in the machine provider tests themselves.
+				By("Creating some master machines")
+				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				for i, ps := range []resourcebuilder.AWSProviderSpecBuilder{usEast1aProviderSpecBuilder, usEast1bProviderSpecBuilder, usEast1cProviderSpecBuilder} {
+					machine := machineBuilder.WithName(fmt.Sprintf("master-%d", i)).WithProviderSpecBuilder(ps).Build()
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+				}
+			})
+
+			Context("with a valid template, but with duplicate failure domains", func() {
+				var provider machineproviders.MachineProvider
+				var err error
+
+				BeforeEach(func() {
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpmsBuilder.Build())
+				})
+
+				It("does not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("returns an OpenShift Machine v1beta1 implementation of the machine provider", func() {
+					typ := reflect.TypeOf(provider)
+					Expect(typ.String()).To(Equal("*v1beta1.openshiftMachineProvider"))
+				})
+
+				It("logs based on the machine info mappings", func() {
+					Expect(logger.Entries()).To(ConsistOf(
+						test.LogEntry{
+							Level: 4,
+							KeysAndValues: []interface{}{
+								"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+									0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+									1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+									2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+								}),
+							},
+							Message: "Mapped provided failure domains",
+						},
+					))
+				})
+			})
+		})
+
 		Context("With an OpenShift Machine v1beta1 machine type", func() {
 			BeforeEach(func() {
 				awsProviderSpec := resourcebuilder.AWSProviderSpec()
