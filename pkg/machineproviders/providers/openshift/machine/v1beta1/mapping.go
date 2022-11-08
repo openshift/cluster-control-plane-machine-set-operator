@@ -63,7 +63,9 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 		return nil, fmt.Errorf("could not construct machine mapping: %w", err)
 	}
 
-	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomains, len(machineMapping))
+	failureDomainsSet := failuredomain.NewSet(failureDomains...)
+
+	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomainsSet.List(), len(machineMapping))
 	if err != nil {
 		return nil, fmt.Errorf("could not construct base failure domain mapping: %w", err)
 	}

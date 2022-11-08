@@ -588,6 +588,137 @@ var _ = Describe("Failure Domain Mapping", func() {
 					},
 				},
 			}),
+			Entry("with duplicate failure domains at the beginning of the Control Plane Machine Set", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
+			Entry("with duplicate failure domains at the end of the Control Plane Machine Set", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
+			Entry("with duplicate failure domains in the middle of the Control Plane Machine Set", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
+			Entry("with multiple duplicate failure domains in the Control Plane Machine Set", mappingMachineIndexesTableInput{
+				cpmsBuilder: cpmsBuilder,
+				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+					usEast1aFailureDomainBuilder,
+					usEast1aFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1bFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+					usEast1cFailureDomainBuilder,
+				).BuildFailureDomains(),
+				machines: []*machinev1beta1.Machine{
+					machineBuilder.WithName("machine-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
+					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
+				},
+				expectedMapping: map[int32]failuredomain.FailureDomain{
+					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+				},
+				expectedLogs: []test.LogEntry{
+					{
+						Level: 4,
+						KeysAndValues: []interface{}{
+							"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+								0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+								1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+								2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+							}),
+						},
+						Message: "Mapped provided failure domains",
+					},
+				},
+			}),
 			Entry("when rebalancing indexes and an index only contains deleted machines", mappingMachineIndexesTableInput{
 				cpmsBuilder: cpmsBuilder,
 				failureDomains: resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(

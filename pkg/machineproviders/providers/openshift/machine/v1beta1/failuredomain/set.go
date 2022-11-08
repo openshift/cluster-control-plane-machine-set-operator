@@ -28,11 +28,7 @@ type Set struct {
 // NewSet creates a new set from the given items.
 func NewSet(items ...FailureDomain) *Set {
 	s := Set{}
-
-	for _, item := range items {
-		fd := item
-		s.items = append(s.items, fd)
-	}
+	s.Insert(items...)
 
 	return &s
 }
