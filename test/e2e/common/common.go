@@ -28,6 +28,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -83,7 +84,7 @@ func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, gomeg
 	case framework.Full:
 		ensureActiveControlPlaneMachineSet(gomegaArgs...)
 	case framework.Manual:
-		Fail("manual support for the control plane machine set not yet implemented")
+		ensureManualActiveControlPlaneMachineSet(testFramework, gomegaArgs...)
 	case framework.Unsupported:
 		Fail(fmt.Sprintf("control plane machine set does not support platform %s", testFramework.GetPlatformType()))
 	}
@@ -114,6 +115,26 @@ func ensureActiveControlPlaneMachineSet(gomegaArgs ...interface{}) {
 
 	checkStateArgs := append([]interface{}{komega.Object(cpms)}, gomegaArgs...)
 	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateActive)), "control plane machine set should be active")
+}
+
+// ensureManualActiveControlPlaneMachineSet creates a CPMS if required and then activates it.
+// If the CPMS already exists and is inactive, it will be activated.
+func ensureManualActiveControlPlaneMachineSet(testFramework framework.Framework, gomegaArgs ...interface{}) {
+	k8sClient := testFramework.GetClient()
+	ctx := testFramework.GetContext()
+
+	cpms := framework.NewEmptyControlPlaneMachineSet()
+	if err := k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms); err != nil && !apierrors.IsNotFound(err) {
+		Fail(fmt.Sprintf("error when checking if a control plane machine set exists: %v", err))
+	} else if err == nil {
+		// The CPMS exists, so we just need to make sure it is active.
+		ensureActiveControlPlaneMachineSet(gomegaArgs...)
+		return
+	}
+
+	// A CPMS does not already exist, we must create one and then activate it.
+	// TODO: Implement create functions for platforms that don't have generators yet.
+	Fail("manual support for the control plane machine set not yet implemented")
 }
 
 // WaitForControlPlaneMachineSetDesiredReplicas waits for the control plane machine set to have the desired number of replicas.
