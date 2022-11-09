@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -113,4 +114,36 @@ func ensureActiveControlPlaneMachineSet(gomegaArgs ...interface{}) {
 
 	checkStateArgs := append([]interface{}{komega.Object(cpms)}, gomegaArgs...)
 	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateActive)), "control plane machine set should be active")
+}
+
+// WaitForControlPlaneMachineSetDesiredReplicas waits for the control plane machine set to have the desired number of replicas.
+// It first waits for the updated replicas to equal the desired number, and then waits for the final replica
+// count to equal the desired number.
+func WaitForControlPlaneMachineSetDesiredReplicas(ctx context.Context, cpms *machinev1.ControlPlaneMachineSet) bool {
+	if ok := Expect(cpms.Spec.Replicas).ToNot(BeNil(), "replicas should always be set"); !ok {
+		return false
+	}
+
+	desiredReplicas := *cpms.Spec.Replicas
+
+	By("Waiting for the updated replicas to equal desired replicas")
+
+	if ok := Eventually(komega.Object(cpms)).WithContext(ctx).Should(HaveField("Status.UpdatedReplicas", Equal(desiredReplicas)), "control plane machine set should have updated all replicas"); !ok {
+		return false
+	}
+
+	By("Updated replicas is now equal to desired replicas")
+
+	// Once the updated replicas equals the desired replicas, we need
+	// to wait for the total replicas to go back to the desired replicas.
+	// This will check the final machine gets removed before we end the test.
+	By("Waiting for the replicas to equal desired replicas")
+
+	if ok := Eventually(komega.Object(cpms)).WithContext(ctx).Should(HaveField("Status.Replicas", Equal(desiredReplicas)), "control plane machine set should have the desired number of replicas"); !ok {
+		return false
+	}
+
+	By("Replicas is now equal to desired replicas")
+
+	return true
 }

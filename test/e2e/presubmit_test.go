@@ -23,10 +23,26 @@ import (
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/presubmit"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func() {
 	BeforeEach(func() {
 		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
+	})
+
+	Context("With an active ControlPlaneMachineSet", func() {
+		BeforeEach(func() {
+			common.EnsureActiveControlPlaneMachineSet(testFramework)
+		})
+
+		Context("and the instance type of index 1 is not as expected", func() {
+			BeforeEach(func() {
+				presubmit.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+			})
+
+			presubmit.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+		})
+
 	})
 })
