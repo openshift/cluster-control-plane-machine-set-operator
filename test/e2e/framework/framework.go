@@ -167,6 +167,8 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 	switch f.platform {
 	case configv1.AWSPlatformType:
 		return increaseAWSInstanceSize(rawProviderSpec, providerConfig)
+	case configv1.AzurePlatformType:
+		return increaseAzureInstanceSize(rawProviderSpec, providerConfig)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -292,6 +294,60 @@ func nextAWSInstanceSize(current string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s.%d%s", family, multiplierInt*2, size), nil
+}
+
+// increaseAzureInstanceSize increases the instance size of the instance on the providerSpec for an Azure providerSpec.
+func increaseAzureInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.Azure().Config()
+
+	var err error
+
+	cfg.VMSize, err = nextAzureVMSize(cfg.VMSize)
+	if err != nil {
+		return fmt.Errorf("failed to get next instance size: %w", err)
+	}
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// nextAzureVMSize returns the next Azure VM size in the series.
+// In Azure terms this normally means doubling the size of the underlying instance.
+// This should mean we do not need to update this when the installer changes the default instance size.
+func nextAzureVMSize(current string) (string, error) {
+	// Regex to match the Azure VM size string.
+	re := regexp.MustCompile(`Standard_(?P<family>[a-zA-Z]+)(?P<multiplier>[0-9]+)(?P<subfamily>[a-z]*)(?P<version>_v[0-9]+)?`)
+
+	values := re.FindStringSubmatch(current)
+	if len(values) != 5 {
+		return "", fmt.Errorf("%w: %s", errInstanceTypeUnsupportedFormat, current)
+	}
+
+	family := values[1]
+	subfamily := values[3]
+	version := values[4]
+
+	multiplier, err := strconv.Atoi(values[2])
+	if err != nil {
+		// This is a panic because the multiplier should always be a number.
+		panic("failed to convert multiplier to int")
+	}
+
+	switch {
+	case multiplier == 32:
+		multiplier = 48
+	case multiplier == 48:
+		multiplier = 64
+	case multiplier >= 64:
+		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+	default:
+		multiplier *= 2
+	}
+
+	return fmt.Sprintf("Standard_%s%d%s%s", family, multiplier, subfamily, version), nil
 }
 
 // setProviderSpecValue sets the value of the provider spec to the value that is passed.
