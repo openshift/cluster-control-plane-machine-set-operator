@@ -68,5 +68,61 @@ var _ = Describe("Framwork", func() {
 				)
 			})
 		})
+
+		Context("on Azure", func() {
+			Context("nextAzureVMSize", func() {
+				type nextInstanceSizeTableInput struct {
+					currentVMSize    string
+					expectedNextSize string
+					expectedError    error
+				}
+
+				DescribeTable("should return the next VM size", func(in nextInstanceSizeTableInput) {
+					nextInstanceSize, err := nextAzureVMSize(in.currentVMSize)
+					if in.expectedError != nil {
+						Expect(err).To(MatchError(in.expectedError))
+					} else {
+						Expect(err).ToNot(HaveOccurred())
+					}
+
+					Expect(nextInstanceSize).To(Equal(in.expectedNextSize))
+				},
+					Entry("when the current VM size is Standard_D2as_v5", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D2as_v5",
+						expectedNextSize: "Standard_D4as_v5",
+					}),
+					Entry("when the current VM size is Standard_B4ms", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_B4ms",
+						expectedNextSize: "Standard_B8ms",
+					}),
+					Entry("when the current VM size is Standard_D8s_v4", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D8s_v4",
+						expectedNextSize: "Standard_D16s_v4",
+					}),
+					Entry("when the current VM size is Standard_D16a_v4", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D16a_v4",
+						expectedNextSize: "Standard_D32a_v4",
+					}),
+					Entry("when the current VM size is Standard_D32s_v3", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D32s_v3",
+						expectedNextSize: "Standard_D48s_v3",
+					}),
+					Entry("when the current VM size is Standard_D48s_v3", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D48s_v3",
+						expectedNextSize: "Standard_D64s_v3",
+					}),
+					Entry("when the current VM size is Standard_D64s_v3", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D64s_v3",
+						expectedNextSize: "",
+						expectedError:    fmt.Errorf("%w: Standard_D64s_v3", errInstanceTypeNotSupported),
+					}),
+					Entry("when the current VM size is Standard_D96s_v3", nextInstanceSizeTableInput{
+						currentVMSize:    "Standard_D96s_v3",
+						expectedNextSize: "",
+						expectedError:    fmt.Errorf("%w: Standard_D96s_v3", errInstanceTypeNotSupported),
+					}),
+				)
+			})
+		})
 	})
 })
