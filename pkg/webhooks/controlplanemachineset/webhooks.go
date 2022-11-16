@@ -293,10 +293,16 @@ func validateOpenShiftAzureProviderConfig(parentPath *field.Path, providerConfig
 
 // validateOpenShiftGCPProviderConfig runs GCP specific checks on the provider config on the ControlPlaneMachineSet.
 // This ensure that the ControlPlaneMachineSet can safely replace GCP control plane machines.
-func validateOpenShiftGCPProviderConfig(parentPath *field.Path, _ providerconfig.GCPProviderConfig) []error {
-	// On GCP, we do not currently update the backend pools for the inernal load balancer.
-	// Until this is supported in Machine API Provider GCP, we cannot safely replace control plane machines.
-	return []error{field.Forbidden(parentPath, "automatic replacement of control plane machines on GCP is not currently supported")}
+func validateOpenShiftGCPProviderConfig(parentPath *field.Path, providerConfig providerconfig.GCPProviderConfig) []error {
+	errs := []error{}
+
+	config := providerConfig.Config()
+
+	if len(config.TargetPools) == 0 {
+		errs = append(errs, field.Required(parentPath.Child("targetPools"), "targetPools is required for control plane machines"))
+	}
+
+	return errs
 }
 
 // fetchControlPlaneMachines returns all control plane machines in the cluster.
