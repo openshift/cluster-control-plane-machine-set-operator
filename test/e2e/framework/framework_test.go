@@ -143,6 +143,40 @@ var _ = Describe("Framwork", func() {
 
 					Expect(nextInstanceSize).To(Equal(in.expectedNextSize))
 				},
+					Entry("when the current Machine size is n1-standard-1", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-standard-1",
+						expectedNextSize:   "n1-standard-2",
+					}),
+					Entry("when the current Machine size is n1-standard-2", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-standard-2",
+						expectedNextSize:   "n1-standard-4",
+					}),
+					Entry("when the current Machine size is n1-standard-32", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-standard-32",
+						expectedNextSize:   "n1-standard-64",
+					}),
+					Entry("when the current Machine size is n1-standard-64", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-standard-64",
+						expectedNextSize:   "n1-standard-96",
+					}),
+					Entry("when the current Machine size is n1-standard-96", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-standard-96",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: n1-standard-96", errInstanceTypeNotSupported),
+					}),
+					Entry("when the current Machine size is n2-standard-64", nextInstanceSizeTableInput{
+						currentMachineSize: "n2-standard-64",
+						expectedNextSize:   "n2-standard-80",
+					}),
+					Entry("when the current Machine size is n2-standard-96", nextInstanceSizeTableInput{
+						currentMachineSize: "n2-standard-96",
+						expectedNextSize:   "n2-standard-128",
+					}),
+					Entry("when the current Machine size is n2-standard-128", nextInstanceSizeTableInput{
+						currentMachineSize: "n2-standard-128",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: n2-standard-128", errInstanceTypeNotSupported),
+					}),
 					Entry("when the current Machine size is e2-standard-2", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-standard-2",
 						expectedNextSize:   "e2-standard-4",
