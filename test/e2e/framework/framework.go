@@ -376,7 +376,7 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 // The Machine sizes being used are in format <e2|n2|n1>-standard-<number>.
 func nextGCPMachineSize(current string) (string, error) {
 	// Regex to match the GCP machine size string.
-	re := regexp.MustCompile(`(?P<family>[0-9a-z]+)-standard-(?P<version>[0-9]+)`)
+	re := regexp.MustCompile(`(?P<family>[0-9a-z]+)-standard-(?P<multiplier>[0-9]+)`)
 
 	values := re.FindStringSubmatch(current)
 	if len(values) != 3 {
@@ -396,6 +396,8 @@ func nextGCPMachineSize(current string) (string, error) {
 
 // setNextGCPMachineSize returns the new GCP machine size in the series
 // according to the family supported (e2, n1, n2).
+//
+//nolint:cyclop
 func setNextGCPMachineSize(current, family string, multiplier int) (string, error) {
 	switch {
 	case multiplier >= 32 && family == "e2":
