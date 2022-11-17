@@ -28,15 +28,17 @@ import (
 // GCPProviderSpec creates a new GCP machine config builder.
 func GCPProviderSpec() GCPProviderSpecBuilder {
 	return GCPProviderSpecBuilder{
-		zone:        "us-central1-a",
+		machineType: "n1-standard-4",
 		targetPools: []string{"target-pool-1", "target-pool-2"},
+		zone:        "us-central1-a",
 	}
 }
 
 // GCPProviderSpecBuilder is used to build a GCP machine config object.
 type GCPProviderSpecBuilder struct {
-	zone        string
+	machineType string
 	targetPools []string
+	zone        string
 }
 
 // Build builds a new GCP machine config based on the configuration provided.
@@ -46,7 +48,7 @@ func (m GCPProviderSpecBuilder) Build() *machinev1beta1.GCPMachineProviderSpec {
 			APIVersion: "machine.openshift.io/v1beta1",
 			Kind:       "GCPMachineProviderSpec",
 		},
-		MachineType: "n1-standard-4",
+		MachineType: m.machineType,
 		UserDataSecret: &corev1.LocalObjectReference{
 			Name: "gcp-user-data-12345678",
 		},
@@ -101,14 +103,20 @@ func (m GCPProviderSpecBuilder) BuildRawExtension() *runtime.RawExtension {
 	}
 }
 
-// WithZone sets the zone for the GCP machine config builder.
-func (m GCPProviderSpecBuilder) WithZone(zone string) GCPProviderSpecBuilder {
-	m.zone = zone
+// WithMachineType sets the machine type for the GCP machine config builder.
+func (m GCPProviderSpecBuilder) WithMachineType(machineType string) GCPProviderSpecBuilder {
+	m.machineType = machineType
 	return m
 }
 
 // WithTargetPools sets the target pools for the GCP machine config builder.
 func (m GCPProviderSpecBuilder) WithTargetPools(targetPools []string) GCPProviderSpecBuilder {
 	m.targetPools = targetPools
+	return m
+}
+
+// WithZone sets the zone for the GCP machine config builder.
+func (m GCPProviderSpecBuilder) WithZone(zone string) GCPProviderSpecBuilder {
+	m.zone = zone
 	return m
 }
