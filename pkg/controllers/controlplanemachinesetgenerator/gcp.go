@@ -70,13 +70,13 @@ func buildGCPFailureDomains(machineSets []machinev1beta1.MachineSet, machines []
 	// Construction of a union of failure domains of machines and machineSets.
 	failureDomains.Insert(machineSetFailureDomains...)
 
-	GCPFailureDomains := []machinev1.GCPFailureDomain{}
+	gcpFailureDomains := []machinev1.GCPFailureDomain{}
 	for _, fd := range failureDomains.List() {
-		GCPFailureDomains = append(GCPFailureDomains, fd.GCP())
+		gcpFailureDomains = append(gcpFailureDomains, fd.GCP())
 	}
 
 	cpmsFailureDomain := machinev1.FailureDomains{
-		GCP:      &GCPFailureDomains,
+		GCP:      &gcpFailureDomains,
 		Platform: configv1.GCPPlatformType,
 	}
 
@@ -97,11 +97,11 @@ func buildControlPlaneMachineSetGCPMachineSpec(machines []machinev1beta1.Machine
 		return nil, fmt.Errorf("failed to extract machine's GCP providerSpec: %w", err)
 	}
 
-	GCPProviderSpec := providerConfig.GCP().Config()
+	gcpProviderSpec := providerConfig.GCP().Config()
 	// Remove field related to the faliure domain.
-	GCPProviderSpec.Zone = ""
+	gcpProviderSpec.Zone = ""
 
-	rawBytes, err := json.Marshal(GCPProviderSpec)
+	rawBytes, err := json.Marshal(gcpProviderSpec)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling GCP providerSpec: %w", err)
 	}

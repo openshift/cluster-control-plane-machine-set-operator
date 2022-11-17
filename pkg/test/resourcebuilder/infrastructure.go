@@ -112,7 +112,7 @@ func (i InfrastructureBuilder) AsAzure(name string) InfrastructureBuilder {
 func (i InfrastructureBuilder) AsGCP(name string, region string) InfrastructureBuilder {
 	i.spec = &configv1.InfrastructureSpec{
 		PlatformSpec: configv1.PlatformSpec{
-			Type: "GCP",
+			Type: configv1.GCPPlatformType,
 			GCP:  &configv1.GCPPlatformSpec{},
 		},
 	}
@@ -124,7 +124,7 @@ func (i InfrastructureBuilder) AsGCP(name string, region string) InfrastructureB
 		ControlPlaneTopology:   configv1.HighlyAvailableTopologyMode,
 		InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
 		PlatformStatus: &configv1.PlatformStatus{
-			Type: "GCP",
+			Type: configv1.GCPPlatformType,
 			GCP: &configv1.GCPPlatformStatus{
 				Region: region,
 			},

@@ -28,17 +28,17 @@ import (
 // GCPProviderSpec creates a new GCP machine config builder.
 func GCPProviderSpec() GCPProviderSpecBuilder {
 	return GCPProviderSpecBuilder{
-		zone:        "us-central1-a",
-		targetPools: []string{"target-pool-1", "target-pool-2"},
 		machineType: "n1-standard-4",
+		targetPools: []string{"target-pool-1", "target-pool-2"},
+		zone:        "us-central1-a",
 	}
 }
 
 // GCPProviderSpecBuilder is used to build a GCP machine config object.
 type GCPProviderSpecBuilder struct {
-	zone        string
-	targetPools []string
 	machineType string
+	targetPools []string
+	zone        string
 }
 
 // Build builds a new GCP machine config based on the configuration provided.
@@ -103,9 +103,9 @@ func (m GCPProviderSpecBuilder) BuildRawExtension() *runtime.RawExtension {
 	}
 }
 
-// WithZone sets the zone for the GCP machine config builder.
-func (m GCPProviderSpecBuilder) WithZone(zone string) GCPProviderSpecBuilder {
-	m.zone = zone
+// WithMachineType sets the machine type for the GCP machine config builder.
+func (m GCPProviderSpecBuilder) WithMachineType(machineType string) GCPProviderSpecBuilder {
+	m.machineType = machineType
 	return m
 }
 
@@ -115,8 +115,8 @@ func (m GCPProviderSpecBuilder) WithTargetPools(targetPools []string) GCPProvide
 	return m
 }
 
-// WithMachineType sets the machine type for the GCP machine config builder.
-func (m GCPProviderSpecBuilder) WithMachineType(machineType string) GCPProviderSpecBuilder {
-	m.machineType = machineType
+// WithZone sets the zone for the GCP machine config builder.
+func (m GCPProviderSpecBuilder) WithZone(zone string) GCPProviderSpecBuilder {
+	m.zone = zone
 	return m
 }

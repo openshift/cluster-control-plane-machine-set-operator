@@ -1339,7 +1339,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 						WithMachineTemplateBuilder(
 				resourcebuilder.OpenShiftMachineV1Beta1Template().
 					WithProviderSpecBuilder(
-						usEast1aProviderSpecBuilderGCP.WithZone("").WithMachineType("n1-standard-4"),
+						usEast1aProviderSpecBuilderGCP.WithZone("").WithMachineType("n1-standard-8"),
 					).
 					WithFailureDomainsBuilder(resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
 						usEast1aFailureDomainBuilderGCP,
@@ -1369,7 +1369,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 						WithMachineTemplateBuilder(
 				resourcebuilder.OpenShiftMachineV1Beta1Template().
 					WithProviderSpecBuilder(
-						usEast1aProviderSpecBuilderGCP.WithZone("").WithMachineType("n1-standard-4"),
+						usEast1aProviderSpecBuilderGCP.WithZone("").WithMachineType("n1-standard-8"),
 					).
 					WithFailureDomainsBuilder(resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
 						usEast1aFailureDomainBuilderGCP,
