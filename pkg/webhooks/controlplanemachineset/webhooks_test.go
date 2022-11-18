@@ -23,16 +23,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
 // stringPtr returns a pointer to the string value.

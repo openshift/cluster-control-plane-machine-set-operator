@@ -25,10 +25,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	machinev1 "github.com/openshift/api/machine/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	machinev1 "github.com/openshift/api/machine/v1"
 )
 
 const (

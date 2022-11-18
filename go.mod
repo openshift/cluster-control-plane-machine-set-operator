@@ -9,6 +9,7 @@ require (
 	github.com/golangci/golangci-lint v1.49.0
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.23.0
+	github.com/openshift-eng/openshift-goimports v0.0.0-20220811163502-c72f1dc2e3aa
 	github.com/openshift/api v0.0.0-20221004120407-c46852673d03
 	github.com/openshift/client-go v0.0.0-20221006134153-58ea193f9d20
 	github.com/openshift/library-go v0.0.0-20220922140741-7772048e4447

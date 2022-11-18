@@ -23,11 +23,14 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
-	machinev1 "github.com/openshift/api/machine/v1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	machinev1 "github.com/openshift/api/machine/v1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 )
 
 const (

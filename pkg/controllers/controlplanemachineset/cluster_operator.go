@@ -22,11 +22,13 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // setClusterOperatorAvailable sets the control-plane-machine-set cluster operator status to available.

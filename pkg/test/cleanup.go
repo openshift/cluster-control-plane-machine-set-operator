@@ -22,15 +22,15 @@ import (
 
 	"github.com/onsi/gomega"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
 // CleanupResources will clean up resources of the types of objects given in a particular namespace if given.

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 

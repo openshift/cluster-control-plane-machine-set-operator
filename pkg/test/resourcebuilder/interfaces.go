@@ -17,8 +17,9 @@ limitations under the License.
 package resourcebuilder
 
 import (
-	machinev1 "github.com/openshift/api/machine/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	machinev1 "github.com/openshift/api/machine/v1"
 )
 
 // ControlPlaneMachineSetTemplateBuilder builds a ControlPlaneMachineSetTemplate.

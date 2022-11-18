@@ -24,12 +24,13 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 
-	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/api/machine/v1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1 "github.com/openshift/api/machine/v1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 // ItShouldHaveAnActiveControlPlaneMachineSet returns an It that checks

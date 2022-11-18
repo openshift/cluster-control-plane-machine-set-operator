@@ -10,6 +10,7 @@ import (
 
 	logr "github.com/go-logr/logr"
 	gomock "github.com/golang/mock/gomock"
+
 	machineproviders "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 )
 

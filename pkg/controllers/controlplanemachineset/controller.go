@@ -23,12 +23,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -45,6 +40,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 )
 
 const (

@@ -24,12 +24,13 @@ import (
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/context"
 
+	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-
-	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 // IncreaseControlPlaneMachineSetInstanceSize increases the instance size of the control plane machine set.

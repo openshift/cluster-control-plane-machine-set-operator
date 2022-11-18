@@ -17,9 +17,10 @@ limitations under the License.
 package resourcebuilder
 
 import (
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 )
 
 // MachineInfo creates a new machineinfo builder.

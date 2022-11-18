@@ -20,14 +20,16 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinev1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1"
 	machinev1beta1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1"
+
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // generateControlPlaneMachineSetAzureSpec generates an Azure flavored ControlPlaneMachineSet Spec.

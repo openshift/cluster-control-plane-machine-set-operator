@@ -17,8 +17,9 @@ limitations under the License.
 package resourcebuilder
 
 import (
-	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // Infrastructure creates a new awsplacementgroup builder.

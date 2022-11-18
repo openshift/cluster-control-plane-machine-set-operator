@@ -24,8 +24,9 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 
-	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // errActualTypeMismatchCondition is used when the type of the actual object does not match the expected type of Condition.

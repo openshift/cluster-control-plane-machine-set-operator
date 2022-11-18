@@ -19,6 +19,7 @@ CONTROLLER_GEN = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-tools/cmd/c
 ENVTEST = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-runtime/tools/setup-envtest
 GINKGO = go run ${PROJECT_DIR}/vendor/github.com/onsi/ginkgo/v2/ginkgo
 GOLANGCI_LINT = go run ${PROJECT_DIR}/vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
+OPENSHIFT_GOIMPORTS = go run ${PROJECT_DIR}/vendor/github.com/openshift-eng/openshift-goimports
 
 VERSION     ?= $(shell git describe --always --abbrev=7)
 MUTABLE_TAG ?= latest
@@ -75,6 +76,10 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: goimports
+goimports: ## Run openshift-goimports against code.
+	$(call ensure-home, ${OPENSHIFT_GOIMPORTS})
+
 .PHONY: vendor
 vendor: ## Ensure the vendor directory is up to date.
 	go mod tidy
@@ -87,7 +92,7 @@ lint: ## Run golangci-lint over the codebase.
 	./hack/verify-log-keys.sh
 
 .PHONY: test
-test: generate fmt vet unit ## Run tests.
+test: generate fmt goimports vet unit ## Run tests.
 
 .PHONY: unit
 unit: ## Run only the tests.

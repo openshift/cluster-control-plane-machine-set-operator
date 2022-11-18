@@ -28,11 +28,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 const (

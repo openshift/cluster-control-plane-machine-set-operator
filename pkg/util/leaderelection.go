@@ -19,11 +19,12 @@ package util
 import (
 	"context"
 
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/library-go/pkg/config/clusterstatus"
 	"github.com/openshift/library-go/pkg/config/leaderelection"
-	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 )
 
 // GetLeaderElectionDefaults returns leader election configs defaults based on the cluster topology.

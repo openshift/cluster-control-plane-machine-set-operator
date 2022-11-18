@@ -22,9 +22,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 func TestE2E(t *testing.T) {

@@ -17,9 +17,11 @@ limitations under the License.
 package providerconfig
 
 import (
-	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	configv1 "github.com/openshift/api/config/v1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 )
 
 // GenericProviderConfig holds the provider spec for machine on platforms that

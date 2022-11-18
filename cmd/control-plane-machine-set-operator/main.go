@@ -24,12 +24,12 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
 	"k8s.io/klog/v2"
@@ -37,16 +37,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
 	cpmsgeneratorcontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachinesetgenerator"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	cpmswebhook "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/webhooks/controlplanemachineset"
-
 	//+kubebuilder:scaffold:imports
-
-	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 )
 
 const (

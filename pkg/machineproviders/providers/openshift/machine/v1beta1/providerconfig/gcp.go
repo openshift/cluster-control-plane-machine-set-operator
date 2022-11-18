@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // GCPProviderConfig holds the provider spec of a GCP Machine.

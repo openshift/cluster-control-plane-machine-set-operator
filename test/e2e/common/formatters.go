@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega/format"
+
 	configv1 "github.com/openshift/api/config/v1"
 )
 
