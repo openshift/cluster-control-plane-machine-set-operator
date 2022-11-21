@@ -70,6 +70,25 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				})
 
 				presubmit.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
+
+			})
+		})
+
+		Context("and the ControlPlaneMachineSet is up to date", Ordered, func() {
+			BeforeEach(func() {
+				common.EnsureControlPlaneMachineSetUpdated(testFramework)
+			})
+
+			Context("and the ControlPlaneMachineSet is deleted", func() {
+				BeforeEach(func() {
+					common.EnsureControlPlaneMachineSetDeleted(testFramework)
+				})
+
+				AfterEach(func() {
+					common.EnsureActiveControlPlaneMachineSet(testFramework)
+				})
+
+				presubmit.ItShouldUninstallTheControlPlaneMachineSet(testFramework)
 			})
 		})
 	})
