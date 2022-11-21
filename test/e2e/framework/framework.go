@@ -169,6 +169,8 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 		return increaseAWSInstanceSize(rawProviderSpec, providerConfig)
 	case configv1.AzurePlatformType:
 		return increaseAzureInstanceSize(rawProviderSpec, providerConfig)
+	case configv1.GCPPlatformType:
+		return increaseGCPInstanceSize(rawProviderSpec, providerConfig)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -233,6 +235,8 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	case configv1.AWSPlatformType:
 		return Full, platformType, nil
 	case configv1.AzurePlatformType:
+		return Manual, platformType, nil
+	case configv1.GCPPlatformType:
 		return Manual, platformType, nil
 	default:
 		return Unsupported, platformType, nil
@@ -348,6 +352,73 @@ func nextAzureVMSize(current string) (string, error) {
 	}
 
 	return fmt.Sprintf("Standard_%s%d%s%s", family, multiplier, subfamily, version), nil
+}
+
+// increaseGCPInstanceSize increases the instance size of the instance on the providerSpec for an GCP providerSpec.
+func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.GCP().Config()
+
+	var err error
+
+	cfg.MachineType, err = nextGCPMachineSize(cfg.MachineType)
+	if err != nil {
+		return fmt.Errorf("failed to get next instance size: %w", err)
+	}
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// nextGCPVMSize returns the next GCP machine size in the series.
+// The Machine sizes being used are in format <e2|n2|n1>-standard-<number>.
+func nextGCPMachineSize(current string) (string, error) {
+	// Regex to match the GCP machine size string.
+	re := regexp.MustCompile(`(?P<family>[0-9a-z]+)-standard-(?P<multiplier>[0-9]+)`)
+
+	values := re.FindStringSubmatch(current)
+	if len(values) != 3 {
+		return "", fmt.Errorf("%w: %s", errInstanceTypeUnsupportedFormat, current)
+	}
+
+	multiplier, err := strconv.Atoi(values[2])
+	if err != nil {
+		// This is a panic because the multiplier should always be a number.
+		panic("failed to convert multiplier to int")
+	}
+
+	family := values[1]
+
+	return setNextGCPMachineSize(current, family, multiplier)
+}
+
+// setNextGCPMachineSize returns the new GCP machine size in the series
+// according to the family supported (e2, n1, n2).
+//
+//nolint:cyclop
+func setNextGCPMachineSize(current, family string, multiplier int) (string, error) {
+	switch {
+	case multiplier >= 32 && family == "e2":
+		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+	case multiplier == 32 && family == "n2":
+		multiplier = 48
+	case multiplier == 64 && family == "n2":
+		multiplier = 80
+	case multiplier == 64 || multiplier == 80:
+		multiplier = 96
+	case multiplier >= 96 && family == "n1":
+		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+	case multiplier == 96:
+		multiplier = 128
+	case multiplier >= 128:
+		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+	default:
+		multiplier *= 2
+	}
+
+	return fmt.Sprintf("%s-standard-%d", family, multiplier), nil
 }
 
 // setProviderSpecValue sets the value of the provider spec to the value that is passed.
