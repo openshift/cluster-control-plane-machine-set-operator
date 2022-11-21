@@ -174,3 +174,15 @@ func ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework framework.Framew
 		))))
 	})
 }
+
+// ItShouldUninstallTheControlPlaneMachineSet checks that the control plane machine set is correctly uninstalled
+// when a deletion is triggered, without triggering control plane machines changes.
+func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framework) {
+	It("should uninstall the control plane machine set without control plane machine changes", func() {
+		common.ExpectControlPlaneMachineSetToBeInactiveOrNotFound(testFramework)
+		common.ExpectControlPlaneMachinesAllRunning(testFramework)
+		common.ExpectControlPlaneMachinesNotOwned(testFramework)
+		common.ExpectControlPlaneMachinesWithoutDeletionTimestamp(testFramework)
+		common.EventuallyClusterOperatorsShouldStabilise()
+	})
+}

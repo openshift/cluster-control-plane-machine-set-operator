@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,6 +31,10 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+)
+
+var (
+	errUIDNotChanged = errors.New("UID has not changed")
 )
 
 // ItShouldHaveAnActiveControlPlaneMachineSet returns an It that checks
@@ -50,6 +55,36 @@ func ExpectControlPlaneMachineSetToBeActive(testFramework framework.Framework) {
 	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 	Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateActive), "control plane machine set should be active")
+}
+
+// ExpectControlPlaneMachineSetToBeInactive gets the control plane machine set and
+// checks that it is active.
+func ExpectControlPlaneMachineSetToBeInactive(testFramework framework.Framework) {
+	By("Checking the control plane machine set is inactive")
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	k8sClient := testFramework.GetClient()
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+	Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive), "control plane machine set should be inactive")
+}
+
+// ExpectControlPlaneMachineSetToBeInactiveOrNotFound gets the control plane machine set and
+// checks that it is inactive or not found.
+func ExpectControlPlaneMachineSetToBeInactiveOrNotFound(testFramework framework.Framework) {
+	By("Checking the control plane machine set is inactive or not found")
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	k8sClient := testFramework.GetClient()
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	if err := k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms); err != nil {
+		Expect(err).To(MatchError(ContainSubstring("not found")), "getting control plane machine set should not error")
+	} else {
+		Expect(cpms).To(HaveField("Spec.State", machinev1.ControlPlaneMachineSetStateInactive), "control plane machine set should be inactive or should not exist")
+	}
 }
 
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
@@ -196,4 +231,78 @@ func EnsureControlPlaneMachineSetUpdateStrategy(testFramework framework.Framewor
 	Eventually(updateArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
 
 	return originalStrategy
+}
+
+// EnsureControlPlaneMachineSetUpdated ensures the control plane machine set is up to date.
+func EnsureControlPlaneMachineSetUpdated(testFramework framework.Framework) {
+	By("Checking the control plane machine set is up to date")
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+	k8sClient := testFramework.GetClient()
+	ctx := testFramework.GetContext()
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+	WaitForControlPlaneMachineSetDesiredReplicas(ctx, cpms)
+}
+
+// EnsureControlPlaneMachineSetDeleted ensures the control plane machine set
+// is deleted and properly removed/recreated.
+func EnsureControlPlaneMachineSetDeleted(testFramework framework.Framework) {
+	By("Ensuring the control plane machine set is deleted")
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+	k8sClient := testFramework.GetClient()
+	ctx := testFramework.GetContext()
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).
+		To(Succeed(), "control plane machine set should exist")
+
+	DeleteControlPlaneMachineSet(testFramework, ctx, cpms)
+
+	WaitForControlPlaneMachineSetRemovedOrRecreated(ctx, cpms, testFramework)
+}
+
+// DeleteControlPlaneMachineSet deletes the control plane machine set.
+func DeleteControlPlaneMachineSet(testFramework framework.Framework, ctx context.Context, cpms *machinev1.ControlPlaneMachineSet) {
+	By("Deleting the control plane machine set")
+
+	k8sClient := testFramework.GetClient()
+	Expect(k8sClient.Delete(ctx, cpms)).To(Succeed(), "control plane machine set should have been deleted")
+}
+
+// WaitForControlPlaneMachineSetRemovedOrRecreated waits for the control plane machine set to be removed.
+func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, cpms *machinev1.ControlPlaneMachineSet, testFramework framework.Framework) bool {
+	By("Waiting for the deleted control plane machine set to be removed/recreated")
+
+	oldUID := cpms.ObjectMeta.UID
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	k8sClient := testFramework.GetClient()
+
+	if ok := Eventually(func() error {
+		newCPMS := &machinev1.ControlPlaneMachineSet{}
+		if err := k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), newCPMS); err != nil {
+			return fmt.Errorf("error getting control plane machine set: %w", err)
+		}
+
+		if newCPMS.GetUID() == oldUID {
+			return errUIDNotChanged
+		}
+
+		return nil
+	}).Should(SatisfyAny(
+		BeNil(),
+		MatchError("not found"),
+	), "control plane machine set should be inactive or should not exist"); !ok {
+		return false
+	}
+
+	By("Control plane machine set is now removed/recreated")
+
+	return true
 }

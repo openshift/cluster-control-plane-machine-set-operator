@@ -256,3 +256,45 @@ func waitForNewMachineRunning(ctx context.Context, oldMachine, newMachine *machi
 		},
 	)
 }
+
+// ExpectControlPlaneMachinesAllRunning checks that all the control plane machines
+// are in running phase.
+func ExpectControlPlaneMachinesAllRunning(testFramework framework.Framework) {
+	By("Checking the control plane machines are all in running phase")
+
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+
+	machineList := &machinev1beta1.MachineList{}
+
+	Eventually(komega.ObjectList(machineList, machineSelector)).Should(HaveField("Items",
+		HaveEach(HaveField("Status.Phase", HaveValue(Equal("Running")))),
+	), "expected all of the control plane machines to be in running phase")
+}
+
+// ExpectControlPlaneMachinesNotOwned checks that none of the control plane machines
+// have owner references.
+func ExpectControlPlaneMachinesNotOwned(testFramework framework.Framework) {
+	By("Checking that none of the control plane machines have owner references")
+
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+
+	machineList := &machinev1beta1.MachineList{}
+
+	Eventually(komega.ObjectList(machineList, machineSelector)).Should(HaveField("Items",
+		HaveEach(HaveField("ObjectMeta.OwnerReferences", HaveLen(0))),
+	), "expected none of the control plane machines to have owner references")
+}
+
+// ExpectControlPlaneMachinesWithoutDeletionTimestamp checks that none of the control plane machines
+// has a deletion timestamp.
+func ExpectControlPlaneMachinesWithoutDeletionTimestamp(testFramework framework.Framework) {
+	By("Checking that none of the control plane machines have a deletion timestamp")
+
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+
+	machineList := &machinev1beta1.MachineList{}
+
+	Eventually(komega.ObjectList(machineList, machineSelector)).Should(HaveField("Items",
+		HaveEach(HaveField("ObjectMeta.DeletionTimestamp", BeNil())),
+	), "expected none of the control plane machines to have a deletionTimestap")
+}
