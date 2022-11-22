@@ -32,12 +32,12 @@ import (
 var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func() {
 	BeforeEach(func() {
 		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
-	})
+	}, OncePerOrdered)
 
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			common.EnsureActiveControlPlaneMachineSet(testFramework)
-		})
+		}, OncePerOrdered)
 
 		Context("and the instance type of index 1 is not as expected", func() {
 			BeforeEach(func() {
@@ -52,24 +52,26 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 
 			BeforeEach(func() {
 				originalStrategy = common.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
-			})
+			}, OncePerOrdered)
 
 			AfterEach(func() {
 				common.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
-			})
+			}, OncePerOrdered)
 
-			Context("and the instance type of index 2 is not as expected", func() {
+			Context("and the instance type of index 2 is not as expected", Ordered, func() {
 				var originalProviderSpec machinev1beta1.ProviderSpec
 
-				BeforeEach(func() {
+				BeforeAll(func() {
 					originalProviderSpec = presubmit.IncreaseControlPlaneMachineInstanceSize(testFramework, 2)
 				})
 
-				AfterEach(func() {
+				AfterAll(func() {
 					presubmit.UpdateControlPlaneMachineProviderSpec(testFramework, 2, originalProviderSpec)
 				})
 
 				presubmit.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
+
+				presubmit.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
 
 			})
 		})

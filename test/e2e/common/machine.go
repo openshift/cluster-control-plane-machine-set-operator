@@ -87,6 +87,41 @@ func CheckControlPlaneMachineRollingReplacement(testFramework framework.Framewor
 	return true
 }
 
+// CheckControlPlaneMachineOnDeleteReplacement checks that the machines with the given index
+// are being replaced in a on delete style with the expected conditions.
+// This function explicitly takes a context which is expected to have a timeout in the parent scope.
+func CheckControlPlaneMachineOnDeleteReplacement(testFramework framework.Framework, idx int, ctx context.Context) bool {
+	oldMachine, newMachine, ok := getOldAndNewMachineForIndex(ctx, testFramework, idx)
+	if !ok {
+		return false
+	}
+
+	// Check the machines name matches the expected format.
+	By("Checking the replacement machine name")
+
+	if ok := checkReplacementMachineName(newMachine, idx); !ok {
+		return false
+	}
+
+	By("Replacement machine name is correct")
+	By("Waiting for the new machine become Running")
+
+	if ok := Eventually(komega.Object(newMachine), ctx).Should(HaveField("Status.Phase", HaveValue(Equal("Running"))), "expected new machine to be running"); !ok {
+		return false
+	}
+
+	By("Replacement machine is Running")
+	By("Checking that the old machine is removed")
+
+	if ok := Eventually(komega.Get(oldMachine), ctx).Should(MatchError(ContainSubstring("not found")), "expected old machine to be removed from the cluster"); !ok {
+		return false
+	}
+
+	By(fmt.Sprintf("Rollout of index %d complete", idx))
+
+	return true
+}
+
 // EventuallyIndexIsBeingReplaced checks that the index given, eventually receives
 // a replacement Machine.
 // It simultaneously checks that no other index is being replaced, this short circuits
