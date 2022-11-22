@@ -168,3 +168,32 @@ func WaitForControlPlaneMachineSetDesiredReplicas(ctx context.Context, cpms *mac
 
 	return true
 }
+
+// EnsureControlPlaneMachineSetUpdateStrategy ensures that the control plane machine set has the specified update strategy.
+func EnsureControlPlaneMachineSetUpdateStrategy(testFramework framework.Framework, strategy machinev1.ControlPlaneMachineSetStrategyType, gomegaArgs ...interface{}) machinev1.ControlPlaneMachineSetStrategyType {
+	k8sClient := testFramework.GetClient()
+	ctx := testFramework.GetContext()
+
+	cpms := framework.NewEmptyControlPlaneMachineSet()
+	if err := k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms); apierrors.IsNotFound(err) {
+		Fail("control plane machine set does not exist")
+	} else if err != nil {
+		Fail(fmt.Sprintf("error when checking if a control plane machine set exists: %v", err))
+	}
+
+	originalStrategy := cpms.Spec.Strategy.Type
+	if originalStrategy == strategy {
+		return originalStrategy
+	}
+
+	updateArgs := append([]interface{}{
+		komega.Update(cpms, func() {
+			cpms.Spec.Strategy.Type = strategy
+		}),
+	}, gomegaArgs...)
+
+	By(fmt.Sprintf("Updating the control plane machine set strategy to %s", strategy))
+	Eventually(updateArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+
+	return originalStrategy
+}

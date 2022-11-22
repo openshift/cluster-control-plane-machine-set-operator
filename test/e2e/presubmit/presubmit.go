@@ -18,6 +18,7 @@ package presubmit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -35,17 +36,57 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
+var (
+	errMoreThanOneMachineInIndex = errors.New("more than one control plane machine in index")
+)
+
 // IncreaseControlPlaneMachineInstanceSize increases the instance size of the control plane machine
 // in the given index. This should trigger the control plane machine set to update the machine in
 // this index based on the update strategy.
 func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, index int, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	machine, err := machineForIndex(testFramework, index)
+	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+	originalProviderSpec := machine.Spec.ProviderSpec
+
+	updatedProviderSpec := originalProviderSpec.DeepCopy()
+	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+
+	By("Updating the control plane machine provider spec")
+
+	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
+		machine.Spec.ProviderSpec = *updatedProviderSpec
+	})}, gomegaArgs...)
+	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+
+	return originalProviderSpec
+}
+
+// UpdateControlPlaneMachineProviderSpec updates the provider spec of the control plane machine in the given index
+// to match the provider spec given.
+func UpdateControlPlaneMachineProviderSpec(testFramework framework.Framework, index int, updatedProviderSpec machinev1beta1.ProviderSpec, gomegaArgs ...interface{}) {
+	machine, err := machineForIndex(testFramework, index)
+	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
+		machine.Spec.ProviderSpec = updatedProviderSpec
+	})}, gomegaArgs...)
+	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+}
+
+// machineForIndex returns the control plane machine in the given index.
+// If multiple machines exist within the index, an error is returned.
+// Only use this when you expect exactly one machine in the index.
+func machineForIndex(testFramework framework.Framework, index int) (*machinev1beta1.Machine, error) {
 	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
 	machineList := &machinev1beta1.MachineList{}
 
 	ctx := testFramework.GetContext()
 	k8sClient := testFramework.GetClient()
 
-	Expect(k8sClient.List(ctx, machineList, machineSelector)).Should(Succeed(), "control plane machines should be able to be listed")
+	if err := k8sClient.List(ctx, machineList, machineSelector); err != nil {
+		return nil, fmt.Errorf("could not list control plane machines: %w", err)
+	}
 
 	var indexMachine *machinev1beta1.Machine
 
@@ -55,25 +96,13 @@ func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, 
 		}
 
 		if indexMachine != nil {
-			Fail(fmt.Sprintf("more than one control plane machine with index %d: %s and %s", index, indexMachine.GetName(), machine.GetName()))
+			return nil, fmt.Errorf("%w %d: %s and %s", errMoreThanOneMachineInIndex, index, indexMachine.GetName(), machine.GetName())
 		}
 
 		indexMachine = machine.DeepCopy()
 	}
 
-	originalProviderSpec := indexMachine.Spec.ProviderSpec
-
-	updatedProviderSpec := originalProviderSpec.DeepCopy()
-	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
-
-	By("Updating the control plane machine provider spec")
-
-	updateMachineArgs := append([]interface{}{komega.Update(indexMachine, func() {
-		indexMachine.Spec.ProviderSpec = *updatedProviderSpec
-	})}, gomegaArgs...)
-	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
-
-	return originalProviderSpec
+	return indexMachine, nil
 }
 
 // ItShouldRollingUpdateReplaceTheOutdatedMachine checks that the control plane machine set replaces, via a rolling update,
@@ -115,5 +144,33 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		By("Waiting for the cluster to stabilise after the rollout")
 		common.EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
 		By("Cluster stabilised after the rollout")
+	})
+}
+
+// ItShouldNotOnDeleteReplaceTheOutdatedMachine checks that the control plane machine set does not replace the outdated
+// machine in the given index when the update strategy is OnDelete.
+func ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework framework.Framework, index int) {
+	It("should not replace the outdated machine", func() {
+		k8sClient := testFramework.GetClient()
+		ctx := testFramework.GetContext()
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		// We expected the updated replicas count to fall to 2, other values should remain
+		// as expected.
+		Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+			HaveField("Replicas", Equal(int32(3))),
+			HaveField("UpdatedReplicas", Equal(int32(2))),
+			HaveField("ReadyReplicas", Equal(int32(3))),
+		)))
+
+		// Check the Machine doesn't get deleted by the CPMS. We assume that if the CPMS hasn't removed
+		// the Machine within 1 minute that it won't remove it at all.
+		Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", ContainElement(SatisfyAll(
+			HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+			HaveField("ObjectMeta.DeletionTimestamp", BeNil()),
+			HaveField("Status.Phase", HaveValue(Equal("Running"))),
+		))))
 	})
 }
