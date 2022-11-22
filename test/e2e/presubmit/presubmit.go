@@ -132,7 +132,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return common.CheckRolloutForIndex(testFramework, rolloutCtx, 1)
+			return common.CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.RollingUpdate)
 		})
 
 		wg.Wait()
@@ -172,6 +172,50 @@ func ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework framework.Framew
 			HaveField("ObjectMeta.DeletionTimestamp", BeNil()),
 			HaveField("Status.Phase", HaveValue(Equal("Running"))),
 		))))
+	})
+}
+
+// ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted checks that the control plane machine set replaces the outdated
+// machine in the given index when the update strategy is OnDelete and the outdated machine is deleted.
+func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framework.Framework, index int) {
+	It("should replace the outdated machine when deleted", func() {
+		k8sClient := testFramework.GetClient()
+		ctx := testFramework.GetContext()
+
+		// Make sure the CPMS exists before we delete the Machine, just in case.
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		machine, err := machineForIndex(testFramework, index)
+		Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+		// Delete the Machine.
+		By("Deleting the machine")
+		Expect(k8sClient.Delete(ctx, machine)).To(Succeed(), "control plane machine should be able to be deleted")
+
+		// Deleting the Machine triggers a rollout, give the rollout 30 minutes to complete.
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
+		defer cancel()
+
+		wg := &sync.WaitGroup{}
+
+		framework.Async(wg, cancel, func() bool {
+			return common.WaitForControlPlaneMachineSetDesiredReplicas(rolloutCtx, cpms.DeepCopy())
+		})
+
+		framework.Async(wg, cancel, func() bool {
+			return common.CheckRolloutForIndex(testFramework, rolloutCtx, index, machinev1.OnDelete)
+		})
+
+		wg.Wait()
+
+		// If there's an error in the context, either it timed out or one of the async checks failed.
+		Expect(rolloutCtx.Err()).ToNot(HaveOccurred(), "rollout should have completed successfully")
+		By("Control plane machine rollout completed successfully")
+
+		By("Waiting for the cluster to stabilise after the rollout")
+		common.EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
+		By("Cluster stabilised after the rollout")
 	})
 }
 

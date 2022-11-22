@@ -26,13 +26,14 @@ import (
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
+	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 // CheckRolloutForIndex first checks that a new machine is created in the correct index,
 // and then checks that the new machine in the index is replaced correctly.
-func CheckRolloutForIndex(testFramework framework.Framework, ctx context.Context, idx int) bool {
+func CheckRolloutForIndex(testFramework framework.Framework, ctx context.Context, idx int, strategy machinev1.ControlPlaneMachineSetStrategyType) bool {
 	By(fmt.Sprintf("Waiting for the index %d to be replaced", idx))
 	// Don't provide additional timeouts here, the default should be enough.
 	if ok := EventuallyIndexIsBeingReplaced(ctx, idx); !ok {
@@ -42,8 +43,21 @@ func CheckRolloutForIndex(testFramework framework.Framework, ctx context.Context
 	By(fmt.Sprintf("Index %d replacement created", idx))
 	By(fmt.Sprintf("Checking the replacement machine for index %d", idx))
 
-	if ok := CheckControlPlaneMachineRollingReplacement(testFramework, idx, ctx); !ok {
+	switch strategy {
+	case machinev1.RollingUpdate:
+		if ok := CheckControlPlaneMachineRollingReplacement(testFramework, idx, ctx); !ok {
+			return false
+		}
+	case machinev1.OnDelete:
+		if ok := CheckControlPlaneMachineOnDeleteReplacement(testFramework, idx, ctx); !ok {
+			return false
+		}
+	case machinev1.Recreate:
+		Fail("Recreate strategy not supported")
 		return false
+	default:
+		// Panic here as the test suite should never reach this point.
+		panic(fmt.Sprintf("unknown strategy %q", strategy))
 	}
 
 	By(fmt.Sprintf("Replacement for index %d is complete", idx))

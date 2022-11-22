@@ -100,15 +100,15 @@ func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
 
 // checkRolloutProgress monitors the progress of each index in the rollout in turn.
 func checkRolloutProgress(testFramework framework.Framework, ctx context.Context) bool {
-	if ok := common.CheckRolloutForIndex(testFramework, ctx, 0); !ok {
+	if ok := common.CheckRolloutForIndex(testFramework, ctx, 0, machinev1.RollingUpdate); !ok {
 		return false
 	}
 
-	if ok := common.CheckRolloutForIndex(testFramework, ctx, 1); !ok {
+	if ok := common.CheckRolloutForIndex(testFramework, ctx, 1, machinev1.RollingUpdate); !ok {
 		return false
 	}
 
-	if ok := common.CheckRolloutForIndex(testFramework, ctx, 2); !ok {
+	if ok := common.CheckRolloutForIndex(testFramework, ctx, 2, machinev1.RollingUpdate); !ok {
 		return false
 	}
 
