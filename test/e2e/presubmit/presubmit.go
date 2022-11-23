@@ -113,7 +113,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		ctx := testFramework.GetContext()
 
 		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		// We give the rollout 30 minutes to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check
@@ -155,7 +155,7 @@ func ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework framework.Framew
 		ctx := testFramework.GetContext()
 
 		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		// We expected the updated replicas count to fall to 2, other values should remain
 		// as expected.
@@ -184,7 +184,7 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 
 		// Make sure the CPMS exists before we delete the Machine, just in case.
 		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		machine, err := machineForIndex(testFramework, index)
 		Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
@@ -240,7 +240,7 @@ func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework framewor
 		k8sClient := testFramework.GetClient()
 
 		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+		Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		Expect(cpms.Spec.Replicas).ToNot(BeNil(), "replicas should always be set")
 
@@ -266,7 +266,7 @@ func ItShouldNotCauseARollout(testFramework framework.Framework) {
 		ctx := testFramework.GetContext()
 
 		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		Expect(cpms.Spec.Replicas).ToNot(BeNil(), "replicas should always be set")
 		desiredReplicas := *cpms.Spec.Replicas

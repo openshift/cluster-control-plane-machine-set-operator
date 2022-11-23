@@ -36,7 +36,7 @@ import (
 // This should trigger the control plane machine set to update the machines based on the
 // update strategy.
 func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
-	cpms := framework.NewEmptyControlPlaneMachineSet()
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
 
 	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
 	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
@@ -64,7 +64,7 @@ func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
 		ctx := testFramework.GetContext()
 
 		cpms := &machinev1.ControlPlaneMachineSet{}
-		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		// We give the rollout an hour to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check

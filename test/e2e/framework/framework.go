@@ -28,6 +28,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -55,6 +56,10 @@ var (
 // Framework is an interface for getting clients and information
 // about the environment within test cases.
 type Framework interface {
+	// ControlPlaneMachineSetKey returns the object key for fetching a control plane
+	// machine set.
+	ControlPlaneMachineSetKey() runtimeclient.ObjectKey
+
 	// LoadClient returns a new controller-runtime client.
 	GetClient() runtimeclient.Client
 
@@ -69,6 +74,10 @@ type Framework interface {
 
 	// GetScheme returns the scheme.
 	GetScheme() *runtime.Scheme
+
+	// NewEmptyControlPlaneMachineSet returns a new control plane machine set with
+	// just the name and namespace set.
+	NewEmptyControlPlaneMachineSet() *machinev1.ControlPlaneMachineSet
 
 	// IncreaseProviderSpecInstanceSize increases the instance size of the
 	// providerSpec passed. This is used to trigger updates to the Machines
@@ -100,6 +109,7 @@ type framework struct {
 	platform     configv1.PlatformType
 	supportLevel PlatformSupportLevel
 	scheme       *runtime.Scheme
+	namespace    string
 }
 
 // NewFramework initialises a new test framework for the E2E suite.
@@ -124,7 +134,29 @@ func NewFramework() (Framework, error) {
 		platform:     platform,
 		supportLevel: supportLevel,
 		scheme:       sch,
+		namespace:    MachineAPINamespace,
 	}, nil
+}
+
+// NewFrameworkWith initialises a new test framework for the E2E suite
+// using the existing scheme, client, platform and support level provided.
+func NewFrameworkWith(sch *runtime.Scheme, client runtimeclient.Client, platform configv1.PlatformType, supportLevel PlatformSupportLevel, namespace string) Framework {
+	return &framework{
+		client:       client,
+		platform:     platform,
+		supportLevel: supportLevel,
+		scheme:       sch,
+		namespace:    namespace,
+	}
+}
+
+// ControlPlaneMachineSetKey is the object key for fetching a control plane
+// machine set.
+func (f *framework) ControlPlaneMachineSetKey() runtimeclient.ObjectKey {
+	return runtimeclient.ObjectKey{
+		Namespace: f.namespace,
+		Name:      ControlPlaneMachineSetName,
+	}
 }
 
 // GetClient returns a controller-runtime client.
@@ -150,6 +182,17 @@ func (f *framework) GetPlatformSupportLevel() PlatformSupportLevel {
 // GetScheme returns the scheme.
 func (f *framework) GetScheme() *runtime.Scheme {
 	return f.scheme
+}
+
+// NewEmptyControlPlaneMachineSet returns a new control plane machine set with
+// just the name and namespace set.
+func (f *framework) NewEmptyControlPlaneMachineSet() *machinev1.ControlPlaneMachineSet {
+	return &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ControlPlaneMachineSetName,
+			Namespace: f.namespace,
+		},
+	}
 }
 
 // IncreaseProviderSpecInstanceSize increases the instance size of the instance on the providerSpec
