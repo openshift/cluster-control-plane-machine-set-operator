@@ -41,7 +41,9 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				periodic.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
 			})
 
-			periodic.ItShouldPerformARollingUpdate(testFramework)
+			periodic.ItShouldPerformARollingUpdate(&periodic.TestOptions{
+				TestFramework: testFramework,
+			})
 		})
 
 	})

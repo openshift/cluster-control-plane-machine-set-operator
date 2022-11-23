@@ -32,6 +32,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
+// TestOptions allow the test cases to be configured with a test framework and
+// optional timeouts.
+type TestOptions struct {
+	TestFramework        framework.Framework
+	RolloutTimeout       time.Duration
+	StabilisationTimeout time.Duration
+}
+
 // IncreaseControlPlaneMachineSetInstanceSize increases the instance size of the control plane machine set.
 // This should trigger the control plane machine set to update the machines based on the
 // update strategy.
@@ -58,8 +66,12 @@ func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framewor
 
 // ItShouldPerformARollingUpdate checks that the control plane machine set performs a rolling update
 // in the manner desired.
-func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
+func ItShouldPerformARollingUpdate(opts *TestOptions) {
 	It("should perform a rolling update", Offset(1), func() {
+		Expect(opts).ToNot(BeNil(), "test options are required")
+		Expect(opts.TestFramework).ToNot(BeNil(), "testFramework is required")
+
+		testFramework := opts.TestFramework
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
@@ -69,7 +81,12 @@ func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
 		// We give the rollout an hour to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check
 		// until they pass or until the timeout is reached.
-		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 1*time.Hour)
+		rolloutTimeout := 1 * time.Hour
+		if opts.RolloutTimeout.Seconds() != 0 {
+			rolloutTimeout = opts.RolloutTimeout
+		}
+
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), rolloutTimeout)
 		defer cancel()
 
 		wg := &sync.WaitGroup{}
@@ -93,7 +110,14 @@ func ItShouldPerformARollingUpdate(testFramework framework.Framework) {
 		By("Control plane machine replacement completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		common.EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
+		stabilisationTimeout := 20 * time.Minute
+		if opts.StabilisationTimeout.Seconds() != 0 {
+			stabilisationTimeout = opts.StabilisationTimeout
+		}
+
+		stabilisationInterval := stabilisationTimeout / 50
+
+		common.EventuallyClusterOperatorsShouldStabilise(stabilisationTimeout, stabilisationInterval)
 		By("Cluster stabilised after the rollout")
 	})
 }
