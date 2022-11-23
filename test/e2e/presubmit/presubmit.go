@@ -186,3 +186,27 @@ func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framewor
 		common.EventuallyClusterOperatorsShouldStabilise()
 	})
 }
+
+// ItShouldHaveTheControlPlaneMachineSetReplicasUpdated checks that the control plane machine set replicas are updated.
+func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework framework.Framework) {
+	It("should have the control plane machine set replicas up to date", func() {
+		By("Checking the control plane machine set replicas are up to date")
+
+		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+		k8sClient := testFramework.GetClient()
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		Expect(cpms.Spec.Replicas).ToNot(BeNil(), "replicas should always be set")
+
+		desiredReplicas := *cpms.Spec.Replicas
+
+		Expect(cpms).To(SatisfyAll(
+			HaveField("Status.Replicas", Equal(desiredReplicas)),
+			HaveField("Status.UpdatedReplicas", Equal(desiredReplicas)),
+			HaveField("Status.ReadyReplicas", Equal(desiredReplicas)),
+			HaveField("Status.UnavailableReplicas", Equal(int32(0))),
+		), "control plane machine set replicas should be up to date")
+	})
+}
