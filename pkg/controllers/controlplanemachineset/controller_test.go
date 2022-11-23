@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,6 +31,9 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/periodic"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/integration"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +47,7 @@ import (
 var _ = Describe("With a running controller", func() {
 	var mgrCancel context.CancelFunc
 	var mgrDone chan struct{}
+	var mgr ctrl.Manager
 
 	var namespaceName string
 
@@ -149,7 +154,8 @@ var _ = Describe("With a running controller", func() {
 		namespaceName = ns.GetName()
 
 		By("Setting up a manager and controller")
-		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		var err error
+		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
 			Scheme:             testScheme,
 			MetricsBindAddress: "0",
 			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
@@ -974,6 +980,69 @@ var _ = Describe("With a running controller", func() {
 			It("should re-add the controlplanemachineset.machine.openshift.io finalizer", func() {
 				Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
 			})
+		})
+	})
+
+	Context("with updated machines", func() {
+		var cpms *machinev1.ControlPlaneMachineSet
+
+		BeforeEach(func() {
+			By("Creating Machines owned by the ControlPlaneMachineSet")
+			machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+			By("Registering the integration machine manager")
+
+			// The machine manager is a dummy implementation that moves machines from zero, through the expected
+			// phases and then eventually to the Running phase.
+			// This allows the CPMS to react to the changes in the machine status and run through its own logic.
+			// We use it here so that we can simulate a full rolling replacement of the control plane which needs
+			// machines to be able to move through the phases to the Running phase.
+
+			machineManager := integration.NewIntegrationMachineManager(integration.MachineManagerOptions{
+				ActionDelay: 500 * time.Millisecond,
+			})
+			Expect(machineManager.SetupWithManager(mgr)).To(Succeed())
+
+			// Wait for the machines to all report running before creating the CPMS.
+			By("Waiting for the machines to become ready")
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+				HaveField("Status.Phase", HaveValue(Equal("Running"))),
+			)))
+
+			// The default CPMS should be sufficient for this test.
+			By("Creating the ControlPlaneMachineSet")
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+			By("Waiting for the ControlPlaneMachineSet to report a stable status")
+			Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+				HaveField("Replicas", Equal(int32(3))),
+				HaveField("UpdatedReplicas", Equal(int32(3))),
+				HaveField("ReadyReplicas", Equal(int32(3))),
+				HaveField("UnavailableReplicas", Equal(int32(0))),
+			)))
+		})
+
+		Context("and the instance size is changed", func() {
+			var testOptions periodic.TestOptions
+
+			BeforeEach(func() {
+				// The CPMS is configured for AWS so use the AWS Platform Type.
+				testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
+
+				periodic.IncreaseControlPlaneMachineSetInstanceSize(testFramework, 10*time.Second, 1*time.Second)
+
+				testOptions.TestFramework = testFramework
+
+				testOptions.RolloutTimeout = 10 * time.Second
+				testOptions.StabilisationTimeout = 1 * time.Second
+			})
+
+			periodic.ItShouldPerformARollingUpdate(&testOptions)
 		})
 	})
 
