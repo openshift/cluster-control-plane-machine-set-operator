@@ -126,6 +126,10 @@ func RunCheckUntil(ctx context.Context, check, condition func(context.Context, G
 		case conditionErr == nil:
 			// The until finally succeeded.
 			return nil
+		case errors.Is(conditionErr, errContextCancelled) || errors.Is(checkErr, errContextCancelled):
+			// The context was cancelled.
+			// Return the context cancelled error so that the Eventually will fail with a consistent error.
+			return errContextCancelled
 		case checkErr != nil:
 			// The check failed but the until has not completed.
 			// Abort the check.
@@ -133,7 +137,7 @@ func RunCheckUntil(ctx context.Context, check, condition func(context.Context, G
 		default:
 			return conditionErr
 		}
-	}).WithContext(ctx).Should(gomega.Succeed())
+	}).WithContext(ctx).Should(gomega.Succeed(), "check failed or condition did not succeed before the context was cancelled")
 }
 
 // runAssertion runs the assertion function and returns an error if the assertion failed.
