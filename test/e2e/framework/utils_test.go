@@ -168,6 +168,7 @@ var _ = Describe("Async utils", func() {
 			// we intercept it, only the eventually error is reported.
 			Expect(errs).To(ConsistOf(MatchError(SatisfyAll(
 				ContainSubstring("Context was cancelled"),
+				ContainSubstring("check failed or condition did not succeed before the context was cancelled"),
 				ContainSubstring("Expected success, but got an error"),
 			))))
 		})
