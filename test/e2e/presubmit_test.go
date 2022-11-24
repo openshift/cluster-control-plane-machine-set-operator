@@ -92,6 +92,15 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 
 				presubmit.ItShouldUninstallTheControlPlaneMachineSet(testFramework)
 				presubmit.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework)
+
+				Context("and the ControlPlaneMachineSet is reactivated", func() {
+					BeforeEach(func() {
+						common.EnsureControlPlaneMachineSetUpdated(testFramework)
+						common.EnsureActiveControlPlaneMachineSet(testFramework)
+					})
+
+					presubmit.ItShouldNotCauseARollout(testFramework)
+				})
 			})
 		})
 	})
