@@ -89,6 +89,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				})
 
 				presubmit.ItShouldUninstallTheControlPlaneMachineSet(testFramework)
+				presubmit.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework)
 			})
 		})
 	})
