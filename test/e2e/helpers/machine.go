@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package helpers
 
 import (
 	"context"
@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -44,6 +45,9 @@ const (
 var (
 	// errMachineNameFormatInvalid is returned when the machine name does not match the expected format.
 	errMachineNameFormatInvalid = errors.New("machine name does not match expected format")
+
+	// errMoreThanOneMachineInIndex is returned when there is more than one machine in the given index.
+	errMoreThanOneMachineInIndex = errors.New("more than one control plane machine in index")
 )
 
 // CheckControlPlaneMachineRollingReplacement checks that the machines with the given index
@@ -332,4 +336,69 @@ func ExpectControlPlaneMachinesWithoutDeletionTimestamp(testFramework framework.
 	Eventually(komega.ObjectList(machineList, machineSelector)).Should(HaveField("Items",
 		HaveEach(HaveField("ObjectMeta.DeletionTimestamp", BeNil())),
 	), "expected none of the control plane machines to have a deletionTimestap")
+}
+
+// IncreaseControlPlaneMachineInstanceSize increases the instance size of the control plane machine
+// in the given index. This should trigger the control plane machine set to update the machine in
+// this index based on the update strategy.
+func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, index int, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	machine, err := machineForIndex(testFramework, index)
+	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+	originalProviderSpec := machine.Spec.ProviderSpec
+
+	updatedProviderSpec := originalProviderSpec.DeepCopy()
+	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+
+	By("Updating the control plane machine provider spec")
+
+	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
+		machine.Spec.ProviderSpec = *updatedProviderSpec
+	})}, gomegaArgs...)
+	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+
+	return originalProviderSpec
+}
+
+// UpdateControlPlaneMachineProviderSpec updates the provider spec of the control plane machine in the given index
+// to match the provider spec given.
+func UpdateControlPlaneMachineProviderSpec(testFramework framework.Framework, index int, updatedProviderSpec machinev1beta1.ProviderSpec, gomegaArgs ...interface{}) {
+	machine, err := machineForIndex(testFramework, index)
+	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
+		machine.Spec.ProviderSpec = updatedProviderSpec
+	})}, gomegaArgs...)
+	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+}
+
+// machineForIndex returns the control plane machine in the given index.
+// If multiple machines exist within the index, an error is returned.
+// Only use this when you expect exactly one machine in the index.
+func machineForIndex(testFramework framework.Framework, index int) (*machinev1beta1.Machine, error) {
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+	machineList := &machinev1beta1.MachineList{}
+
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	if err := k8sClient.List(ctx, machineList, machineSelector); err != nil {
+		return nil, fmt.Errorf("could not list control plane machines: %w", err)
+	}
+
+	var indexMachine *machinev1beta1.Machine
+
+	for _, machine := range machineList.Items {
+		if !strings.HasSuffix(machine.Name, fmt.Sprintf("-%d", index)) {
+			continue
+		}
+
+		if indexMachine != nil {
+			return nil, fmt.Errorf("%w %d: %s and %s", errMoreThanOneMachineInIndex, index, indexMachine.GetName(), machine.GetName())
+		}
+
+		indexMachine = machine.DeepCopy()
+	}
+
+	return indexMachine, nil
 }

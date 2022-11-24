@@ -21,27 +21,26 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/periodic"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func() {
 	BeforeEach(func() {
-		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
+		helpers.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
 	})
 
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
-			common.EnsureActiveControlPlaneMachineSet(testFramework)
+			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		})
 
 		Context("and the instance type is changed", func() {
 			BeforeEach(func() {
-				periodic.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
+				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
 			})
 
-			periodic.ItShouldPerformARollingUpdate(&periodic.TestOptions{
+			helpers.ItShouldPerformARollingUpdate(&helpers.TestOptions{
 				TestFramework: testFramework,
 			})
 		})

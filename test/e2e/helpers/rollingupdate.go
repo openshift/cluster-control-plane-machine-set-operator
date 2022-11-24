@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package helpers
 
 import (
 	"context"
@@ -78,4 +78,21 @@ func CheckReplicasDoesNotExceedSurgeCapacity(ctx context.Context) bool {
 		HaveLen(3),
 		HaveLen(4),
 	)), "control plane machines should never go above 4 replicas, or below 3 replicas")
+}
+
+// checkRolloutProgress monitors the progress of each index in the rollout in turn.
+func checkRolloutProgress(testFramework framework.Framework, ctx context.Context) bool {
+	if ok := CheckRolloutForIndex(testFramework, ctx, 0, machinev1.RollingUpdate); !ok {
+		return false
+	}
+
+	if ok := CheckRolloutForIndex(testFramework, ctx, 1, machinev1.RollingUpdate); !ok {
+		return false
+	}
+
+	if ok := CheckRolloutForIndex(testFramework, ctx, 2, machinev1.RollingUpdate); !ok {
+		return false
+	}
+
+	return true
 }
