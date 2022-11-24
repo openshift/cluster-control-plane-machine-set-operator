@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package helpers
 
 import (
 	"context"
@@ -23,10 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 
-	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,14 +35,6 @@ import (
 var (
 	errUIDNotChanged = errors.New("UID has not changed")
 )
-
-// ItShouldHaveAnActiveControlPlaneMachineSet returns an It that checks
-// there is an active control plane machine set installed within the cluster.
-func ItShouldHaveAnActiveControlPlaneMachineSet(testFramework framework.Framework) {
-	It("should have an active control plane machine set", Offset(1), func() {
-		ExpectControlPlaneMachineSetToBeActive(testFramework)
-	})
-}
 
 // ExpectControlPlaneMachineSetToBeActive gets the control plane machine set and
 // checks that it is active.
@@ -85,29 +76,6 @@ func ExpectControlPlaneMachineSetToBeInactiveOrNotFound(testFramework framework.
 	} else {
 		Expect(cpms).To(HaveField("Spec.State", machinev1.ControlPlaneMachineSetStateInactive), "control plane machine set should be inactive or should not exist")
 	}
-}
-
-// EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
-// Stabilise means that they are available, are not progressing, and are not degraded.
-func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
-	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
-	defer format.UnregisterCustomFormatter(key)
-
-	// The following assertion checks:
-	// The list "Items", all (ConsistOf) have a field "Status.Conditions",
-	// that contain elements that are both "Type" something and "Status" something.
-	clusterOperators := &configv1.ClusterOperatorList{}
-	gomegaArgs = append([]interface{}{komega.ObjectList(clusterOperators)}, gomegaArgs...)
-
-	By("Waiting for the cluster operators to stabilise")
-
-	Eventually(gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
-		SatisfyAll(
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorAvailable)), HaveField("Status", Equal(configv1.ConditionTrue)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorProgressing)), HaveField("Status", Equal(configv1.ConditionFalse)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorDegraded)), HaveField("Status", Equal(configv1.ConditionFalse)))),
-		),
-	))), "cluster operators should all be available, not progressing and not degraded")
 }
 
 // EnsureActiveControlPlaneMachineSet ensures that there is an active control plane machine set
@@ -305,4 +273,28 @@ func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, cpms *
 	By("Control plane machine set is now removed/recreated")
 
 	return true
+}
+
+// IncreaseControlPlaneMachineSetInstanceSize increases the instance size of the control plane machine set.
+// This should trigger the control plane machine set to update the machines based on the
+// update strategy.
+func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+
+	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
+	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
+
+	updatedProviderSpec := originalProviderSpec.DeepCopy()
+	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+
+	By("Increasing the control plane machine set instance size")
+
+	updateCPMSArgs := append([]interface{}{komega.Update(cpms, func() {
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
+	})}, gomegaArgs...)
+	Eventually(updateCPMSArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+
+	return originalProviderSpec
 }

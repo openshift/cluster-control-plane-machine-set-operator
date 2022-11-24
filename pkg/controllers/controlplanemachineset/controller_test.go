@@ -31,7 +31,7 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/periodic"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/integration"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1026,13 +1026,13 @@ var _ = Describe("With a running controller", func() {
 		})
 
 		Context("and the instance size is changed", func() {
-			var testOptions periodic.TestOptions
+			var testOptions helpers.TestOptions
 
 			BeforeEach(func() {
 				// The CPMS is configured for AWS so use the AWS Platform Type.
 				testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
 
-				periodic.IncreaseControlPlaneMachineSetInstanceSize(testFramework, 10*time.Second, 1*time.Second)
+				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework, 10*time.Second, 1*time.Second)
 
 				testOptions.TestFramework = testFramework
 
@@ -1040,7 +1040,7 @@ var _ = Describe("With a running controller", func() {
 				testOptions.StabilisationTimeout = 1 * time.Second
 			})
 
-			periodic.ItShouldPerformARollingUpdate(&testOptions)
+			helpers.ItShouldPerformARollingUpdate(&testOptions)
 		})
 	})
 

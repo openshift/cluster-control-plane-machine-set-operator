@@ -24,82 +24,80 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/presubmit"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func() {
 	BeforeEach(func() {
-		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
+		helpers.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
 	}, OncePerOrdered)
 
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
-			common.EnsureActiveControlPlaneMachineSet(testFramework)
+			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		}, OncePerOrdered)
 
 		Context("and the instance type of index 1 is not as expected", func() {
 			BeforeEach(func() {
-				presubmit.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+				helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
 			})
 
-			presubmit.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
 		})
 
 		Context("with the OnDelete update strategy", func() {
 			var originalStrategy machinev1.ControlPlaneMachineSetStrategyType
 
 			BeforeEach(func() {
-				originalStrategy = common.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
+				originalStrategy = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
 			}, OncePerOrdered)
 
 			AfterEach(func() {
-				common.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
+				helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
 			}, OncePerOrdered)
 
 			Context("and the instance type of index 2 is not as expected", Ordered, func() {
 				var originalProviderSpec machinev1beta1.ProviderSpec
 
 				BeforeAll(func() {
-					originalProviderSpec = presubmit.IncreaseControlPlaneMachineInstanceSize(testFramework, 2)
+					originalProviderSpec = helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 2)
 				})
 
 				AfterAll(func() {
-					presubmit.UpdateControlPlaneMachineProviderSpec(testFramework, 2, originalProviderSpec)
+					helpers.UpdateControlPlaneMachineProviderSpec(testFramework, 2, originalProviderSpec)
 				})
 
-				presubmit.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
+				helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
 
-				presubmit.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
-
+				helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
 			})
 		})
 
 		Context("and the ControlPlaneMachineSet is up to date", Ordered, func() {
 			BeforeEach(func() {
-				common.EnsureControlPlaneMachineSetUpdated(testFramework)
+				helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
 			})
 
 			Context("and the ControlPlaneMachineSet is deleted", func() {
 				BeforeEach(func() {
-					common.EnsureControlPlaneMachineSetDeleted(testFramework)
+					helpers.EnsureControlPlaneMachineSetDeleted(testFramework)
 				})
 
 				AfterEach(func() {
-					common.EnsureActiveControlPlaneMachineSet(testFramework)
+					helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 				})
 
-				presubmit.ItShouldUninstallTheControlPlaneMachineSet(testFramework)
-				presubmit.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework)
+				helpers.ItShouldUninstallTheControlPlaneMachineSet(testFramework)
+				helpers.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework)
 
 				Context("and the ControlPlaneMachineSet is reactivated", func() {
 					BeforeEach(func() {
-						common.EnsureControlPlaneMachineSetUpdated(testFramework)
-						common.EnsureActiveControlPlaneMachineSet(testFramework)
+						helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
+						helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 					})
 
-					presubmit.ItShouldNotCauseARollout(testFramework)
+					helpers.ItShouldNotCauseARollout(testFramework)
 				})
 			})
 		})

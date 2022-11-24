@@ -22,13 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/common"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), framework.PreSubmit(), func() {
 	BeforeEach(func() {
-		common.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
+		helpers.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
 	})
 
 	Context("on a fully supported cluster", func() {
@@ -39,7 +39,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), framew
 		})
 
 		Context("upon install", func() {
-			common.ItShouldHaveAnActiveControlPlaneMachineSet(testFramework)
+			helpers.ItShouldHaveAnActiveControlPlaneMachineSet(testFramework)
 		})
 	})
 })
