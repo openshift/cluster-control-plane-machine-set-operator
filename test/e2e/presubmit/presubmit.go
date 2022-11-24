@@ -210,3 +210,35 @@ func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework framewor
 		), "control plane machine set replicas should be up to date")
 	})
 }
+
+// ItShouldNotCauseARollout checks that the control plane machine set doesn't cause a rollout.
+func ItShouldNotCauseARollout(testFramework framework.Framework) {
+	It("should have the control plane machine set not cause a rollout", func() {
+		By("Checking the control plane machine set replicas are consistently up to date")
+
+		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+		k8sClient := testFramework.GetClient()
+		ctx := testFramework.GetContext()
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		Expect(cpms.Spec.Replicas).ToNot(BeNil(), "replicas should always be set")
+		desiredReplicas := *cpms.Spec.Replicas
+
+		// We expect the control plane machine set replicas to consistently
+		// be up to date, which should mean no rollout has been triggered.
+		// Here assume that if no changes happen to the replica counts
+		// within the default timeout interval, then they won't happen at all.
+		Consistently(komega.Object(cpms)).Should(SatisfyAll(
+			HaveField("Status.Replicas", Equal(desiredReplicas)),
+			HaveField("Status.UpdatedReplicas", Equal(desiredReplicas)),
+			HaveField("Status.ReadyReplicas", Equal(desiredReplicas)),
+			HaveField("Status.UnavailableReplicas", Equal(int32(0))),
+		), "control plane machine set replicas should consisently be up to date")
+
+		// Check that the operators are stable.
+		common.EventuallyClusterOperatorsShouldStabilise()
+	})
+}
