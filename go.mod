@@ -13,7 +13,6 @@ require (
 	github.com/openshift/client-go v0.0.0-20221006134153-58ea193f9d20
 	github.com/openshift/library-go v0.0.0-20220922140741-7772048e4447
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/net v0.1.0
 	k8s.io/api v0.25.1
 	k8s.io/apimachinery v0.25.1
 	k8s.io/client-go v0.25.1
@@ -211,6 +210,7 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20220713135740-79cabaa25d75 // indirect
 	golang.org/x/mod v0.6.0 // indirect
+	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.1.0 // indirect
