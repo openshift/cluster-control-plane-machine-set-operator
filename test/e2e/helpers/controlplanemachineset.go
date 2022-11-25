@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package helpers
 
 import (
 	"context"
@@ -23,10 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 
-	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,14 +36,6 @@ var (
 	errUIDNotChanged = errors.New("UID has not changed")
 )
 
-// ItShouldHaveAnActiveControlPlaneMachineSet returns an It that checks
-// there is an active control plane machine set installed within the cluster.
-func ItShouldHaveAnActiveControlPlaneMachineSet(testFramework framework.Framework) {
-	It("should have an active control plane machine set", Offset(1), func() {
-		ExpectControlPlaneMachineSetToBeActive(testFramework)
-	})
-}
-
 // ExpectControlPlaneMachineSetToBeActive gets the control plane machine set and
 // checks that it is active.
 func ExpectControlPlaneMachineSetToBeActive(testFramework framework.Framework) {
@@ -52,7 +43,7 @@ func ExpectControlPlaneMachineSetToBeActive(testFramework framework.Framework) {
 	k8sClient := testFramework.GetClient()
 
 	cpms := &machinev1.ControlPlaneMachineSet{}
-	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+	Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 	Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateActive), "control plane machine set should be active")
 }
@@ -66,7 +57,7 @@ func ExpectControlPlaneMachineSetToBeInactive(testFramework framework.Framework)
 	k8sClient := testFramework.GetClient()
 
 	cpms := &machinev1.ControlPlaneMachineSet{}
-	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+	Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 	Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive), "control plane machine set should be inactive")
 }
@@ -80,34 +71,11 @@ func ExpectControlPlaneMachineSetToBeInactiveOrNotFound(testFramework framework.
 	k8sClient := testFramework.GetClient()
 
 	cpms := &machinev1.ControlPlaneMachineSet{}
-	if err := k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms); err != nil {
+	if err := k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms); err != nil {
 		Expect(err).To(MatchError(ContainSubstring("not found")), "getting control plane machine set should not error")
 	} else {
 		Expect(cpms).To(HaveField("Spec.State", machinev1.ControlPlaneMachineSetStateInactive), "control plane machine set should be inactive or should not exist")
 	}
-}
-
-// EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
-// Stabilise means that they are available, are not progressing, and are not degraded.
-func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
-	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
-	defer format.UnregisterCustomFormatter(key)
-
-	// The following assertion checks:
-	// The list "Items", all (ConsistOf) have a field "Status.Conditions",
-	// that contain elements that are both "Type" something and "Status" something.
-	clusterOperators := &configv1.ClusterOperatorList{}
-	gomegaArgs = append([]interface{}{komega.ObjectList(clusterOperators)}, gomegaArgs...)
-
-	By("Waiting for the cluster operators to stabilise")
-
-	Eventually(gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
-		SatisfyAll(
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorAvailable)), HaveField("Status", Equal(configv1.ConditionTrue)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorProgressing)), HaveField("Status", Equal(configv1.ConditionFalse)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorDegraded)), HaveField("Status", Equal(configv1.ConditionFalse)))),
-		),
-	))), "cluster operators should all be available, not progressing and not degraded")
 }
 
 // EnsureActiveControlPlaneMachineSet ensures that there is an active control plane machine set
@@ -117,7 +85,7 @@ func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, gomegaArgs ...interface{}) {
 	switch testFramework.GetPlatformSupportLevel() {
 	case framework.Full:
-		ensureActiveControlPlaneMachineSet(gomegaArgs...)
+		ensureActiveControlPlaneMachineSet(testFramework, gomegaArgs...)
 	case framework.Manual:
 		ensureManualActiveControlPlaneMachineSet(testFramework, gomegaArgs...)
 	case framework.Unsupported:
@@ -126,8 +94,8 @@ func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, gomeg
 }
 
 // ensureActiveControlPlaneMachineSet checks that a CPMS exists and then, if it is not active, activates it.
-func ensureActiveControlPlaneMachineSet(gomegaArgs ...interface{}) {
-	cpms := framework.NewEmptyControlPlaneMachineSet()
+func ensureActiveControlPlaneMachineSet(testFramework framework.Framework, gomegaArgs ...interface{}) {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
 
 	By("Checking the control plane machine set exists")
 
@@ -158,12 +126,12 @@ func ensureManualActiveControlPlaneMachineSet(testFramework framework.Framework,
 	k8sClient := testFramework.GetClient()
 	ctx := testFramework.GetContext()
 
-	cpms := framework.NewEmptyControlPlaneMachineSet()
-	if err := k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms); err != nil && !apierrors.IsNotFound(err) {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+	if err := k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms); err != nil && !apierrors.IsNotFound(err) {
 		Fail(fmt.Sprintf("error when checking if a control plane machine set exists: %v", err))
 	} else if err == nil {
 		// The CPMS exists, so we just need to make sure it is active.
-		ensureActiveControlPlaneMachineSet(gomegaArgs...)
+		ensureActiveControlPlaneMachineSet(testFramework, gomegaArgs...)
 		return
 	}
 
@@ -209,8 +177,8 @@ func EnsureControlPlaneMachineSetUpdateStrategy(testFramework framework.Framewor
 	k8sClient := testFramework.GetClient()
 	ctx := testFramework.GetContext()
 
-	cpms := framework.NewEmptyControlPlaneMachineSet()
-	if err := k8sClient.Get(ctx, framework.ControlPlaneMachineSetKey(), cpms); apierrors.IsNotFound(err) {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+	if err := k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms); apierrors.IsNotFound(err) {
 		Fail("control plane machine set does not exist")
 	} else if err != nil {
 		Fail(fmt.Sprintf("error when checking if a control plane machine set exists: %v", err))
@@ -243,7 +211,7 @@ func EnsureControlPlaneMachineSetUpdated(testFramework framework.Framework) {
 	ctx := testFramework.GetContext()
 
 	cpms := &machinev1.ControlPlaneMachineSet{}
-	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+	Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 	WaitForControlPlaneMachineSetDesiredReplicas(ctx, cpms)
 }
@@ -259,7 +227,7 @@ func EnsureControlPlaneMachineSetDeleted(testFramework framework.Framework) {
 	ctx := testFramework.GetContext()
 
 	cpms := &machinev1.ControlPlaneMachineSet{}
-	Expect(k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), cpms)).
+	Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).
 		To(Succeed(), "control plane machine set should exist")
 
 	DeleteControlPlaneMachineSet(testFramework, ctx, cpms)
@@ -286,7 +254,7 @@ func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, cpms *
 
 	if ok := Eventually(func() error {
 		newCPMS := &machinev1.ControlPlaneMachineSet{}
-		if err := k8sClient.Get(testFramework.GetContext(), framework.ControlPlaneMachineSetKey(), newCPMS); err != nil {
+		if err := k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), newCPMS); err != nil {
 			return fmt.Errorf("error getting control plane machine set: %w", err)
 		}
 
@@ -305,4 +273,28 @@ func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, cpms *
 	By("Control plane machine set is now removed/recreated")
 
 	return true
+}
+
+// IncreaseControlPlaneMachineSetInstanceSize increases the instance size of the control plane machine set.
+// This should trigger the control plane machine set to update the machines based on the
+// update strategy.
+func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+
+	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
+	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
+
+	updatedProviderSpec := originalProviderSpec.DeepCopy()
+	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+
+	By("Increasing the control plane machine set instance size")
+
+	updateCPMSArgs := append([]interface{}{komega.Update(cpms, func() {
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
+	})}, gomegaArgs...)
+	Eventually(updateCPMSArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+
+	return originalProviderSpec
 }

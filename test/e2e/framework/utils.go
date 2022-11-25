@@ -24,11 +24,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
-	machinev1 "github.com/openshift/api/machine/v1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -58,32 +53,12 @@ type GomegaAssertions interface {
 	ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) gomega.Assertion
 }
 
-// ControlPlaneMachineSetKey is the object key for fetching a control plane
-// machine set.
-func ControlPlaneMachineSetKey() runtimeclient.ObjectKey {
-	return runtimeclient.ObjectKey{
-		Namespace: MachineAPINamespace,
-		Name:      ControlPlaneMachineSetName,
-	}
-}
-
 // ControlPlaneMachineSetSelectorLabels are the set of labels use to select
 // control plane machines within the cluster.
 func ControlPlaneMachineSetSelectorLabels() map[string]string {
 	return map[string]string{
 		"machine.openshift.io/cluster-api-machine-role": "master",
 		"machine.openshift.io/cluster-api-machine-type": "master",
-	}
-}
-
-// NewEmptyControlPlaneMachineSet returns a new control plane machine set with
-// just the name and namespace set.
-func NewEmptyControlPlaneMachineSet() *machinev1.ControlPlaneMachineSet {
-	return &machinev1.ControlPlaneMachineSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ControlPlaneMachineSetName,
-			Namespace: MachineAPINamespace,
-		},
 	}
 }
 
