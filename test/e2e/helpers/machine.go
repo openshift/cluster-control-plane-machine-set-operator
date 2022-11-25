@@ -338,6 +338,34 @@ func ExpectControlPlaneMachinesWithoutDeletionTimestamp(testFramework framework.
 	), "expected none of the control plane machines to have a deletionTimestap")
 }
 
+// ConsistentlyControlPlaneMachinesWithoutDeletionTimestamp checks that none of the control plane machines
+// have a deletion timestamp, consistently.
+func ConsistentlyControlPlaneMachinesWithoutDeletionTimestamp(testFramework framework.Framework) {
+	By("Checking that none of the control plane machines have a deletion timestamp")
+
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+
+	machineList := &machinev1beta1.MachineList{}
+
+	Consistently(komega.ObjectList(machineList, machineSelector)).Should(HaveField("Items",
+		HaveEach(HaveField("ObjectMeta.DeletionTimestamp", BeNil())),
+	), "expected none of the control plane machines to have a deletionTimestap")
+}
+
+// ExpectControlPlaneMachinesOwned checks that all of the control plane machines
+// have owner references.
+func ExpectControlPlaneMachinesOwned(testFramework framework.Framework) {
+	By("Checking that all of the control plane machines have owner references")
+
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+
+	machineList := &machinev1beta1.MachineList{}
+
+	Eventually(komega.ObjectList(machineList, machineSelector)).Should(HaveField("Items",
+		Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty()))),
+	), "expected none of the control plane machines to not have an owner reference")
+}
+
 // IncreaseControlPlaneMachineInstanceSize increases the instance size of the control plane machine
 // in the given index. This should trigger the control plane machine set to update the machine in
 // this index based on the update strategy.
