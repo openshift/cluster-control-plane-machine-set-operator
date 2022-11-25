@@ -93,7 +93,7 @@ func ItShouldPerformARollingUpdate(opts *TestOptions) {
 		By("Control plane machine replacement completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		stabilisationTimeout := 20 * time.Minute
+		stabilisationTimeout := 30 * time.Minute
 		if opts.StabilisationTimeout.Seconds() != 0 {
 			stabilisationTimeout = opts.StabilisationTimeout
 		}
@@ -142,7 +142,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
+		EventuallyClusterOperatorsShouldStabilise(30*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
