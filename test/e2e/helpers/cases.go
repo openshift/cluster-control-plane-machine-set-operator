@@ -286,3 +286,19 @@ func ItShouldNotCauseARollout(testFramework framework.Framework) {
 		EventuallyClusterOperatorsShouldStabilise()
 	})
 }
+
+// ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences checks that all the control plane machines
+// have the correct owner references set.
+func ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramework framework.Framework) {
+	It("should find all control plane machines to have owner references set", func() {
+		// Check that all the control plane machines are owned.
+		ExpectControlPlaneMachinesOwned(testFramework)
+
+		// Check that no control plane machine is garbage collected (being deleted),
+		// as this may happen if incorrect owner references are added.
+		ConsistentlyControlPlaneMachinesWithoutDeletionTimestamp(testFramework)
+
+		// Check that the operators are stable.
+		EventuallyClusterOperatorsShouldStabilise()
+	})
+}

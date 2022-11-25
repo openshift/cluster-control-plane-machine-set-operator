@@ -98,6 +98,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 					})
 
 					helpers.ItShouldNotCauseARollout(testFramework)
+					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramework)
 				})
 			})
 		})
