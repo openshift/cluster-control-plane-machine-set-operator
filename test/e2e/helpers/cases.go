@@ -39,9 +39,8 @@ func ItShouldHaveAnActiveControlPlaneMachineSet(testFramework framework.Framewor
 	})
 }
 
-// TestOptions allow the test cases to be configured with a test framework and
-// optional timeouts.
-type TestOptions struct {
+// RollingUpdatePeriodicTestOptions allow the test cases to be configured.
+type RollingUpdatePeriodicTestOptions struct {
 	TestFramework        framework.Framework
 	RolloutTimeout       time.Duration
 	StabilisationTimeout time.Duration
@@ -49,7 +48,7 @@ type TestOptions struct {
 
 // ItShouldPerformARollingUpdate checks that the control plane machine set performs a rolling update
 // in the manner desired.
-func ItShouldPerformARollingUpdate(opts *TestOptions) {
+func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 	It("should perform a rolling update", Offset(1), func() {
 		Expect(opts).ToNot(BeNil(), "test options are required")
 		Expect(opts.TestFramework).ToNot(BeNil(), "testFramework is required")
