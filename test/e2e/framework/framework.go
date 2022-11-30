@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -83,6 +84,10 @@ type Framework interface {
 	// providerSpec passed. This is used to trigger updates to the Machines
 	// managed by the control plane machine set.
 	IncreaseProviderSpecInstanceSize(providerSpec *runtime.RawExtension) error
+
+	// ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
+	// to a control plane machine set suitable provider spec.
+	ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error)
 }
 
 // PlatformSupportLevel is used to identify which tests should run
@@ -217,6 +222,77 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
+}
+
+// ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
+// to a raw, control plane machine set suitable provider spec.
+func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error) {
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machinev1beta1.MachineSpec{
+		ProviderSpec: providerSpec,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provider config: %w", err)
+	}
+
+	switch f.platform {
+	case configv1.AWSPlatformType:
+		return convertAWSProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	case configv1.AzurePlatformType:
+		return convertAzureProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	case configv1.GCPPlatformType:
+		return convertGCPProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	default:
+		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
+	}
+}
+
+// convertAWSProviderConfigToControlPlaneMachineSetProviderSpec converts an AWS providerConfig into a
+// raw control plane machine set provider spec.
+func convertAWSProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	awsPs := providerConfig.AWS().Config()
+	awsPs.Subnet = machinev1beta1.AWSResourceReference{}
+	awsPs.Placement.AvailabilityZone = ""
+
+	rawBytes, err := json.Marshal(awsPs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling aws providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
+// convertGCPProviderConfigToControlPlaneMachineSetProviderSpec converts a GCP providerConfig into a
+// raw control plane machine set provider spec.
+func convertGCPProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	gcpPs := providerConfig.GCP().Config()
+	gcpPs.Zone = ""
+
+	rawBytes, err := json.Marshal(gcpPs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling gcp providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
+// convertAzureProviderConfigToControlPlaneMachineSetProviderSpec converts an Azure providerConfig into a
+// raw control plane machine set provider spec.
+func convertAzureProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	azurePs := providerConfig.Azure().Config()
+	azurePs.Zone = nil
+
+	rawBytes, err := json.Marshal(azurePs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling azure providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
 }
 
 // loadClient returns a new controller-runtime client.
