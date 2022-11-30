@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -91,6 +92,37 @@ func EnsureActiveControlPlaneMachineSet(testFramework framework.Framework, gomeg
 	case framework.Unsupported:
 		Fail(fmt.Sprintf("control plane machine set does not support platform %s", testFramework.GetPlatformType()))
 	}
+}
+
+// EnsureInactiveControlPlaneMachineSet ensures that there is an inactive control plane machine set
+// within the cluster.
+func EnsureInactiveControlPlaneMachineSet(testFramework framework.Framework, gomegaArgs ...interface{}) {
+	switch testFramework.GetPlatformSupportLevel() {
+	case framework.Full, framework.Manual:
+		ensureInactiveControlPlaneMachineSet(testFramework, gomegaArgs...)
+	case framework.Unsupported:
+		Fail(fmt.Sprintf("control plane machine set does not support platform %s", testFramework.GetPlatformType()))
+	}
+}
+
+// ensureInactiveControlPlaneMachineSet checks that a CPMS exists and is inactive.
+func ensureInactiveControlPlaneMachineSet(testFramework framework.Framework, gomegaArgs ...interface{}) {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+	ctx := testFramework.GetContext()
+
+	By("Checking the control plane machine set exists")
+
+	checkExistsArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
+	Eventually(checkExistsArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	if cpms.Spec.State != machinev1.ControlPlaneMachineSetStateInactive {
+		DeleteControlPlaneMachineSet(testFramework, ctx, cpms)
+	}
+
+	By("Checking the control plane machine set is inactive")
+
+	checkStateArgs := append([]interface{}{komega.Object(cpms)}, gomegaArgs...)
+	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateInactive)), "control plane machine set should be inactive")
 }
 
 // ensureActiveControlPlaneMachineSet checks that a CPMS exists and then, if it is not active, activates it.
@@ -232,7 +264,7 @@ func EnsureControlPlaneMachineSetDeleted(testFramework framework.Framework) {
 
 	DeleteControlPlaneMachineSet(testFramework, ctx, cpms)
 
-	WaitForControlPlaneMachineSetRemovedOrRecreated(ctx, cpms, testFramework)
+	WaitForControlPlaneMachineSetRemovedOrRecreated(ctx, testFramework, cpms.ObjectMeta.UID)
 }
 
 // DeleteControlPlaneMachineSet deletes the control plane machine set.
@@ -244,10 +276,8 @@ func DeleteControlPlaneMachineSet(testFramework framework.Framework, ctx context
 }
 
 // WaitForControlPlaneMachineSetRemovedOrRecreated waits for the control plane machine set to be removed.
-func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, cpms *machinev1.ControlPlaneMachineSet, testFramework framework.Framework) bool {
+func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, testFramework framework.Framework, oldCPMSUID types.UID) bool {
 	By("Waiting for the deleted control plane machine set to be removed/recreated")
-
-	oldUID := cpms.ObjectMeta.UID
 
 	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
 	k8sClient := testFramework.GetClient()
@@ -258,7 +288,7 @@ func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, cpms *
 			return fmt.Errorf("error getting control plane machine set: %w", err)
 		}
 
-		if newCPMS.GetUID() == oldUID {
+		if newCPMS.GetUID() == oldCPMSUID {
 			return errUIDNotChanged
 		}
 
@@ -297,4 +327,17 @@ func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framewor
 	Eventually(updateCPMSArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
 
 	return originalProviderSpec
+}
+
+// GetControlPlaneMachineSetUID gets the UID of the control plane machine set.
+func GetControlPlaneMachineSetUID(testFramework framework.Framework) types.UID {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+	k8sClient := testFramework.GetClient()
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).
+		To(Succeed(), "control plane machine set should exist")
+
+	return cpms.ObjectMeta.UID
 }

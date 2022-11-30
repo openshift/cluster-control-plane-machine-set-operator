@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -44,6 +45,15 @@ type RollingUpdatePeriodicTestOptions struct {
 	TestFramework        framework.Framework
 	RolloutTimeout       time.Duration
 	StabilisationTimeout time.Duration
+}
+
+// ControlPlaneMachineSetRegenerationTestOptions allow test cases to be configured.
+type ControlPlaneMachineSetRegenerationTestOptions struct {
+	TestFramework        framework.Framework
+	OriginalProviderSpec machinev1beta1.ProviderSpec
+	UpdatedProviderSpec  machinev1beta1.ProviderSpec
+	UID                  types.UID
+	Index                int
 }
 
 // ItShouldPerformARollingUpdate checks that the control plane machine set performs a rolling update
@@ -299,5 +309,36 @@ func ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramewor
 
 		// Check that the operators are stable.
 		EventuallyClusterOperatorsShouldStabilise()
+	})
+}
+
+// ItShouldPerformControlPlaneMachineSetRegeneration checks that an inactive control plane machine set
+// is regenerated if the reference machine spec changes.
+func ItShouldPerformControlPlaneMachineSetRegeneration(opts *ControlPlaneMachineSetRegenerationTestOptions, gomegaArgs ...interface{}) {
+	It("should perform control plane machine set regeneration", func() {
+		Expect(opts.TestFramework).ToNot(BeNil(), "test framework should not be nil")
+		ctx := opts.TestFramework.GetContext()
+		cpms := opts.TestFramework.NewEmptyControlPlaneMachineSet()
+
+		// Check that the control plane machine set is regenerated.
+		WaitForControlPlaneMachineSetRemovedOrRecreated(ctx, opts.TestFramework, opts.UID)
+		EnsureInactiveControlPlaneMachineSet(opts.TestFramework)
+
+		rawExtension, err := opts.TestFramework.ConvertToControlPlaneMachineSetProviderSpec(opts.UpdatedProviderSpec)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Checking the control plane machine set reports 1 updated machine, 2 needing update")
+		Eventually(komega.Object(cpms)).Should(
+			SatisfyAll(
+				HaveField("Status.UpdatedReplicas", Equal(int32(1))),
+				HaveField("Status.UnavailableReplicas", Equal(int32(0))),
+			),
+		)
+
+		By("Checking the control plane machine set has the correct providerSpec")
+		Expect(cpms).To(
+			HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw",
+				MatchJSON(rawExtension.Raw)),
+		)
 	})
 }

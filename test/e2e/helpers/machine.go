@@ -369,7 +369,7 @@ func ExpectControlPlaneMachinesOwned(testFramework framework.Framework) {
 // IncreaseControlPlaneMachineInstanceSize increases the instance size of the control plane machine
 // in the given index. This should trigger the control plane machine set to update the machine in
 // this index based on the update strategy.
-func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, index int, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, index int, gomegaArgs ...interface{}) (machinev1beta1.ProviderSpec, machinev1beta1.ProviderSpec) {
 	machine, err := machineForIndex(testFramework, index)
 	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
 
@@ -378,19 +378,21 @@ func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, 
 	updatedProviderSpec := originalProviderSpec.DeepCopy()
 	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
 
-	By("Updating the control plane machine provider spec")
+	By(fmt.Sprintf("Updating the provider spec of the control plane machine at index %d", index))
 
 	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
 		machine.Spec.ProviderSpec = *updatedProviderSpec
 	})}, gomegaArgs...)
 	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
 
-	return originalProviderSpec
+	return originalProviderSpec, machine.Spec.ProviderSpec
 }
 
 // UpdateControlPlaneMachineProviderSpec updates the provider spec of the control plane machine in the given index
 // to match the provider spec given.
 func UpdateControlPlaneMachineProviderSpec(testFramework framework.Framework, index int, updatedProviderSpec machinev1beta1.ProviderSpec, gomegaArgs ...interface{}) {
+	By(fmt.Sprintf("Updating the provider spec of the control plane machine at index %d", index))
+
 	machine, err := machineForIndex(testFramework, index)
 	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
 
@@ -398,6 +400,41 @@ func UpdateControlPlaneMachineProviderSpec(testFramework framework.Framework, in
 		machine.Spec.ProviderSpec = updatedProviderSpec
 	})}, gomegaArgs...)
 	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+}
+
+// IncreaseNewestControlPlaneMachineInstanceSize increases the instance size of the the newest control plane machine
+// to match the provider spec given.
+func IncreaseNewestControlPlaneMachineInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) (int, machinev1beta1.ProviderSpec, machinev1beta1.ProviderSpec) {
+	index, err := newestMachineIndex(testFramework)
+	Expect(err).ToNot(HaveOccurred(), "control plane newest machine index should be found")
+
+	originalProviderSpec, updatedProviderSpec := IncreaseControlPlaneMachineInstanceSize(testFramework, index)
+
+	return index, originalProviderSpec, updatedProviderSpec
+}
+
+// newestMachineIndex returns the index of the newest (latest .metadata.creationTimestamp) control plane machine.
+// If multiple machines have the same creationTimestamp, the index of the one with the alphabetically greater name is picked.
+func newestMachineIndex(testFramework framework.Framework) (int, error) {
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+	machineList := &machinev1beta1.MachineList{}
+
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	if err := k8sClient.List(ctx, machineList, machineSelector); err != nil {
+		return 0, fmt.Errorf("could not list control plane machines: %w", err)
+	}
+
+	sortedMachines := sortMachinesByCreationTimeDescending(machineList.Items)
+	newestMachine := sortedMachines[0]
+
+	index, err := machineIndex(newestMachine)
+	if err != nil {
+		return 0, fmt.Errorf("could not get control plane machine index: %w", err)
+	}
+
+	return index, nil
 }
 
 // machineForIndex returns the control plane machine in the given index.
@@ -429,4 +466,19 @@ func machineForIndex(testFramework framework.Framework, index int) (*machinev1be
 	}
 
 	return indexMachine, nil
+}
+
+// sortMachinesByCreationTimeDescending sorts a slice of Machines by CreationTime, Name (descending).
+func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []machinev1beta1.Machine {
+	// Sort in inverse order so that the newest one is first.
+	sort.Slice(machines, func(i, j int) bool {
+		first, second := machines[i].CreationTimestamp, machines[j].CreationTimestamp
+		if first != second {
+			return second.Before(&first)
+		}
+
+		return machines[i].Name > machines[j].Name
+	})
+
+	return machines
 }
