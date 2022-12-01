@@ -1028,7 +1028,7 @@ var _ = Describe("With a running controller", func() {
 		})
 
 		Context("and the instance size is changed", func() {
-			var testOptions helpers.TestOptions
+			var testOptions helpers.RollingUpdatePeriodicTestOptions
 
 			BeforeEach(func() {
 				// The CPMS is configured for AWS so use the AWS Platform Type.

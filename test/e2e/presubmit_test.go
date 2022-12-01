@@ -33,6 +33,10 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 		helpers.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
 	}, OncePerOrdered)
 
+	AfterEach(func() {
+		helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+	}, OncePerOrdered)
+
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
@@ -61,7 +65,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				var originalProviderSpec machinev1beta1.ProviderSpec
 
 				BeforeAll(func() {
-					originalProviderSpec = helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 2)
+					originalProviderSpec, _ = helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 2)
 				})
 
 				AfterAll(func() {
@@ -100,6 +104,38 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 					helpers.ItShouldNotCauseARollout(testFramework)
 					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramework)
 				})
+			})
+		})
+	})
+
+	Context("With an inactive ControlPlaneMachineSet", func() {
+		BeforeEach(func() {
+			helpers.EnsureInactiveControlPlaneMachineSet(testFramework)
+		})
+
+		Context("and the ControlPlaneMachineSet is up to date", func() {
+			BeforeEach(func() {
+				helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
+			})
+
+			AfterEach(func() {
+				helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
+			})
+
+			Context("and there is diff in the providerSpec of the newest, alphabetically last machine", func() {
+				var opts helpers.ControlPlaneMachineSetRegenerationTestOptions
+
+				BeforeEach(func() {
+					opts.TestFramework = testFramework
+					opts.UID = helpers.GetControlPlaneMachineSetUID(testFramework)
+					opts.Index, opts.OriginalProviderSpec, opts.UpdatedProviderSpec = helpers.IncreaseNewestControlPlaneMachineInstanceSize(testFramework)
+				})
+
+				AfterEach(func() {
+					helpers.UpdateControlPlaneMachineProviderSpec(testFramework, opts.Index, opts.OriginalProviderSpec)
+				})
+
+				helpers.ItShouldPerformControlPlaneMachineSetRegeneration(&opts)
 			})
 		})
 	})

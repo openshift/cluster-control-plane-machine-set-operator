@@ -40,7 +40,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
 			})
 
-			helpers.ItShouldPerformARollingUpdate(&helpers.TestOptions{
+			helpers.ItShouldPerformARollingUpdate(&helpers.RollingUpdatePeriodicTestOptions{
 				TestFramework: testFramework,
 			})
 		})
