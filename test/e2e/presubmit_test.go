@@ -33,10 +33,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 		helpers.EventuallyClusterOperatorsShouldStabilise(10*time.Minute, 10*time.Second)
 	}, OncePerOrdered)
 
-	AfterEach(func() {
-		helpers.EnsureActiveControlPlaneMachineSet(testFramework)
-	}, OncePerOrdered)
-
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
