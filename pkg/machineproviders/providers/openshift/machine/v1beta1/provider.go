@@ -167,6 +167,17 @@ type openshiftMachineProvider struct {
 	machineAPIScheme *apimachineryruntime.Scheme
 }
 
+// WithClient sets the desired client to the Machine Provider.
+func (m *openshiftMachineProvider) WithClient(client client.Client) machineproviders.MachineProvider {
+	// Take a shallow copy, this should be sufficient for the usage of the provider.
+	o := &openshiftMachineProvider{}
+	*o = *m
+
+	o.client = client
+
+	return o
+}
+
 // GetMachineInfos inspects the current state of the Machines matched by the selector
 // and returns information about the Machines in the form of a MachineInfo.
 // For each Machine, it identifies the following:

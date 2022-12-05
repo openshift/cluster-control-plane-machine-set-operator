@@ -43,6 +43,10 @@ const (
 	// attempting to delete replacement Machine.
 	errorDeletingMachine = "Error deleting machine"
 
+	// alreadyPresentReplacement is a log message used to inform the user that a new Machine was not created to
+	// replace an existing Machine, because a replacement has already been created.
+	alreadyPresentReplacement = "Replacement machine already present"
+
 	// invalidStrategyMessage is used to inform the user that they have provided an invalid value
 	// for the update strategy.
 	invalidStrategyMessage = "invalid value for spec.strategy.type"
@@ -353,7 +357,7 @@ func (r *ControlPlaneMachineSetReconciler) createOnDeleteReplacementMachines(ctx
 		// Trigger a Machine creation.
 		logger := logger.WithValues("index", idx, "namespace", r.Namespace, "name", unknownMachineName)
 
-		result, err := createMachine(ctx, logger, machineProvider, idx)
+		result, err := r.createMachine(ctx, logger, machineProvider, idx)
 		if err != nil {
 			return false, result, err
 		}
@@ -368,7 +372,7 @@ func (r *ControlPlaneMachineSetReconciler) createOnDeleteReplacementMachines(ctx
 
 		if isDeletedMachine(machines[0]) {
 			// if deleted create the replacement
-			result, err := createMachine(ctx, logger, machineProvider, idx)
+			result, err := r.createMachine(ctx, logger, machineProvider, idx)
 			if err != nil {
 				return false, result, err
 			}
@@ -399,7 +403,7 @@ func (r *ControlPlaneMachineSetReconciler) createRollingUpdateReplacementMachine
 		// Trigger a Machine creation.
 		logger := logger.WithValues("index", idx, "namespace", r.Namespace, "name", unknownMachineName)
 
-		result, err := createMachineWithSurge(ctx, logger, machineProvider, idx, maxSurge, surgeCount)
+		result, err := r.createMachineWithSurge(ctx, logger, machineProvider, idx, maxSurge, surgeCount)
 		if err != nil {
 			return false, result, err
 		}
@@ -415,7 +419,7 @@ func (r *ControlPlaneMachineSetReconciler) createRollingUpdateReplacementMachine
 		outdatedMachine := machinesNeedingReplacement[0]
 		logger := logger.WithValues("index", outdatedMachine.Index, "namespace", r.Namespace, "name", outdatedMachine.MachineRef.ObjectMeta.Name)
 
-		result, err := createMachineWithSurge(ctx, logger, machineProvider, outdatedMachine.Index, maxSurge, surgeCount)
+		result, err := r.createMachineWithSurge(ctx, logger, machineProvider, outdatedMachine.Index, maxSurge, surgeCount)
 		if err != nil {
 			return false, result, err
 		}
@@ -441,7 +445,22 @@ func deleteMachine(ctx context.Context, logger logr.Logger, machineProvider mach
 }
 
 // createMachine creates the Machine provided.
-func createMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (ctrl.Result, error) {
+func (r *ControlPlaneMachineSetReconciler) createMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (ctrl.Result, error) {
+	// Check if a replacement machine already exists and
+	// was not previously detected due to potential stale cache.
+	exists, err := r.checkForExistingReplacement(ctx, logger, machineProvider, idx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error checking for existing replacement: %w", err)
+	}
+
+	if exists {
+		// A machine within the index for which we are about to
+		// create a replacement already has a replacement machine.
+		// This means the machine provider cache was stale when we previously checked.
+		// No need to create a replacement.
+		logger.V(2).Info(alreadyPresentReplacement)
+	}
+
 	if err := machineProvider.CreateMachine(ctx, logger, idx); err != nil {
 		werr := fmt.Errorf("error creating new Machine for index %d: %w", idx, err)
 		logger.Error(werr, errorCreatingMachine)
@@ -457,7 +476,7 @@ func createMachine(ctx context.Context, logger logr.Logger, machineProvider mach
 // createMachineWithSurge creates the Machine provided while observing the surge count.
 // This function will not create machines if the current surgeCount is greater
 // than the maxSurge. If it does create a machine, it will increase the surgeCount.
-func createMachineWithSurge(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32, maxSurge int, surgeCount *int) (ctrl.Result, error) {
+func (r *ControlPlaneMachineSetReconciler) createMachineWithSurge(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32, maxSurge int, surgeCount *int) (ctrl.Result, error) {
 	// Check if a surge in Machines is allowed.
 	if *surgeCount >= maxSurge {
 		// No more room to surge
@@ -468,7 +487,7 @@ func createMachineWithSurge(ctx context.Context, logger logr.Logger, machineProv
 
 	// There is still room to surge,
 	// trigger a Replacement Machine creation.
-	result, err := createMachine(ctx, logger, machineProvider, idx)
+	result, err := r.createMachine(ctx, logger, machineProvider, idx)
 	if err != nil {
 		return result, err
 	}
@@ -476,6 +495,28 @@ func createMachineWithSurge(ctx context.Context, logger logr.Logger, machineProv
 	*surgeCount++
 
 	return result, nil
+}
+
+// checkForExistingReplacement checks with an uncached API client if a specific index,
+// already has an existing, up to date, replacement machine.
+func (r *ControlPlaneMachineSetReconciler) checkForExistingReplacement(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (bool, error) {
+	// Define an uncached machine provider.
+	uncachedMachineProvider := machineProvider.WithClient(r.UncachedClient)
+
+	mInfos, err := uncachedMachineProvider.GetMachineInfos(ctx, logger)
+	if err != nil {
+		return false, fmt.Errorf("error getting Machines: %w", err)
+	}
+
+	for _, m := range mInfos {
+		if m.Index == idx && !m.NeedsUpdate && m.MachineRef.ObjectMeta.DeletionTimestamp == nil {
+			// An up to date Machine has been found for the specified index,
+			// meaning an updated replacement already exists for this index.
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // isDeletedMachine checks if a machine is deleted.
@@ -600,6 +641,17 @@ func sortMachineInfosByIndex(indexedMachineInfos map[int32][]machineproviders.Ma
 	sort.Slice(slice, func(i, j int) bool {
 		return slice[i].index < slice[j].index
 	})
+
+	return slice
+}
+
+// machineInfosMaptoSlice returns a slice of MachineInfos from a map of MachineInfos slices.
+func machineInfosMaptoSlice(indexedMachineInfos map[int32][]machineproviders.MachineInfo) []machineproviders.MachineInfo {
+	slice := []machineproviders.MachineInfo{}
+
+	for _, machines := range indexedMachineInfos {
+		slice = append(slice, machines...)
+	}
 
 	return slice
 }

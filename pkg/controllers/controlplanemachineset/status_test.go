@@ -49,9 +49,10 @@ var _ = Describe("Status", func() {
 			By("Setting up the reconciler")
 			logger = test.NewTestLogger()
 			reconciler = &ControlPlaneMachineSetReconciler{
-				Namespace: namespaceName,
-				Scheme:    testScheme,
-				Client:    k8sClient,
+				Namespace:      namespaceName,
+				Scheme:         testScheme,
+				Client:         k8sClient,
+				UncachedClient: k8sClient,
 			}
 
 			By("Setting up supporting resources")
