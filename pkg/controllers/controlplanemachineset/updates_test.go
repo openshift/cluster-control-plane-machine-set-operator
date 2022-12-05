@@ -98,7 +98,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		type rollingUpdateTableInput struct {
 			cpmsBuilder          resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos         map[int32][]machineproviders.MachineInfo
-			setupMock            func()
+			setupMock            func(machineInfos map[int32][]machineproviders.MachineInfo)
 			expectedErrorBuilder func() error
 			expectedResult       ctrl.Result
 			expectedLogsBuilder  func() []test.LogEntry
@@ -106,7 +106,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 
 		DescribeTable("should implement the update strategy based on the MachineInfo", func(in rollingUpdateTableInput) {
 			// We setup the mock machine provider on each test with the expected assertions.
-			in.setupMock()
+			in.setupMock(in.machineInfos)
 
 			var errExpected error
 			cpms := cpmsBuilder.Build()
@@ -132,7 +132,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -155,7 +155,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -182,7 +184,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -211,7 +215,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -240,7 +244,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
@@ -275,7 +279,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 					// We expect this particular machine to be called for deletion.
@@ -307,7 +311,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -332,8 +336,10 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					// Note, in this case it should only create a single machine.
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -372,7 +378,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					// Note, in this case it should not create anything new because we are at surge capacity.
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -413,7 +419,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					// Note, in this case, it should wait for the old Machine to go away before starting a new update.
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
@@ -457,7 +463,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -493,7 +499,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -518,7 +526,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -543,7 +551,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					// The missing index should take priority over the index in need of an update.
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
@@ -581,7 +591,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -623,7 +635,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Times(0)
 					// We expect this particular machine to be called for deletion.
 					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build()
@@ -680,7 +692,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					// We expect this particular machine to be called for deletion.
 					machineInfo1 := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
@@ -729,7 +741,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build()},
 					3: {updatedMachineBuilder.WithIndex(3).WithMachineName("machine-3").WithNodeName("node-3").WithNeedsUpdate(true).Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -785,7 +797,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 					3: {updatedMachineBuilder.WithIndex(3).WithMachineName("machine-3").WithNodeName("node-3").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -813,7 +825,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithNeedsUpdate(true).Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					machineInfo0 := outdatedNonReadyMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
@@ -870,7 +882,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -902,7 +916,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -935,7 +949,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -965,7 +979,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		type onDeleteUpdateTableInput struct {
 			cpmsBuilder          resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos         map[int32][]machineproviders.MachineInfo
-			setupMock            func()
+			setupMock            func(machineInfos map[int32][]machineproviders.MachineInfo)
 			expectedErrorBuilder func() error
 			expectedResult       ctrl.Result
 			expectedLogsBuilder  func() []test.LogEntry
@@ -973,7 +987,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 
 		DescribeTable("should implement the update strategy based on the MachineInfo", func(in onDeleteUpdateTableInput) {
 			// We setup the mock machine provider on each test with the expected assertions.
-			in.setupMock()
+			in.setupMock(in.machineInfos)
 
 			cpms := cpmsBuilder.Build()
 			originalCPMS := cpms.DeepCopy()
@@ -996,7 +1010,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1019,7 +1033,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1044,7 +1058,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1069,7 +1085,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					4: {updatedMachineBuilder.WithIndex(4).WithMachineName("machine-4").WithNodeName("node-4").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					5: {updatedMachineBuilder.WithIndex(5).WithMachineName("machine-5").WithNodeName("node-5").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(4)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1095,7 +1113,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1123,7 +1143,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1152,7 +1172,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1177,7 +1197,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1213,7 +1233,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1248,7 +1270,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1283,7 +1307,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1322,7 +1348,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1364,7 +1390,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1404,7 +1430,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1445,7 +1471,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1487,7 +1513,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1522,7 +1548,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1547,7 +1575,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1572,7 +1600,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1607,7 +1637,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
@@ -1642,7 +1672,9 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithMachineDeletionTimestamp(metav1.Now()).Build()},
 				},
-				setupMock: func() {
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},

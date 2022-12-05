@@ -166,9 +166,10 @@ var _ = Describe("With a running controller", func() {
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		reconciler := &ControlPlaneMachineSetReconciler{
-			Client:       mgr.GetClient(),
-			Namespace:    namespaceName,
-			OperatorName: operatorName,
+			Client:         mgr.GetClient(),
+			UncachedClient: mgr.GetClient(),
+			Namespace:      namespaceName,
+			OperatorName:   operatorName,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
@@ -1267,9 +1268,10 @@ var _ = Describe("ensureFinalizer", func() {
 		namespaceName = ns.GetName()
 
 		reconciler = &ControlPlaneMachineSetReconciler{
-			Client:    k8sClient,
-			Scheme:    testScheme,
-			Namespace: namespaceName,
+			Client:         k8sClient,
+			UncachedClient: k8sClient,
+			Scheme:         testScheme,
+			Namespace:      namespaceName,
 		}
 
 		// The ControlPlaneMachineSet should already exist by the time we get here.
@@ -1410,10 +1412,11 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		namespaceName = ns.GetName()
 
 		reconciler = &ControlPlaneMachineSetReconciler{
-			Client:     k8sClient,
-			Scheme:     testScheme,
-			RESTMapper: testRESTMapper,
-			Namespace:  namespaceName,
+			Client:         k8sClient,
+			UncachedClient: k8sClient,
+			Scheme:         testScheme,
+			RESTMapper:     testRESTMapper,
+			Namespace:      namespaceName,
 		}
 
 		// The ControlPlaneMachineSet should already exist by the time we get here.
@@ -1917,8 +1920,9 @@ var _ = Describe("validateClusterState", func() {
 		}
 
 		reconciler := &ControlPlaneMachineSetReconciler{
-			Client:    k8sClient,
-			Namespace: namespaceName,
+			Client:         k8sClient,
+			UncachedClient: k8sClient,
+			Namespace:      namespaceName,
 		}
 
 		cpms := in.cpmsBuilder.Build()
