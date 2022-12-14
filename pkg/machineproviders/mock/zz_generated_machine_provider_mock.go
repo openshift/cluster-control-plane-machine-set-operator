@@ -11,6 +11,7 @@ import (
 	logr "github.com/go-logr/logr"
 	gomock "github.com/golang/mock/gomock"
 	machineproviders "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MockMachineProvider is a mock of MachineProvider interface.
@@ -77,4 +78,18 @@ func (m *MockMachineProvider) GetMachineInfos(arg0 context.Context, arg1 logr.Lo
 func (mr *MockMachineProviderMockRecorder) GetMachineInfos(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMachineInfos", reflect.TypeOf((*MockMachineProvider)(nil).GetMachineInfos), arg0, arg1)
+}
+
+// WithClient mocks base method.
+func (m *MockMachineProvider) WithClient(arg0 client.Client) machineproviders.MachineProvider {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithClient", arg0)
+	ret0, _ := ret[0].(machineproviders.MachineProvider)
+	return ret0
+}
+
+// WithClient indicates an expected call of WithClient.
+func (mr *MockMachineProviderMockRecorder) WithClient(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithClient", reflect.TypeOf((*MockMachineProvider)(nil).WithClient), arg0)
 }
