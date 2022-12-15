@@ -1045,6 +1045,24 @@ var _ = Describe("With a running controller", func() {
 
 			helpers.ItShouldPerformARollingUpdate(&testOptions)
 		})
+
+		Context("and a machine is deleted", func() {
+			index := 1
+			BeforeEach(func() {
+				machine := &machinev1beta1.Machine{}
+				machineName := fmt.Sprintf("master-%d", index)
+				machineKey := client.ObjectKey{Namespace: namespaceName, Name: machineName}
+
+				By(fmt.Sprintf("Deleting machine in index %d", index))
+
+				Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+			})
+
+			It("should create a replacement machine for the correct index", func() {
+				helpers.EventuallyIndexIsBeingReplaced(ctx, index)
+			})
+		})
 	})
 
 	Context("with unbalanced machines", func() {
