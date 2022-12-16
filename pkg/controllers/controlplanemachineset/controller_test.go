@@ -1095,97 +1095,103 @@ var _ = Describe("With a running controller", func() {
 				HaveField("Status.Phase", HaveValue(Equal("Running"))),
 			)))
 
-			// The default CPMS should be sufficient for this test.
-			By("Creating the ControlPlaneMachineSet with the OnDelete strategy")
-			cpms = resourcebuilder.ControlPlaneMachineSet().
-				WithNamespace(namespaceName).
-				WithStrategyType(machinev1.OnDelete).
-				WithMachineTemplateBuilder(tmplBuilder).
-				Build()
-			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
-
-			By("Waiting for the ControlPlaneMachineSet to report a stable status")
-
-			// We expect the CPMS to observe the current state of the cluster.
-			// The cluster has 3 machines in a single failure domain so we expect
-			// it to report 3 replicas, but only 1 updated replica.
-			Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-				HaveField("Replicas", Equal(int32(3))),
-				HaveField("UpdatedReplicas", Equal(int32(1))),
-				HaveField("ReadyReplicas", Equal(int32(3))),
-				HaveField("UnavailableReplicas", Equal(int32(0))),
-			)))
 		}, OncePerOrdered)
 
-		var expectIndexToBeReplacedWithProviderSpec = func(index int, providerSpec *runtime.RawExtension) {
-			By(fmt.Sprintf("Fetching the machine in index %d", index))
-			machine := &machinev1beta1.Machine{}
-			machineKey := client.ObjectKey{Namespace: namespaceName, Name: fmt.Sprintf("master-%d", index)}
+		Context("when a new Control Plane Machine Set is created with an OnDelete strategy", func() {
+			BeforeEach(func() {
+				// The default CPMS should be sufficient for this test.
+				By("Creating the ControlPlaneMachineSet with the OnDelete strategy")
+				cpms = resourcebuilder.ControlPlaneMachineSet().
+					WithNamespace(namespaceName).
+					WithStrategyType(machinev1.OnDelete).
+					WithMachineTemplateBuilder(tmplBuilder).
+					Build()
+				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
-			Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+				By("Waiting for the ControlPlaneMachineSet to report a stable status")
 
-			By("Deleting the existing machine")
-			Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+				// We expect the CPMS to observe the current state of the cluster.
+				// The cluster has 3 machines in a single failure domain so we expect
+				// it to report 3 replicas, but only 1 updated replica.
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(1))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+			}, OncePerOrdered)
 
-			By("Checking that a new machine is created in the expected failure domain")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", ContainElement(SatisfyAll(
-				HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
-				HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
-			))))
-		}
+			var expectIndexToBeReplacedWithProviderSpec = func(index int, providerSpec *runtime.RawExtension) {
+				By(fmt.Sprintf("Fetching the machine in index %d", index))
+				machine := &machinev1beta1.Machine{}
+				machineKey := client.ObjectKey{Namespace: namespaceName, Name: fmt.Sprintf("master-%d", index)}
 
-		var checkOnDeleteRebalance = func(first, second int) {
-			Context("should rebalance the machines", Ordered, func() {
-				It(fmt.Sprintf("should place index %d in zone B", first), func() {
-					expectIndexToBeReplacedWithProviderSpec(first, usEast1bProviderSpecBuilder.BuildRawExtension())
+				Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+
+				By("Deleting the existing machine")
+				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+
+				By("Checking that a new machine is created in the expected failure domain")
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", ContainElement(SatisfyAll(
+					HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+					HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
+				))))
+			}
+
+			var checkOnDeleteRebalance = func(first, second int) {
+				Context("should rebalance the machines", Ordered, func() {
+					It(fmt.Sprintf("should place index %d in zone B", first), func() {
+						expectIndexToBeReplacedWithProviderSpec(first, usEast1bProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It(fmt.Sprintf("should place index %d in zone C", second), func() {
+						expectIndexToBeReplacedWithProviderSpec(second, usEast1cProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It("should then report a healthy status", func() {
+						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+							HaveField("Replicas", Equal(int32(3))),
+							HaveField("UpdatedReplicas", Equal(int32(3))),
+							HaveField("ReadyReplicas", Equal(int32(3))),
+							HaveField("UnavailableReplicas", Equal(int32(0))),
+						)))
+					})
 				})
+			}
 
-				It(fmt.Sprintf("should place index %d in zone C", second), func() {
-					expectIndexToBeReplacedWithProviderSpec(second, usEast1cProviderSpecBuilder.BuildRawExtension())
+			var checkOnDeleteRebalanceIndex2 = func(second int) {
+				Context("should rebalance the machines", Ordered, func() {
+					It("should place index 2 in zone C", func() {
+						expectIndexToBeReplacedWithProviderSpec(2, usEast1cProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It(fmt.Sprintf("should place index %d in zone B", second), func() {
+						expectIndexToBeReplacedWithProviderSpec(second, usEast1bProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It("should then report a healthy status", func() {
+						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+							HaveField("Replicas", Equal(int32(3))),
+							HaveField("UpdatedReplicas", Equal(int32(3))),
+							HaveField("ReadyReplicas", Equal(int32(3))),
+							HaveField("UnavailableReplicas", Equal(int32(0))),
+						)))
+					})
 				})
+			}
 
-				It("should then report a healthy status", func() {
-					Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
-						HaveField("Replicas", Equal(int32(3))),
-						HaveField("UpdatedReplicas", Equal(int32(3))),
-						HaveField("ReadyReplicas", Equal(int32(3))),
-						HaveField("UnavailableReplicas", Equal(int32(0))),
-					)))
-				})
-			})
-		}
+			// Check all combinations where we delete 0 or 1 first.
+			checkOnDeleteRebalance(0, 1)
+			checkOnDeleteRebalance(0, 2)
+			checkOnDeleteRebalance(1, 0)
+			checkOnDeleteRebalance(1, 2)
 
-		var checkOnDeleteRebalanceIndex2 = func(second int) {
-			Context("should rebalance the machines", Ordered, func() {
-				It("should place index 2 in zone C", func() {
-					expectIndexToBeReplacedWithProviderSpec(2, usEast1cProviderSpecBuilder.BuildRawExtension())
-				})
+			// When all machines are currently in the same index,
+			// index 2 will always be moved to zone C.
+			checkOnDeleteRebalanceIndex2(0)
+			checkOnDeleteRebalanceIndex2(1)
 
-				It(fmt.Sprintf("should place index %d in zone B", second), func() {
-					expectIndexToBeReplacedWithProviderSpec(second, usEast1bProviderSpecBuilder.BuildRawExtension())
-				})
-
-				It("should then report a healthy status", func() {
-					Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
-						HaveField("Replicas", Equal(int32(3))),
-						HaveField("UpdatedReplicas", Equal(int32(3))),
-						HaveField("ReadyReplicas", Equal(int32(3))),
-						HaveField("UnavailableReplicas", Equal(int32(0))),
-					)))
-				})
-			})
-		}
-
-		// Check all combinations where we delete 0 or 1 first.
-		checkOnDeleteRebalance(0, 1)
-		checkOnDeleteRebalance(0, 2)
-		checkOnDeleteRebalance(1, 0)
-		checkOnDeleteRebalance(1, 2)
-
-		// When all machines are currently in the same index,
-		// index 2 will always be moved to zone C.
-		checkOnDeleteRebalanceIndex2(0)
-		checkOnDeleteRebalanceIndex2(1)
+		})
 	})
 
 	Context("when deleting the ControlPlaneMachineSet", func() {
