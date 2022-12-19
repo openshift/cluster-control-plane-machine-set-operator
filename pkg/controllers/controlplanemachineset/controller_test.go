@@ -1091,60 +1091,169 @@ var _ = Describe("With a running controller", func() {
 
 			// Wait for the machines to all report running before creating the CPMS.
 			By("Waiting for the machines to become ready")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", HaveEach(
 				HaveField("Status.Phase", HaveValue(Equal("Running"))),
 			)))
 
-			// The default CPMS should be sufficient for this test.
-			By("Creating the ControlPlaneMachineSet with the OnDelete strategy")
-			cpms = resourcebuilder.ControlPlaneMachineSet().
-				WithNamespace(namespaceName).
-				WithStrategyType(machinev1.OnDelete).
-				WithMachineTemplateBuilder(tmplBuilder).
-				Build()
-			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
-
-			By("Waiting for the ControlPlaneMachineSet to report a stable status")
-
-			// We expect the CPMS to observe the current state of the cluster.
-			// The cluster has 3 machines in a single failure domain so we expect
-			// it to report 3 replicas, but only 1 updated replica.
-			Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-				HaveField("Replicas", Equal(int32(3))),
-				HaveField("UpdatedReplicas", Equal(int32(1))),
-				HaveField("ReadyReplicas", Equal(int32(3))),
-				HaveField("UnavailableReplicas", Equal(int32(0))),
-			)))
 		}, OncePerOrdered)
 
-		var expectIndexToBeReplacedWithProviderSpec = func(index int, providerSpec *runtime.RawExtension) {
-			By(fmt.Sprintf("Fetching the machine in index %d", index))
-			machine := &machinev1beta1.Machine{}
-			machineKey := client.ObjectKey{Namespace: namespaceName, Name: fmt.Sprintf("master-%d", index)}
+		Context("when a new Control Plane Machine Set is created with an OnDelete strategy", func() {
+			BeforeEach(func() {
+				// The default CPMS should be sufficient for this test.
+				By("Creating the ControlPlaneMachineSet with the OnDelete strategy")
+				cpms = resourcebuilder.ControlPlaneMachineSet().
+					WithNamespace(namespaceName).
+					WithStrategyType(machinev1.OnDelete).
+					WithMachineTemplateBuilder(tmplBuilder).
+					Build()
+				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
-			Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+				By("Waiting for the ControlPlaneMachineSet to report a stable status")
 
-			By("Deleting the existing machine")
-			Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+				// We expect the CPMS to observe the current state of the cluster.
+				// The cluster has 3 machines in a single failure domain so we expect
+				// it to report 3 replicas, but only 1 updated replica.
+				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(1))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+			}, OncePerOrdered)
 
-			By("Checking that a new machine is created in the expected failure domain")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", ContainElement(SatisfyAll(
-				HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
-				HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
-			))))
-		}
+			var expectIndexToBeReplacedWithProviderSpec = func(index int, providerSpec *runtime.RawExtension) {
+				By(fmt.Sprintf("Fetching the machine in index %d", index))
+				machine := &machinev1beta1.Machine{}
+				machineKey := client.ObjectKey{Namespace: namespaceName, Name: fmt.Sprintf("master-%d", index)}
 
-		var checkOnDeleteRebalance = func(first, second int) {
+				Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+
+				By("Deleting the existing machine")
+				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+
+				By("Checking that a new machine is created in the expected failure domain")
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", ContainElement(SatisfyAll(
+					HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+					HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
+				))))
+			}
+
+			var checkOnDeleteRebalance = func(first, second int) {
+				Context("should rebalance the machines", Ordered, func() {
+					It(fmt.Sprintf("should place index %d in zone B", first), func() {
+						expectIndexToBeReplacedWithProviderSpec(first, usEast1bProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It(fmt.Sprintf("should place index %d in zone C", second), func() {
+						expectIndexToBeReplacedWithProviderSpec(second, usEast1cProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It("should then report a healthy status", func() {
+						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+							HaveField("Replicas", Equal(int32(3))),
+							HaveField("UpdatedReplicas", Equal(int32(3))),
+							HaveField("ReadyReplicas", Equal(int32(3))),
+							HaveField("UnavailableReplicas", Equal(int32(0))),
+						)))
+					})
+				})
+			}
+
+			var checkOnDeleteRebalanceIndex2 = func(second int) {
+				Context("should rebalance the machines", Ordered, func() {
+					It("should place index 2 in zone C", func() {
+						expectIndexToBeReplacedWithProviderSpec(2, usEast1cProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It(fmt.Sprintf("should place index %d in zone B", second), func() {
+						expectIndexToBeReplacedWithProviderSpec(second, usEast1bProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It("should then report a healthy status", func() {
+						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+							HaveField("Replicas", Equal(int32(3))),
+							HaveField("UpdatedReplicas", Equal(int32(3))),
+							HaveField("ReadyReplicas", Equal(int32(3))),
+							HaveField("UnavailableReplicas", Equal(int32(0))),
+						)))
+					})
+				})
+			}
+
+			// Check all combinations where we delete 0 or 1 first.
+			checkOnDeleteRebalance(0, 1)
+			checkOnDeleteRebalance(0, 2)
+			checkOnDeleteRebalance(1, 0)
+			checkOnDeleteRebalance(1, 2)
+
+			// When all machines are currently in the same index,
+			// index 2 will always be moved to zone C.
+			checkOnDeleteRebalanceIndex2(0)
+			checkOnDeleteRebalanceIndex2(1)
+		})
+
+		Context("when a new Control Plane Machine Set is created with a RollingUpdate strategy", func() {
+			BeforeEach(func() {
+				// The default CPMS should be sufficient for this test.
+				By("Creating an Inactive ControlPlaneMachineSet with RollingUpdate strategy")
+				cpms = resourcebuilder.ControlPlaneMachineSet().
+					WithNamespace(namespaceName).
+					WithStrategyType(machinev1.RollingUpdate).
+					WithMachineTemplateBuilder(tmplBuilder).
+					WithState(machinev1.ControlPlaneMachineSetStateInactive).
+					Build()
+				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+				By("Waiting for the ControlPlaneMachineSet to report two machines needing an update")
+
+				// We expect the CPMS to observe the current state of the cluster.
+				// The cluster has 3 machines in a single failure domain so we expect
+				// it to report 3 replicas, but only 1 updated replica.
+				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(1))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+
+			}, OncePerOrdered)
+
 			Context("should rebalance the machines", Ordered, func() {
-				It(fmt.Sprintf("should place index %d in zone B", first), func() {
-					expectIndexToBeReplacedWithProviderSpec(first, usEast1bProviderSpecBuilder.BuildRawExtension())
+				BeforeAll(func() {
+					By("Activating the ControlPlaneMachineSet")
+
+					Eventually(komega.Update(cpms, func() {
+						cpms.Spec.State = machinev1.ControlPlaneMachineSetStateActive
+					})).Should(Succeed())
 				})
 
-				It(fmt.Sprintf("should place index %d in zone C", second), func() {
-					expectIndexToBeReplacedWithProviderSpec(second, usEast1cProviderSpecBuilder.BuildRawExtension())
+				var expectIndexToBeReplacedWithProviderSpec = func(index int, oldProviderSpec, providerSpec *runtime.RawExtension) {
+					By(fmt.Sprintf("Checking that machine with index %d is rebalanced (deleted, recreated) across failure domains", index))
+					Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(
+						SatisfyAll(
+							// A machine with this index and the old, unbalanced providerSpec, shouldn't
+							// exist anymore as it should be deleted.
+							HaveField("Items", Not(ContainElement(SatisfyAll(
+								HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+								HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(oldProviderSpec.Raw)),
+							)))),
+							// A new, replacement machine with this index should exist and have been rebalanced to a new
+							// failure domain, hence having an updated providerSpec.
+							HaveField("Items", ContainElement(SatisfyAll(
+								HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+								HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
+							))),
+						),
+					)
+				}
+
+				It("should delete two machines and create two new ones rebalancing them across failure domains", func() {
+					expectIndexToBeReplacedWithProviderSpec(1, usEast1aProviderSpecBuilder.BuildRawExtension(), usEast1bProviderSpecBuilder.BuildRawExtension())
+					expectIndexToBeReplacedWithProviderSpec(2, usEast1aProviderSpecBuilder.BuildRawExtension(), usEast1cProviderSpecBuilder.BuildRawExtension())
 				})
 
 				It("should then report a healthy status", func() {
+					By("Waiting for the ControlPlaneMachineSet to report a stable status (machines rebalanced)")
 					Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
 						HaveField("Replicas", Equal(int32(3))),
 						HaveField("UpdatedReplicas", Equal(int32(3))),
@@ -1153,39 +1262,7 @@ var _ = Describe("With a running controller", func() {
 					)))
 				})
 			})
-		}
-
-		var checkOnDeleteRebalanceIndex2 = func(second int) {
-			Context("should rebalance the machines", Ordered, func() {
-				It("should place index 2 in zone C", func() {
-					expectIndexToBeReplacedWithProviderSpec(2, usEast1cProviderSpecBuilder.BuildRawExtension())
-				})
-
-				It(fmt.Sprintf("should place index %d in zone B", second), func() {
-					expectIndexToBeReplacedWithProviderSpec(second, usEast1bProviderSpecBuilder.BuildRawExtension())
-				})
-
-				It("should then report a healthy status", func() {
-					Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
-						HaveField("Replicas", Equal(int32(3))),
-						HaveField("UpdatedReplicas", Equal(int32(3))),
-						HaveField("ReadyReplicas", Equal(int32(3))),
-						HaveField("UnavailableReplicas", Equal(int32(0))),
-					)))
-				})
-			})
-		}
-
-		// Check all combinations where we delete 0 or 1 first.
-		checkOnDeleteRebalance(0, 1)
-		checkOnDeleteRebalance(0, 2)
-		checkOnDeleteRebalance(1, 0)
-		checkOnDeleteRebalance(1, 2)
-
-		// When all machines are currently in the same index,
-		// index 2 will always be moved to zone C.
-		checkOnDeleteRebalanceIndex2(0)
-		checkOnDeleteRebalanceIndex2(1)
+		})
 	})
 
 	Context("when deleting the ControlPlaneMachineSet", func() {
