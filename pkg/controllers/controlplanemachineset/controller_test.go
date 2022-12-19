@@ -1091,7 +1091,7 @@ var _ = Describe("With a running controller", func() {
 
 			// Wait for the machines to all report running before creating the CPMS.
 			By("Waiting for the machines to become ready")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", HaveEach(
 				HaveField("Status.Phase", HaveValue(Equal("Running"))),
 			)))
 
@@ -1113,7 +1113,7 @@ var _ = Describe("With a running controller", func() {
 				// We expect the CPMS to observe the current state of the cluster.
 				// The cluster has 3 machines in a single failure domain so we expect
 				// it to report 3 replicas, but only 1 updated replica.
-				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
 					HaveField("Replicas", Equal(int32(3))),
 					HaveField("UpdatedReplicas", Equal(int32(1))),
 					HaveField("ReadyReplicas", Equal(int32(3))),
@@ -1132,7 +1132,7 @@ var _ = Describe("With a running controller", func() {
 				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
 
 				By("Checking that a new machine is created in the expected failure domain")
-				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", ContainElement(SatisfyAll(
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", ContainElement(SatisfyAll(
 					HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
 					HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
 				))))
@@ -1209,7 +1209,7 @@ var _ = Describe("With a running controller", func() {
 				// We expect the CPMS to observe the current state of the cluster.
 				// The cluster has 3 machines in a single failure domain so we expect
 				// it to report 3 replicas, but only 1 updated replica.
-				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
 					HaveField("Replicas", Equal(int32(3))),
 					HaveField("UpdatedReplicas", Equal(int32(1))),
 					HaveField("ReadyReplicas", Equal(int32(3))),
