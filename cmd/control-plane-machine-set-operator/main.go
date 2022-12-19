@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
@@ -59,7 +60,7 @@ const (
 	unknownVersionValue           = "unknown"
 )
 
-func main() { //nolint:funlen
+func main() { //nolint:funlen,cyclop
 	scheme := runtime.NewScheme()
 	setupLog := ctrl.Log.WithName("setup")
 
@@ -119,8 +120,20 @@ func main() { //nolint:funlen
 		os.Exit(1)
 	}
 
+	// Define an uncached client.
+	// More resource intensive than the default client,
+	// is to be used only in situations where we want to avoid the cache.
+	// We specifically declare an uncached client.Client rather than a client.Reader
+	// for it to be wire compatible with the default client, so that we can easily
+	// override it as needed.
+	uncachedClient, err := client.New(cfg, client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper()})
+	if err != nil {
+		setupLog.Error(err, "unable to set up uncached client")
+	}
+
 	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
 		Client:         mgr.GetClient(),
+		UncachedClient: client.NewNamespacedClient(uncachedClient, managedNamespace),
 		Scheme:         mgr.GetScheme(),
 		Namespace:      managedNamespace,
 		OperatorName:   "control-plane-machine-set",

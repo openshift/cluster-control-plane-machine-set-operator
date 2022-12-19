@@ -73,9 +73,10 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		reconciler := &ControlPlaneMachineSetReconciler{
-			Client:       k8sClient,
-			Namespace:    namespaceName,
-			OperatorName: operatorName,
+			Client:         k8sClient,
+			UncachedClient: k8sClient,
+			Namespace:      namespaceName,
+			OperatorName:   operatorName,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
@@ -196,9 +197,10 @@ var _ = Describe("Cluster Operator Status", func() {
 		cpmsBuilder = resourcebuilder.ControlPlaneMachineSet().WithName(clusterControlPlaneMachineSetName).WithNamespace(namespaceName)
 
 		reconciler = &ControlPlaneMachineSetReconciler{
-			Client:       k8sClient,
-			Namespace:    namespaceName,
-			OperatorName: operatorName,
+			Client:         k8sClient,
+			UncachedClient: k8sClient,
+			Namespace:      namespaceName,
+			OperatorName:   operatorName,
 		}
 
 		// CVO will create a blank cluster operator for us before the operator starts.

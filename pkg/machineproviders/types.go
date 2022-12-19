@@ -22,6 +22,7 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MachineInfo collates information about a Control Plane Machine and Node.
@@ -70,6 +71,11 @@ type MachineProvider interface {
 	// GetMachineInfos is used to collect information about the Control Plane Machines and Nodes that currently exist
 	// within the Cluster, as referred to by the ControlPlaneMachineSet.
 	GetMachineInfos(context.Context, logr.Logger) ([]MachineInfo, error)
+
+	// WithClient is used to set API client for the Machine Provider.
+	// It should not mutate the state of the existing provider but return
+	// a copy of the provider with the new client.
+	WithClient(client client.Client) MachineProvider
 
 	// CreateMachine is used to instruct the Machine Provider to create a new Machine. The only input is the index for
 	// the new Machine. During construction of the MachineProvider, it should map indexes to failure domains so that it

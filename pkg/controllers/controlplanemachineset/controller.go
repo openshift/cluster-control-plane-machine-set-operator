@@ -79,8 +79,9 @@ var (
 // ControlPlaneMachineSetReconciler reconciles a ControlPlaneMachineSet object.
 type ControlPlaneMachineSetReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	RESTMapper meta.RESTMapper
+	Scheme         *runtime.Scheme
+	RESTMapper     meta.RESTMapper
+	UncachedClient client.Client
 
 	// Namespace is the namespace in which the ControlPlaneMachineSet controller should operate.
 	// Any ControlPlaneMachineSet not in this namespace should be ignored.
