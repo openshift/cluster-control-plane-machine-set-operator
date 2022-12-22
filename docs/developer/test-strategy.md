@@ -43,7 +43,7 @@ Check that the finalizer is removed correctly.
 Eg in integration we have no GC running.
    </td>
    <td>Once this is completed, we need to reinstall the CPMS, the CPMS generator will be tested here as well as we will have to check the status is as expected before re-activating the CPMS.</td>
-   <td>Integration</td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>2</td>
@@ -66,19 +66,19 @@ Eg we can observe the status and then activate the CPMS to allow it to react.
 <p>
 If we make any modifications to test the output of the CPMS status, we must not modify the newest machine else the spec of the CPMS will be updated.
    </td>
-   <td>Integration</td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>3</td>
    <td>When the newest Machines spec is changed, the generated CPMS is updated</td>
    <td>If we introduce a new Machine (we won’t, but we can update the spec of the newest machine), then the generator should update the existing CPMS to reflect the updated spec</td>
-   <td>E2E (?), Integration</td>
+   <td>E2E, Integration</td>
    <td>This is cheap to run in E2E and can be checked easily. Maybe not needed as already in integration tests?</td>
    <td>Must reset the Machine after we have updated it and checked the expectations.
 <p>
 Must run after case #2.
    </td>
-   <td>Integration</td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>4</td>
@@ -90,7 +90,7 @@ Must run after case #2.
 This is difficult integration test as we don’t run the generator and CPMS core controller together in our integration suite today. (There’s also no MAPI running so it’s not a real test).
    </td>
    <td>Must run after case #2.</td>
-   <td></td>
+   <td>E2E</td>
   </tr>
   <tr>
    <td>5</td>
@@ -111,7 +111,7 @@ We already have some coverage of this at the integration test level.
 We need to make sure that load balancer attachment is working correctly when running this as an E2E test. See <a href="#checking-load-balancer-connectivity">Checking Connectivity</a> below for a plan for this.
    </td>
    <td>At the end of this test, should make sure all cluster operators settle down and the cluster stabilises before executing other tests.</td>
-   <td>Integration</td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>6</td>
@@ -131,7 +131,7 @@ See <a href="#checking-load-balancer-connectivity">Checking Connectivity</a> bel
    </td>
    <td>We already have some small integration tests that test a subset of this but some longer tests that run through actually removing the machines and watching the operator loop through a whole RollingUpdate would also be good.
    </td>
-   <td></td>
+   <td>Integration</td>
   </tr>
   <tr>
    <td>7</td>
@@ -140,7 +140,7 @@ See <a href="#checking-load-balancer-connectivity">Checking Connectivity</a> bel
    <td>E2E, Integration</td>
    <td>We already have this at the integration level but this is fairly cheap to test at the E2E level as well and is closely related/required for test case #8</td>
    <td>Should be run in an ordered container with case #8</td>
-   <td>Integration</td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>8</td>
@@ -152,7 +152,7 @@ See <a href="#checking-load-balancer-connectivity">Checking Connectivity</a> bel
 We need to make sure that load balancer attachment is working correctly when running this as an E2E test. See <a href="##checking-load-balancer-connectivity">Checking Connectivity</a> below for a plan for this.
    </td>
    <td>Should be run ordered with #7. Technically not required to have the spec differ but that would be the normal case.</td>
-   <td>Integration</td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>9</td>
@@ -164,7 +164,7 @@ We need to make sure that load balancer attachment is working correctly when run
 This can be checked at the integration level succinctly.
    </td>
    <td></td>
-   <td></td>
+   <td>Integration</td>
   </tr>
   <tr>
    <td>10</td>
@@ -213,7 +213,7 @@ Owner references are valid.
    <td>E2E</td>
    <td>Invalid owner references could cause the GC to remove the Machines, which would be bad.</td>
    <td>Should check that no Machines get a deletion timestamp set.</td>
-   <td></td>
+   <td>E2E</td>
   </tr>
   <tr>
    <td>14</td>
@@ -225,7 +225,7 @@ CPMS RollingUpdate should pick a Machine to replace
    <td>Unit, Integration</td>
    <td>External factors don’t really influence this logic so we can simulate this effectively in an integration test</td>
    <td>This already has some coverage in the mapping unit tests.</td>
-   <td>Unit</td>
+   <td>Unit, Integration</td>
   </tr>
   <tr>
    <td>15</td>
@@ -237,7 +237,7 @@ CPMS RollingUpdate should pick a Machine to replace
 When a Machine is deleted, if it’s in a repeated failure domain, it should be the one to change, not the other Machines
    </td>
    <td>This already has some coverage in the mapping unit tests.</td>
-   <td>Unit</td>
+   <td>Unit, Integration</td>
   </tr>
 </table>
 
@@ -301,7 +301,7 @@ We can also simulate this with an integration test to test the surging behaviour
 <p>
 Intention here is to change CPMS spec to a bigger instance and watch it roll out, no fiddling with Machines, this will be exactly as a user would do the vertical scale.
    </td>
-   <td></td>
+   <td>E2E, Integration</td>
   </tr>
   <tr>
    <td>P2</td>
