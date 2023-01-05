@@ -327,6 +327,13 @@ func (r *ControlPlaneMachineSetReconciler) deleteReplacedMachines(ctx context.Co
 		toDeleteMachine = machinesOutdatedNonReady[0]
 	}
 
+	if len(machinesUpdated) > 1 {
+		// More than one Updated (Ready and Up-to-date) Machine exists for this index.
+		// This means there is an excess in Updated Machines for this index and
+		// the oldest Machine in this state should be deleted.
+		toDeleteMachine = sortMachineInfoByCreationTimestamp(machinesUpdated)[0]
+	}
+
 	// Check if any Machine was deemed for deletion.
 	if toDeleteMachine.MachineRef != nil {
 		logger := logger.WithValues("index", toDeleteMachine.Index, "namespace", r.Namespace, "name", toDeleteMachine.MachineRef.ObjectMeta.Name)
@@ -643,6 +650,15 @@ func sortMachineInfosByIndex(indexedMachineInfos map[int32][]machineproviders.Ma
 	})
 
 	return slice
+}
+
+// sortMachineInfoByCreationTimestamp returns a slice of MachineInfo sorted by Machine's CreationTimestamp.
+func sortMachineInfoByCreationTimestamp(machineInfos []machineproviders.MachineInfo) []machineproviders.MachineInfo {
+	sort.Slice(machineInfos, func(i, j int) bool {
+		return machineInfos[i].MachineRef.ObjectMeta.CreationTimestamp.Before(&machineInfos[j].MachineRef.ObjectMeta.CreationTimestamp)
+	})
+
+	return machineInfos
 }
 
 // machineInfosMaptoSlice returns a slice of MachineInfos from a map of MachineInfos slices.
