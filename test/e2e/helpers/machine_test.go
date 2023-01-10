@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("Machine tests", func() {
@@ -52,19 +52,19 @@ var _ = Describe("Machine tests", func() {
 				expectedError: fmt.Errorf("%w: ", errMachineNameFormatInvalid),
 			}),
 			Entry("with a single digit numeric suffix", machineIndexTableInput{
-				machine:       resourcebuilder.Machine().WithName("machine-worker-foo-2").Build(),
+				machine:       machinev1beta1resourcebuilder.Machine().WithName("machine-worker-foo-2").Build(),
 				expectedIndex: 2,
 			}),
 			Entry("with a two digit numeric suffix", machineIndexTableInput{
-				machine:       resourcebuilder.Machine().WithName("machine-worker-foo-23").Build(),
+				machine:       machinev1beta1resourcebuilder.Machine().WithName("machine-worker-foo-23").Build(),
 				expectedIndex: 23,
 			}),
 			Entry("with a three digit numeric suffix", machineIndexTableInput{
-				machine:       resourcebuilder.Machine().WithName("machine-worker-foo-234").Build(),
+				machine:       machinev1beta1resourcebuilder.Machine().WithName("machine-worker-foo-234").Build(),
 				expectedIndex: 234,
 			}),
 			Entry("with a non-digit suffix", machineIndexTableInput{
-				machine:       resourcebuilder.Machine().WithName("machine-worker-foo-a").Build(),
+				machine:       machinev1beta1resourcebuilder.Machine().WithName("machine-worker-foo-a").Build(),
 				expectedIndex: -1,
 				expectedError: fmt.Errorf("%w: machine-worker-foo-a", errMachineNameFormatInvalid),
 			}),

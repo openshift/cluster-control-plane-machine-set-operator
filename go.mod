@@ -12,10 +12,11 @@ require (
 	github.com/go-test/deep v1.1.0
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.50.1
-	github.com/onsi/ginkgo/v2 v2.6.1
-	github.com/onsi/gomega v1.24.2
+	github.com/onsi/ginkgo/v2 v2.7.0
+	github.com/onsi/gomega v1.26.0
 	github.com/openshift/api v0.0.0-20230208093943-11903e0431cd
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
+	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230209105200-2ec5c87daab3
 	github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.26.1
@@ -23,9 +24,9 @@ require (
 	k8s.io/client-go v0.26.1
 	k8s.io/component-base v0.26.1
 	k8s.io/klog/v2 v2.90.0
-	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
+	k8s.io/utils v0.0.0-20230115233650-391b47cb4029
 	sigs.k8s.io/controller-runtime v0.14.4
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230127152628-dd6bafd4572e
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230131074648-f5014c077fc3
 	sigs.k8s.io/controller-tools v0.11.3
 )
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,12 @@ import (
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/mock"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machineprovidersresourcebuilder "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder/machineproviders"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -39,28 +41,28 @@ import (
 
 var _ = Describe("reconcileMachineUpdates", func() {
 	var namespaceName string
-	var logger test.TestLogger
+	var logger testutils.TestLogger
 	var reconciler *ControlPlaneMachineSetReconciler
-	var cpmsBuilder resourcebuilder.ControlPlaneMachineSetBuilder
+	var cpmsBuilder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 
 	var mockCtrl *gomock.Controller
 	var mockMachineProvider *mock.MockMachineProvider
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
 		By("Setting up the reconciler")
-		logger = test.NewTestLogger()
+		logger = testutils.NewTestLogger()
 		reconciler = &ControlPlaneMachineSetReconciler{
 			Namespace: namespaceName,
 			Scheme:    testScheme,
 		}
 
 		By("Setting up supporting resources")
-		cpmsBuilder = resourcebuilder.ControlPlaneMachineSet()
+		cpmsBuilder = machinev1resourcebuilder.ControlPlaneMachineSet()
 
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockMachineProvider = mock.NewMockMachineProvider(mockCtrl)
@@ -74,18 +76,18 @@ var _ = Describe("reconcileMachineUpdates", func() {
 	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 	nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
 
-	updatedMachineBuilder := resourcebuilder.MachineInfo().
+	updatedMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithNodeGVR(nodeGVR).
 		WithReady(true).
 		WithNeedsUpdate(false)
 
-	pendingMachineBuilder := resourcebuilder.MachineInfo().
+	pendingMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithReady(false).
 		WithNeedsUpdate(false)
 
-	outdatedNonReadyMachineBuilder := resourcebuilder.MachineInfo().
+	outdatedNonReadyMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithReady(false).
 		WithNeedsUpdate(true)
@@ -97,12 +99,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type rollingUpdateTableInput struct {
-			cpmsBuilder          resourcebuilder.ControlPlaneMachineSetInterface
+			cpmsBuilder          machinev1resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos         map[int32][]machineproviders.MachineInfo
 			setupMock            func(machineInfos map[int32][]machineproviders.MachineInfo)
 			expectedErrorBuilder func() error
 			expectedResult       ctrl.Result
-			expectedLogsBuilder  func() []test.LogEntry
+			expectedLogsBuilder  func() []testutils.LogEntry
 		}
 
 		DescribeTable("should implement the update strategy based on the MachineInfo", func(in rollingUpdateTableInput) {
@@ -137,8 +139,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 4,
 							KeysAndValues: []interface{}{
@@ -162,8 +164,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -191,8 +193,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 							KeysAndValues: []interface{}{
@@ -220,8 +222,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -252,8 +254,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -287,8 +289,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(transientError).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Error: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
 							KeysAndValues: []interface{}{
@@ -316,8 +318,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -344,8 +346,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -384,8 +386,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -429,8 +431,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(nil).Times(1)
 				},
 
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -468,8 +470,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -506,8 +508,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -531,8 +533,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.RollingUpdate,
@@ -560,8 +562,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -598,8 +600,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -645,8 +647,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo1 := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo1.MachineRef).Return(nil).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -699,8 +701,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo1 := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo1.MachineRef).Return(nil).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -746,8 +748,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -805,8 +807,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -839,8 +841,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo0 := updatedMachineBuilder.WithIndex(0).WithMachineName("machine-older-extra-0").Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -875,8 +877,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 4,
 							KeysAndValues: []interface{}{
@@ -904,8 +906,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					machineInfo0 := outdatedNonReadyMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build()
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo0.MachineRef).Times(1)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -962,8 +964,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						// We wouldn't normally continue operation when a Machine is pending removal, however,
 						// when a user has manually deleted a Machine and the etcd deletion hook is present,
 						// we still need to handle creating the replacement Machine to unblock the rollout.
@@ -994,8 +996,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						// We wouldn't normally continue operation when a Machine is pending removal, however,
 						// when a user has manually deleted a Machine and the etcd deletion hook is present,
 						// we still need to handle creating the replacement Machine to unblock the rollout.
@@ -1027,8 +1029,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -1051,12 +1053,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		type onDeleteUpdateTableInput struct {
-			cpmsBuilder          resourcebuilder.ControlPlaneMachineSetInterface
+			cpmsBuilder          machinev1resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos         map[int32][]machineproviders.MachineInfo
 			setupMock            func(machineInfos map[int32][]machineproviders.MachineInfo)
 			expectedErrorBuilder func() error
 			expectedResult       ctrl.Result
-			expectedLogsBuilder  func() []test.LogEntry
+			expectedLogsBuilder  func() []testutils.LogEntry
 		}
 
 		DescribeTable("should implement the update strategy based on the MachineInfo", func(in onDeleteUpdateTableInput) {
@@ -1088,8 +1090,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 4,
 							KeysAndValues: []interface{}{
@@ -1111,8 +1113,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1138,8 +1140,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1165,8 +1167,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(4)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1193,8 +1195,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1221,8 +1223,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1250,8 +1252,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1275,8 +1277,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1313,8 +1315,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1350,8 +1352,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1388,8 +1390,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1426,8 +1428,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1468,8 +1470,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1508,8 +1510,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1549,8 +1551,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1591,8 +1593,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1628,8 +1630,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1653,8 +1655,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1680,8 +1682,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1715,8 +1717,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{{
 						Level: 2,
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
@@ -1752,8 +1754,8 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
-				expectedLogsBuilder: func() []test.LogEntry {
-					return []test.LogEntry{
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
 						{
 							Level: 2,
 							KeysAndValues: []interface{}{
@@ -1792,14 +1794,14 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		It("Logs that the strategy is invalid", func() {
-			Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
+			Expect(logger.Entries()).To(ConsistOf(testutils.LogEntry{
 				Error:   errRecreateStrategyNotSupported,
 				Message: invalidStrategyMessage,
 			}))
 		})
 
 		It("Sets the degraded condition", func() {
-			Expect(cpms.Status.Conditions).To(ConsistOf(test.MatchCondition(metav1.Condition{
+			Expect(cpms.Status.Conditions).To(ConsistOf(testutils.MatchCondition(metav1.Condition{
 				Type:    conditionDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  reasonInvalidStrategy,
@@ -1830,14 +1832,14 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		})
 
 		It("Logs that the strategy is invalid", func() {
-			Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
+			Expect(logger.Entries()).To(ConsistOf(testutils.LogEntry{
 				Error:   fmt.Errorf("%w: %s", errUnknownStrategy, "invalid"),
 				Message: invalidStrategyMessage,
 			}))
 		})
 
 		It("Sets the degraded condition", func() {
-			Expect(cpms.Status.Conditions).To(ConsistOf(test.MatchCondition(metav1.Condition{
+			Expect(cpms.Status.Conditions).To(ConsistOf(testutils.MatchCondition(metav1.Condition{
 				Type:    conditionDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  reasonInvalidStrategy,
@@ -1850,7 +1852,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 var _ = Describe("utils tests", func() {
 	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 	nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
-	updatedMachineBuilder := resourcebuilder.MachineInfo().
+	updatedMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithNodeGVR(nodeGVR).
 		WithReady(true).

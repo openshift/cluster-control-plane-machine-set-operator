@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,12 @@ import (
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
 var _ = Describe("MachineProviders", func() {
@@ -65,7 +67,7 @@ var _ = Describe("MachineProviders", func() {
 		},
 	}
 
-	usEast1aProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+	usEast1aProviderSpecBuilder := machinev1beta1resourcebuilder.AWSProviderSpec().
 		WithAvailabilityZone("us-east-1a").
 		WithSecurityGroups([]machinev1beta1.AWSResourceReference{
 			{
@@ -78,7 +80,7 @@ var _ = Describe("MachineProviders", func() {
 			},
 		}).WithSubnet(usEast1aSubnet)
 
-	usEast1bProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+	usEast1bProviderSpecBuilder := machinev1beta1resourcebuilder.AWSProviderSpec().
 		WithAvailabilityZone("us-east-1b").
 		WithSecurityGroups([]machinev1beta1.AWSResourceReference{
 			{
@@ -91,7 +93,7 @@ var _ = Describe("MachineProviders", func() {
 			},
 		}).WithSubnet(usEast1bSubnet)
 
-	usEast1cProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+	usEast1cProviderSpecBuilder := machinev1beta1resourcebuilder.AWSProviderSpec().
 		WithAvailabilityZone("us-east-1c").
 		WithSecurityGroups([]machinev1beta1.AWSResourceReference{
 			{
@@ -104,7 +106,7 @@ var _ = Describe("MachineProviders", func() {
 			},
 		}).WithSubnet(usEast1cSubnet)
 
-	usEast1aFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+	usEast1aFailureDomainBuilder := machinev1resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1a").
 		WithSubnet(machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
@@ -116,7 +118,7 @@ var _ = Describe("MachineProviders", func() {
 			},
 		})
 
-	usEast1bFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+	usEast1bFailureDomainBuilder := machinev1resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1b").
 		WithSubnet(machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
@@ -128,7 +130,7 @@ var _ = Describe("MachineProviders", func() {
 			},
 		})
 
-	usEast1cFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+	usEast1cFailureDomainBuilder := machinev1resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1c").
 		WithSubnet(machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
@@ -141,25 +143,25 @@ var _ = Describe("MachineProviders", func() {
 		})
 
 	Context("NewMachineProvider", func() {
-		var cpmsBuilder resourcebuilder.ControlPlaneMachineSetBuilder
-		var logger test.TestLogger
+		var cpmsBuilder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
+		var logger testutils.TestLogger
 		var namespaceName string
 
 		const invalidCPMSType = machinev1.ControlPlaneMachineSetMachineType("invalid")
 
 		BeforeEach(func() {
 			By("Setting up a namespace for the test")
-			ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+			ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 			namespaceName = ns.GetName()
 
-			cpmsBuilder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName)
+			cpmsBuilder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName)
 
-			logger = test.NewTestLogger()
+			logger = testutils.NewTestLogger()
 		})
 
 		AfterEach(func() {
-			test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 				&machinev1beta1.Machine{},
 			)
 		})
@@ -190,13 +192,13 @@ var _ = Describe("MachineProviders", func() {
 
 		Context("With duplicate failure domains", func() {
 			BeforeEach(func() {
-				awsProviderSpec := resourcebuilder.AWSProviderSpec()
+				awsProviderSpec := machinev1beta1resourcebuilder.AWSProviderSpec()
 
 				cpmsBuilder = cpmsBuilder.WithMachineTemplateBuilder(
-					resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(
+					machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(
 						awsProviderSpec,
 					).WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders( // here is the duplication of the failure domains
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders( // here is the duplication of the failure domains
 							usEast1aFailureDomainBuilder,
 							usEast1aFailureDomainBuilder,
 							usEast1bFailureDomainBuilder,
@@ -208,8 +210,8 @@ var _ = Describe("MachineProviders", func() {
 				// We create a happy path so that the construction is successful.
 				// More detailed error cases will happen in the machine provider tests themselves.
 				By("Creating some master machines")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-				for i, ps := range []resourcebuilder.AWSProviderSpecBuilder{usEast1aProviderSpecBuilder, usEast1bProviderSpecBuilder, usEast1cProviderSpecBuilder} {
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				for i, ps := range []machinev1beta1resourcebuilder.AWSProviderSpecBuilder{usEast1aProviderSpecBuilder, usEast1bProviderSpecBuilder, usEast1cProviderSpecBuilder} {
 					machine := machineBuilder.WithName(fmt.Sprintf("master-%d", i)).WithProviderSpecBuilder(ps).Build()
 					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 				}
@@ -234,7 +236,7 @@ var _ = Describe("MachineProviders", func() {
 
 				It("logs based on the machine info mappings", func() {
 					Expect(logger.Entries()).To(ConsistOf(
-						test.LogEntry{
+						testutils.LogEntry{
 							Level: 4,
 							KeysAndValues: []interface{}{
 								"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
@@ -252,13 +254,13 @@ var _ = Describe("MachineProviders", func() {
 
 		Context("With an OpenShift Machine v1beta1 machine type", func() {
 			BeforeEach(func() {
-				awsProviderSpec := resourcebuilder.AWSProviderSpec()
+				awsProviderSpec := machinev1beta1resourcebuilder.AWSProviderSpec()
 
 				cpmsBuilder = cpmsBuilder.WithMachineTemplateBuilder(
-					resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(
+					machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(
 						awsProviderSpec,
 					).WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aFailureDomainBuilder,
 							usEast1bFailureDomainBuilder,
 							usEast1cFailureDomainBuilder,
@@ -269,8 +271,8 @@ var _ = Describe("MachineProviders", func() {
 				// We create a happy path so that the construction is successful.
 				// More detailed error cases will happen in the machine provider tests themselves.
 				By("Creating some master machines")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-				for i, ps := range []resourcebuilder.AWSProviderSpecBuilder{usEast1aProviderSpecBuilder, usEast1bProviderSpecBuilder, usEast1cProviderSpecBuilder} {
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				for i, ps := range []machinev1beta1resourcebuilder.AWSProviderSpecBuilder{usEast1aProviderSpecBuilder, usEast1bProviderSpecBuilder, usEast1cProviderSpecBuilder} {
 					machine := machineBuilder.WithName(fmt.Sprintf("master-%d", i)).WithProviderSpecBuilder(ps).Build()
 					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 				}
@@ -296,7 +298,7 @@ var _ = Describe("MachineProviders", func() {
 
 				It("logs based on the machine info mappings", func() {
 					Expect(logger.Entries()).To(ConsistOf(
-						test.LogEntry{
+						testutils.LogEntry{
 							Level: 4,
 							KeysAndValues: []interface{}{
 								"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{

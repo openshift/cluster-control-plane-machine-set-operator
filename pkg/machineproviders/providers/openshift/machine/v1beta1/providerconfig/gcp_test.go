@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("GCP Provider Config", func() {
@@ -32,7 +33,7 @@ var _ = Describe("GCP Provider Config", func() {
 	usCentral1b := "us-central1-b"
 
 	BeforeEach(func() {
-		machineProviderConfig := resourcebuilder.GCPProviderSpec().
+		machineProviderConfig := machinev1beta1resourcebuilder.GCPProviderSpec().
 			WithZone(usCentral1a).
 			Build()
 
@@ -43,7 +44,7 @@ var _ = Describe("GCP Provider Config", func() {
 
 	Context("ExtractFailureDomain", func() {
 		It("returns the configured failure domain", func() {
-			expected := resourcebuilder.GCPFailureDomain().
+			expected := machinev1resourcebuilder.GCPFailureDomain().
 				WithZone(usCentral1a).
 				Build()
 
@@ -55,7 +56,7 @@ var _ = Describe("GCP Provider Config", func() {
 		var changedProviderConfig GCPProviderConfig
 
 		BeforeEach(func() {
-			changedFailureDomain := resourcebuilder.GCPFailureDomain().
+			changedFailureDomain := machinev1resourcebuilder.GCPFailureDomain().
 				WithZone(usCentral1b).
 				Build()
 
@@ -64,7 +65,7 @@ var _ = Describe("GCP Provider Config", func() {
 
 		Context("ExtractFailureDomain", func() {
 			It("returns the changed failure domain from the changed config", func() {
-				expected := resourcebuilder.GCPFailureDomain().
+				expected := machinev1resourcebuilder.GCPFailureDomain().
 					WithZone(usCentral1b).
 					Build()
 
@@ -72,7 +73,7 @@ var _ = Describe("GCP Provider Config", func() {
 			})
 
 			It("returns the original failure domain from the original config", func() {
-				expected := resourcebuilder.GCPFailureDomain().
+				expected := machinev1resourcebuilder.GCPFailureDomain().
 					WithZone(usCentral1a).
 					Build()
 
@@ -86,7 +87,7 @@ var _ = Describe("GCP Provider Config", func() {
 		var expectedGCPConfig machinev1beta1.GCPMachineProviderSpec
 
 		BeforeEach(func() {
-			configBuilder := resourcebuilder.GCPProviderSpec()
+			configBuilder := machinev1beta1resourcebuilder.GCPProviderSpec()
 			expectedGCPConfig = *configBuilder.Build()
 			rawConfig := configBuilder.BuildRawExtension()
 

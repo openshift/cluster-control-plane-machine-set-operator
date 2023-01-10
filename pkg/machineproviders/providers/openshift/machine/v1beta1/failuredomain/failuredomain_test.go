@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 )
 
 var _ = Describe("FailureDomains", func() {
@@ -49,7 +49,7 @@ var _ = Describe("FailureDomains", func() {
 			var err error
 
 			BeforeEach(func() {
-				config := resourcebuilder.AWSFailureDomains().BuildFailureDomains()
+				config := machinev1resourcebuilder.AWSFailureDomains().BuildFailureDomains()
 
 				failureDomains, err = NewFailureDomains(config)
 			})
@@ -72,7 +72,7 @@ var _ = Describe("FailureDomains", func() {
 			var err error
 
 			BeforeEach(func() {
-				config := resourcebuilder.AWSFailureDomains().BuildFailureDomains()
+				config := machinev1resourcebuilder.AWSFailureDomains().BuildFailureDomains()
 				config.AWS = nil
 
 				failureDomains, err = NewFailureDomains(config)
@@ -92,7 +92,7 @@ var _ = Describe("FailureDomains", func() {
 			var err error
 
 			BeforeEach(func() {
-				config := resourcebuilder.AzureFailureDomains().BuildFailureDomains()
+				config := machinev1resourcebuilder.AzureFailureDomains().BuildFailureDomains()
 
 				failureDomains, err = NewFailureDomains(config)
 			})
@@ -115,7 +115,7 @@ var _ = Describe("FailureDomains", func() {
 			var err error
 
 			BeforeEach(func() {
-				config := resourcebuilder.AzureFailureDomains().BuildFailureDomains()
+				config := machinev1resourcebuilder.AzureFailureDomains().BuildFailureDomains()
 				config.Azure = nil
 
 				failureDomains, err = NewFailureDomains(config)
@@ -135,7 +135,7 @@ var _ = Describe("FailureDomains", func() {
 			var err error
 
 			BeforeEach(func() {
-				config := resourcebuilder.GCPFailureDomains().BuildFailureDomains()
+				config := machinev1resourcebuilder.GCPFailureDomains().BuildFailureDomains()
 
 				failureDomains, err = NewFailureDomains(config)
 			})
@@ -158,7 +158,7 @@ var _ = Describe("FailureDomains", func() {
 			var err error
 
 			BeforeEach(func() {
-				config := resourcebuilder.GCPFailureDomains().BuildFailureDomains()
+				config := machinev1resourcebuilder.GCPFailureDomains().BuildFailureDomains()
 				config.GCP = nil
 
 				failureDomains, err = NewFailureDomains(config)
@@ -206,7 +206,7 @@ var _ = Describe("FailureDomains", func() {
 
 		Context("with an availability zone", func() {
 			BeforeEach(func() {
-				fd.aws = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()
+				fd.aws = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build()
 			})
 
 			It("returns the availability zone for String()", func() {
@@ -219,7 +219,7 @@ var _ = Describe("FailureDomains", func() {
 				BeforeEach(func() {
 					subnetARN := "subnet-us-east-1a"
 
-					fd.aws = resourcebuilder.AWSFailureDomain().WithSubnet(machinev1.AWSResourceReference{
+					fd.aws = machinev1resourcebuilder.AWSFailureDomain().WithSubnet(machinev1.AWSResourceReference{
 						Type: machinev1.AWSARNReferenceType,
 						ARN:  &subnetARN,
 					}).Build()
@@ -232,7 +232,7 @@ var _ = Describe("FailureDomains", func() {
 
 			Context("with a filter type subnet", func() {
 				BeforeEach(func() {
-					fd.aws = resourcebuilder.AWSFailureDomain().WithSubnet(machinev1.AWSResourceReference{
+					fd.aws = machinev1resourcebuilder.AWSFailureDomain().WithSubnet(machinev1.AWSResourceReference{
 						Type: machinev1.AWSFiltersReferenceType,
 						Filters: &[]machinev1.AWSResourceFilter{
 							{
@@ -252,7 +252,7 @@ var _ = Describe("FailureDomains", func() {
 				BeforeEach(func() {
 					subnetID := "subnet-us-east-1c"
 
-					fd.aws = resourcebuilder.AWSFailureDomain().WithSubnet(machinev1.AWSResourceReference{
+					fd.aws = machinev1resourcebuilder.AWSFailureDomain().WithSubnet(machinev1.AWSResourceReference{
 						Type: machinev1.AWSIDReferenceType,
 						ID:   &subnetID,
 					}).Build()
@@ -276,7 +276,7 @@ var _ = Describe("FailureDomains", func() {
 
 		Context("with an availability zone", func() {
 			BeforeEach(func() {
-				fd.azure = resourcebuilder.AzureFailureDomain().WithZone("1").Build()
+				fd.azure = machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build()
 			})
 
 			It("returns the availability zone for String()", func() {
@@ -286,7 +286,7 @@ var _ = Describe("FailureDomains", func() {
 
 		Context("with no availability zone", func() {
 			BeforeEach(func() {
-				fd.azure = resourcebuilder.AzureFailureDomain().Build()
+				fd.azure = machinev1resourcebuilder.AzureFailureDomain().Build()
 				fd.azure.Zone = ""
 			})
 
@@ -304,11 +304,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.AWSPlatformType,
-					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+					aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.AWSPlatformType,
-					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+					aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
 				}
 			})
 
@@ -321,7 +321,7 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.AWSPlatformType,
-					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+					aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
 				}
 			})
 
@@ -334,11 +334,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.AzurePlatformType,
-					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+					azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.AzurePlatformType,
-					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+					azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				}
 			})
 
@@ -351,11 +351,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.AzurePlatformType,
-					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+					azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.AzurePlatformType,
-					azure:        resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+					azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				}
 			})
 
@@ -368,11 +368,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.GCPPlatformType,
-					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+					gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.GCPPlatformType,
-					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+					gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
 				}
 			})
 
@@ -385,11 +385,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.GCPPlatformType,
-					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+					gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.GCPPlatformType,
-					gcp:          resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
+					gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
 				}
 			})
 
@@ -402,11 +402,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.AWSPlatformType,
-					aws:          resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+					aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.AzurePlatformType,
-					azure:        resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+					azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				}
 			})
 

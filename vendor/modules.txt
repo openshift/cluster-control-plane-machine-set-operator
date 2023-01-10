@@ -480,7 +480,7 @@ github.com/nishanths/predeclared/passes/predeclared
 # github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
-# github.com/onsi/ginkgo/v2 v2.6.1 => github.com/onsi/ginkgo/v2 v2.4.0
+# github.com/onsi/ginkgo/v2 v2.7.0 => github.com/onsi/ginkgo/v2 v2.4.0
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -502,7 +502,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.24.2
+# github.com/onsi/gomega v1.26.0
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -529,6 +529,16 @@ github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
 github.com/openshift/client-go/machine/applyconfigurations/internal
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1
+# github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230209105200-2ec5c87daab3
+## explicit; go 1.19
+github.com/openshift/cluster-api-actuator-pkg/testutils
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/apps/v1
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1
+github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/meta/v1
 # github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a
 ## explicit; go 1.19
 github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers
@@ -1260,7 +1270,7 @@ k8s.io/kube-openapi/pkg/schemamutation
 k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
+# k8s.io/utils v0.0.0-20230115233650-391b47cb4029
 ## explicit; go 1.18
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -1336,7 +1346,7 @@ sigs.k8s.io/controller-runtime/pkg/webhook
 sigs.k8s.io/controller-runtime/pkg/webhook/admission
 sigs.k8s.io/controller-runtime/pkg/webhook/conversion
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
-# sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230127152628-dd6bafd4572e
+# sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230131074648-f5014c077fc3
 ## explicit; go 1.17
 sigs.k8s.io/controller-runtime/tools/setup-envtest
 sigs.k8s.io/controller-runtime/tools/setup-envtest/env

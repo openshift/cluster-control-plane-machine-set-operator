@@ -40,7 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	appsv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/apps/v1"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
@@ -79,19 +80,19 @@ func DeployProxy(testFramework framework.Framework, gomegaArgs ...interface{}) {
 	mitmSignerKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
 	mitmSignerCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
 
-	mitmSignerSecret := resourcebuilder.Secret().WithName(mitmSignerName).WithNamespace(proxyNamespace).WithLabels(proxyLabels).
+	mitmSignerSecret := corev1resourcebuilder.Secret().WithName(mitmSignerName).WithNamespace(proxyNamespace).WithLabels(proxyLabels).
 		WithData(map[string][]byte{"tls.crt": mitmSignerCert, "tls.key": mitmSignerKey}).Build()
 
-	mitmBootstrapConfigMap := resourcebuilder.ConfigMap().WithName(mitmBootstrapName).WithNamespace(proxyNamespace).WithLabels(proxyLabels).
+	mitmBootstrapConfigMap := corev1resourcebuilder.ConfigMap().WithName(mitmBootstrapName).WithNamespace(proxyNamespace).WithLabels(proxyLabels).
 		WithData(map[string]string{"startup.sh": proxySetup}).Build()
 
-	mitmCustomPkiConfigMap := resourcebuilder.ConfigMap().WithName(mitmCustomPKIName).WithNamespace(mitmCustomPKINamespace).
+	mitmCustomPkiConfigMap := corev1resourcebuilder.ConfigMap().WithName(mitmCustomPKIName).WithNamespace(mitmCustomPKINamespace).
 		WithData(map[string]string{"ca-bundle.crt": string(mitmSignerCert)}).Build()
 
-	mitmDaemonset := resourcebuilder.DaemonSet().WithName(proxyName).WithNamespace(proxyNamespace).WithLabels(proxyLabels).
+	mitmDaemonset := appsv1resourcebuilder.DaemonSet().WithName(proxyName).WithNamespace(proxyNamespace).WithLabels(proxyLabels).
 		WithVolumes(buildDaemonSetVolumes()).WithContainers(buildDaemonSetContainers()).Build()
 
-	mitmService := resourcebuilder.Service().WithNamespace(proxyNamespace).WithName(proxyName).
+	mitmService := corev1resourcebuilder.Service().WithNamespace(proxyNamespace).WithName(proxyName).
 		WithLabels(proxyLabels).WithSelector(proxyLabels).WithPorts(buildServicePorts()).Build()
 
 	k8sClient := testFramework.GetClient()
@@ -222,11 +223,11 @@ func DeleteProxy(testFramework framework.Framework, gomegaArgs ...interface{}) {
 	k8sClient := testFramework.GetClient()
 	ctx := testFramework.GetContext()
 	proxyNamespace := testFramework.ControlPlaneMachineSetKey().Namespace
-	mitmSignerSecret := resourcebuilder.Secret().WithName(mitmSignerName).WithNamespace(proxyNamespace).Build()
-	mitmBootstrapConfigMap := resourcebuilder.ConfigMap().WithName(mitmBootstrapName).WithNamespace(proxyNamespace).Build()
-	mitmCustomPkiConfigMap := resourcebuilder.ConfigMap().WithName(mitmCustomPKIName).WithNamespace(mitmCustomPKINamespace).Build()
-	mitmDaemonset := resourcebuilder.DaemonSet().WithName(mitmDaemonsetName).WithNamespace(proxyNamespace).Build()
-	mitmService := resourcebuilder.Service().WithName(mitmServiceName).WithNamespace(proxyNamespace).Build()
+	mitmSignerSecret := corev1resourcebuilder.Secret().WithName(mitmSignerName).WithNamespace(proxyNamespace).Build()
+	mitmBootstrapConfigMap := corev1resourcebuilder.ConfigMap().WithName(mitmBootstrapName).WithNamespace(proxyNamespace).Build()
+	mitmCustomPkiConfigMap := corev1resourcebuilder.ConfigMap().WithName(mitmCustomPKIName).WithNamespace(mitmCustomPKINamespace).Build()
+	mitmDaemonset := appsv1resourcebuilder.DaemonSet().WithName(mitmDaemonsetName).WithNamespace(proxyNamespace).Build()
+	mitmService := corev1resourcebuilder.Service().WithName(mitmServiceName).WithNamespace(proxyNamespace).Build()
 
 	By("Deleting the MITM proxy Secret")
 	Eventually(k8sClient.Delete(ctx, mitmSignerSecret)).Should(Succeed())

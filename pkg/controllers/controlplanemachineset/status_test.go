@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import (
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machineprovidersresourcebuilder "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder/machineproviders"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -35,19 +37,19 @@ import (
 var _ = Describe("Status", func() {
 	Context("updateControlPlaneMachineSetStatus", func() {
 		var namespaceName string
-		var logger test.TestLogger
+		var logger testutils.TestLogger
 		var reconciler *ControlPlaneMachineSetReconciler
 		var cpms *machinev1.ControlPlaneMachineSet
 		var patchBase client.Patch
 
 		BeforeEach(func() {
 			By("Setting up a namespace for the test")
-			ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+			ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 			namespaceName = ns.GetName()
 
 			By("Setting up the reconciler")
-			logger = test.NewTestLogger()
+			logger = testutils.NewTestLogger()
 			reconciler = &ControlPlaneMachineSetReconciler{
 				Namespace:      namespaceName,
 				Scheme:         testScheme,
@@ -56,7 +58,7 @@ var _ = Describe("Status", func() {
 			}
 
 			By("Setting up supporting resources")
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
 			Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 
 			// These values are dummy values for now.
@@ -68,11 +70,11 @@ var _ = Describe("Status", func() {
 			Expect(k8sClient.Status().Update(ctx, cpms)).To(Succeed())
 
 			patchBase = client.MergeFrom(cpms.DeepCopy())
-			logger = test.NewTestLogger()
+			logger = testutils.NewTestLogger()
 		})
 
 		AfterEach(func() {
-			test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 				&machinev1.ControlPlaneMachineSet{},
 			)
 		})
@@ -101,7 +103,7 @@ var _ = Describe("Status", func() {
 				data, err := patchBase.Data(cpms)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
+				Expect(logger.Entries()).To(ConsistOf(testutils.LogEntry{
 					Level: 3,
 					KeysAndValues: []interface{}{
 						"data", string(data),
@@ -136,7 +138,7 @@ var _ = Describe("Status", func() {
 			})
 
 			It("should log that no status update was required", func() {
-				Expect(logger.Entries()).To(ConsistOf(test.LogEntry{
+				Expect(logger.Entries()).To(ConsistOf(testutils.LogEntry{
 					Level:   3,
 					Message: notUpdatingStatus,
 				}))
@@ -146,23 +148,23 @@ var _ = Describe("Status", func() {
 
 	Context("reconcileStatusWithMachineInfo", func() {
 		type reconcileStatusTableInput struct {
-			cpmsBuilder    resourcebuilder.ControlPlaneMachineSetInterface
+			cpmsBuilder    machinev1resourcebuilder.ControlPlaneMachineSetInterface
 			machineInfos   map[int32][]machineproviders.MachineInfo
 			expectedError  error
 			expectedStatus machinev1.ControlPlaneMachineSetStatus
-			expectedLogs   []test.LogEntry
+			expectedLogs   []testutils.LogEntry
 		}
 
 		machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 		nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
 
-		updatedMachineBuilder := resourcebuilder.MachineInfo().
+		updatedMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 			WithMachineGVR(machineGVR).
 			WithNodeGVR(nodeGVR).
 			WithReady(true).
 			WithNeedsUpdate(false)
 
-		pendingMachineBuilder := resourcebuilder.MachineInfo().
+		pendingMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 			WithMachineGVR(machineGVR).
 			WithReady(false).
 			WithNeedsUpdate(false)
@@ -174,7 +176,7 @@ var _ = Describe("Status", func() {
 			WithErrorMessage("node removed from cloud provider")
 
 		DescribeTable("correctly sets the status based on the machine info", func(in *reconcileStatusTableInput) {
-			logger := test.NewTestLogger()
+			logger := testutils.NewTestLogger()
 			cpms := in.cpmsBuilder.Build()
 
 			err := reconcileStatusWithMachineInfo(logger.Logger(), cpms, in.machineInfos)
@@ -190,10 +192,10 @@ var _ = Describe("Status", func() {
 			Expect(cpms.Status.ReadyReplicas).To(Equal(in.expectedStatus.ReadyReplicas))
 			Expect(cpms.Status.UpdatedReplicas).To(Equal(in.expectedStatus.UpdatedReplicas))
 			Expect(cpms.Status.UnavailableReplicas).To(Equal(in.expectedStatus.UnavailableReplicas))
-			Expect(cpms.Status.Conditions).To(test.MatchConditions(in.expectedStatus.Conditions))
+			Expect(cpms.Status.Conditions).To(testutils.MatchConditions(in.expectedStatus.Conditions))
 		},
 			Entry("with up to date Machines", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(1),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(1),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -227,7 +229,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     3,
 					UnavailableReplicas: 0,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -242,7 +244,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("when Machines need updates", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(2),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(2),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
@@ -277,7 +279,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     1,
 					UnavailableReplicas: 0,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -292,7 +294,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("with pending replacement replicas", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(3),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -333,7 +335,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     1,
 					UnavailableReplicas: 0,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -348,7 +350,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("with ready replacement replicas", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(4),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(4),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -389,7 +391,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     3,
 					UnavailableReplicas: 0,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -404,7 +406,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("with no MachineInfos", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(5),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(5),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {},
 					1: {},
@@ -440,7 +442,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     0,
 					UnavailableReplicas: 3,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -455,7 +457,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("with an unhealthy Machine", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(7),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(7),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -491,7 +493,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     2,
 					UnavailableReplicas: 1,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -506,7 +508,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("with an unhealthy index (failure domain)", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(8),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(8),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {
@@ -548,7 +550,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     2,
 					UnavailableReplicas: 1,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{
@@ -563,7 +565,7 @@ var _ = Describe("Status", func() {
 				},
 			}),
 			Entry("with an empty index", &reconcileStatusTableInput{
-				cpmsBuilder: resourcebuilder.ControlPlaneMachineSet().WithGeneration(9),
+				cpmsBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithGeneration(9),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").Build()},
@@ -599,7 +601,7 @@ var _ = Describe("Status", func() {
 					UpdatedReplicas:     2,
 					UnavailableReplicas: 1,
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level: 4,
 						KeysAndValues: []interface{}{

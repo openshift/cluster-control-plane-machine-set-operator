@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("AWS Provider Config", func() {
@@ -68,7 +69,7 @@ var _ = Describe("AWS Provider Config", func() {
 	}
 
 	BeforeEach(func() {
-		machineProviderConfig := resourcebuilder.AWSProviderSpec().
+		machineProviderConfig := machinev1beta1resourcebuilder.AWSProviderSpec().
 			WithAvailabilityZone(azUSEast1a).
 			WithSubnet(machinev1beta1SubnetUSEast1a).
 			Build()
@@ -80,7 +81,7 @@ var _ = Describe("AWS Provider Config", func() {
 
 	Context("ExtractFailureDomain", func() {
 		It("returns the configured failure domain", func() {
-			expected := resourcebuilder.AWSFailureDomain().
+			expected := machinev1resourcebuilder.AWSFailureDomain().
 				WithAvailabilityZone(azUSEast1a).
 				WithSubnet(machinev1SubnetUSEast1a).
 				Build()
@@ -93,7 +94,7 @@ var _ = Describe("AWS Provider Config", func() {
 		var changedProviderConfig AWSProviderConfig
 
 		BeforeEach(func() {
-			changedFailureDomain := resourcebuilder.AWSFailureDomain().
+			changedFailureDomain := machinev1resourcebuilder.AWSFailureDomain().
 				WithAvailabilityZone(azUSEast1b).
 				WithSubnet(machinev1SubnetUSEast1b).
 				Build()
@@ -111,7 +112,7 @@ var _ = Describe("AWS Provider Config", func() {
 
 		Context("ExtractFailureDomain", func() {
 			It("returns the changed failure domain from the changed config", func() {
-				expected := resourcebuilder.AWSFailureDomain().
+				expected := machinev1resourcebuilder.AWSFailureDomain().
 					WithAvailabilityZone(azUSEast1b).
 					WithSubnet(machinev1SubnetUSEast1b).
 					Build()
@@ -120,7 +121,7 @@ var _ = Describe("AWS Provider Config", func() {
 			})
 
 			It("returns the original failure domain from the original config", func() {
-				expected := resourcebuilder.AWSFailureDomain().
+				expected := machinev1resourcebuilder.AWSFailureDomain().
 					WithAvailabilityZone(azUSEast1a).
 					WithSubnet(machinev1SubnetUSEast1a).
 					Build()
@@ -135,7 +136,7 @@ var _ = Describe("AWS Provider Config", func() {
 		var expectedAWSConfig machinev1beta1.AWSMachineProviderConfig
 
 		BeforeEach(func() {
-			configBuilder := resourcebuilder.AWSProviderSpec()
+			configBuilder := machinev1beta1resourcebuilder.AWSProviderSpec()
 			expectedAWSConfig = *configBuilder.Build()
 			rawConfig := configBuilder.BuildRawExtension()
 

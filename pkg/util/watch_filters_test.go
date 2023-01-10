@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@ package util
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,7 +50,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("returns a correct request for the cluster ControlPlaneMachineSet", func() {
-			co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+			co := configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 
 			Expect(clusterOperatorFilter(co)).To(ConsistOf(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -98,7 +100,7 @@ var _ = Describe("Watch Filters", func() {
 
 		It("Panics with the wrong object kind", func() {
 			expectedMessage := "expected to get an of object of type configv1.ClusterOperator"
-			machine := resourcebuilder.Machine().Build()
+			machine := machinev1beta1resourcebuilder.Machine().Build()
 
 			Expect(func() {
 				clusterOperatorPredicate.Create(createEvent(machine))
@@ -118,7 +120,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("returns false when the wrong cluster operator is provided", func() {
-			co := resourcebuilder.ClusterOperator().WithName("machine-api-operator").Build()
+			co := configv1resourcebuilder.ClusterOperator().WithName("machine-api-operator").Build()
 
 			Expect(clusterOperatorPredicate.Create(createEvent(co))).To(BeFalse())
 			Expect(clusterOperatorPredicate.Update(updateEvent(co))).To(BeFalse())
@@ -127,7 +129,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("returns true when the correct cluster operator is provided", func() {
-			co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+			co := configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 
 			Expect(clusterOperatorPredicate.Create(createEvent(co))).To(BeTrue())
 			Expect(clusterOperatorPredicate.Update(updateEvent(co))).To(BeTrue())
@@ -147,7 +149,7 @@ var _ = Describe("Watch Filters", func() {
 
 		It("Panics with the wrong object kind", func() {
 			expectedMessage := "expected to get an of object of type machinev1.ControlPlaneMachineSet"
-			machine := resourcebuilder.Machine().Build()
+			machine := machinev1beta1resourcebuilder.Machine().Build()
 			Expect(func() {
 				cpmsPredicate.Create(createEvent(machine))
 			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
@@ -166,7 +168,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns false with the wrong namespace", func() {
-			cpms := resourcebuilder.ControlPlaneMachineSet().
+			cpms := machinev1resourcebuilder.ControlPlaneMachineSet().
 				WithName(clusterControlPlaneMachineSetName).
 				WithNamespace("wrong-namespace").
 				Build()
@@ -178,7 +180,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns false with the wrong name", func() {
-			cpms := resourcebuilder.ControlPlaneMachineSet().
+			cpms := machinev1resourcebuilder.ControlPlaneMachineSet().
 				WithName("wrong-name").
 				WithNamespace(testNamespace).
 				Build()
@@ -190,7 +192,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns true with the correct namespace and name", func() {
-			cpms := resourcebuilder.ControlPlaneMachineSet().
+			cpms := machinev1resourcebuilder.ControlPlaneMachineSet().
 				WithName(clusterControlPlaneMachineSetName).
 				WithNamespace(testNamespace).
 				Build()
@@ -213,7 +215,7 @@ var _ = Describe("Watch Filters", func() {
 
 		It("Panics with the wrong object kind", func() {
 			expectedMessage := "expected to get an of object of type machinev1beta1.Machine: got type *v1.ControlPlaneMachineSet"
-			cpms := resourcebuilder.ControlPlaneMachineSet().Build()
+			cpms := machinev1resourcebuilder.ControlPlaneMachineSet().Build()
 
 			Expect(func() {
 				machinePredicate.Create(createEvent(cpms))
@@ -233,7 +235,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns false with the wrong namespace", func() {
-			machine := resourcebuilder.Machine().
+			machine := machinev1beta1resourcebuilder.Machine().
 				WithNamespace("wrong-namespace").
 				AsMaster().
 				Build()
@@ -245,7 +247,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns false with worker machines", func() {
-			machine := resourcebuilder.Machine().
+			machine := machinev1beta1resourcebuilder.Machine().
 				WithNamespace(testNamespace).
 				AsWorker().
 				Build()
@@ -257,7 +259,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns false when missing the machine type label", func() {
-			machine := resourcebuilder.Machine().
+			machine := machinev1beta1resourcebuilder.Machine().
 				WithNamespace(testNamespace).
 				WithLabels(map[string]string{
 					"machine.openshift.io/cluster-api-machine-role": "master",
@@ -271,7 +273,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns false when missing the machine role label", func() {
-			machine := resourcebuilder.Machine().
+			machine := machinev1beta1resourcebuilder.Machine().
 				WithNamespace(testNamespace).
 				WithLabels(map[string]string{
 					"machine.openshift.io/cluster-api-machine-type": "master",
@@ -285,7 +287,7 @@ var _ = Describe("Watch Filters", func() {
 		})
 
 		It("Returns true with the correct namespace and labels", func() {
-			machine := resourcebuilder.Machine().
+			machine := machinev1beta1resourcebuilder.Machine().
 				WithNamespace(testNamespace).
 				AsMaster().
 				Build()
