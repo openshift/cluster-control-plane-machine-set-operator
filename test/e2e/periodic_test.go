@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,27 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+		})
+
+		Context("with a cluster wide proxy", Ordered, func() {
+			BeforeAll(func() {
+				helpers.DeployProxy(testFramework)
+				helpers.ConfigureClusterWideProxy(testFramework)
+				helpers.EventuallyClusterOperatorsShouldStabilise(45*time.Minute, 10*time.Second)
+			})
+
+			AfterAll(func() {
+				helpers.UnconfigureClusterWideProxy(testFramework)
+				helpers.EventuallyClusterOperatorsShouldStabilise(45*time.Minute, 10*time.Second)
+				helpers.DeleteProxy(testFramework)
+			})
+
+			Context("and the instance type of index 1 is not as expected", func() {
+				BeforeEach(func() {
+					helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+				})
+				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+			})
 		})
 
 		Context("and the instance type is changed", func() {
