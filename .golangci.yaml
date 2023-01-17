@@ -63,8 +63,11 @@ linters:
     - wsl
 linters-settings:
   goheader:
+    values:
+      regexp:
+        license-year: (202[2-9]|20[3-9][0-9])
     template: |-
-      Copyright {{YEAR}} Red Hat, Inc.
+      Copyright {{license-year}} Red Hat, Inc.
 
       Licensed under the Apache License, Version 2.0 (the "License");
       you may not use this file except in compliance with the License.
