@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,9 +31,13 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/integration"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,6 +48,7 @@ import (
 var _ = Describe("With a running controller", func() {
 	var mgrCancel context.CancelFunc
 	var mgrDone chan struct{}
+	var mgr ctrl.Manager
 
 	var namespaceName string
 
@@ -149,7 +155,8 @@ var _ = Describe("With a running controller", func() {
 		namespaceName = ns.GetName()
 
 		By("Setting up a manager and controller")
-		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		var err error
+		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
 			Scheme:             testScheme,
 			MetricsBindAddress: "0",
 			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
@@ -181,7 +188,7 @@ var _ = Describe("With a running controller", func() {
 		// CVO will create a blank cluster operator for us before the operator starts.
 		co = resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 		Expect(k8sClient.Create(ctx, co)).To(Succeed())
-	})
+	}, OncePerOrdered)
 
 	AfterEach(func() {
 		By("Stopping the manager")
@@ -195,7 +202,7 @@ var _ = Describe("With a running controller", func() {
 			&machinev1beta1.Machine{},
 			&machinev1.ControlPlaneMachineSet{},
 		)
-	})
+	}, OncePerOrdered)
 
 	Context("when a new Control Plane Machine Set is created with a RollingUpdate strategy", func() {
 		var cpms *machinev1.ControlPlaneMachineSet
@@ -973,6 +980,287 @@ var _ = Describe("With a running controller", func() {
 
 			It("should re-add the controlplanemachineset.machine.openshift.io finalizer", func() {
 				Eventually(komega.Object(cpms)).Should(HaveField("ObjectMeta.Finalizers", ContainElement(controlPlaneMachineSetFinalizer)))
+			})
+		})
+	})
+
+	Context("with updated machines", func() {
+		var cpms *machinev1.ControlPlaneMachineSet
+
+		BeforeEach(func() {
+			By("Creating Machines owned by the ControlPlaneMachineSet")
+			machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+
+			By("Registering the integration machine manager")
+
+			// The machine manager is a dummy implementation that moves machines from zero, through the expected
+			// phases and then eventually to the Running phase.
+			// This allows the CPMS to react to the changes in the machine status and run through its own logic.
+			// We use it here so that we can simulate a full rolling replacement of the control plane which needs
+			// machines to be able to move through the phases to the Running phase.
+
+			machineManager := integration.NewIntegrationMachineManager(integration.MachineManagerOptions{
+				ActionDelay: 500 * time.Millisecond,
+			})
+			Expect(machineManager.SetupWithManager(mgr)).To(Succeed())
+
+			// Wait for the machines to all report running before creating the CPMS.
+			By("Waiting for the machines to become ready")
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+				HaveField("Status.Phase", HaveValue(Equal("Running"))),
+			)))
+
+			// The default CPMS should be sufficient for this test.
+			By("Creating the ControlPlaneMachineSet")
+			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+			By("Waiting for the ControlPlaneMachineSet to report a stable status")
+			Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+				HaveField("Replicas", Equal(int32(3))),
+				HaveField("UpdatedReplicas", Equal(int32(3))),
+				HaveField("ReadyReplicas", Equal(int32(3))),
+				HaveField("UnavailableReplicas", Equal(int32(0))),
+			)))
+		})
+
+		Context("and the instance size is changed", func() {
+			var testOptions helpers.RollingUpdatePeriodicTestOptions
+
+			BeforeEach(func() {
+				// The CPMS is configured for AWS so use the AWS Platform Type.
+				testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
+
+				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework, 10*time.Second, 1*time.Second)
+
+				testOptions.TestFramework = testFramework
+
+				testOptions.RolloutTimeout = 10 * time.Second
+				testOptions.StabilisationTimeout = 1 * time.Second
+			})
+
+			helpers.ItShouldPerformARollingUpdate(&testOptions)
+		})
+
+		Context("and a machine is deleted", func() {
+			index := 1
+			BeforeEach(func() {
+				machine := &machinev1beta1.Machine{}
+				machineName := fmt.Sprintf("master-%d", index)
+				machineKey := client.ObjectKey{Namespace: namespaceName, Name: machineName}
+
+				By(fmt.Sprintf("Deleting machine in index %d", index))
+
+				Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+			})
+
+			It("should create a replacement machine for the correct index", func() {
+				helpers.EventuallyIndexIsBeingReplaced(ctx, index)
+			})
+		})
+	})
+
+	Context("with unbalanced machines", func() {
+		var cpms *machinev1.ControlPlaneMachineSet
+
+		BeforeEach(func() {
+			By("Creating Machines in a single failure domain")
+			machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+
+			By("Registering the integration machine manager")
+
+			// The machine manager is a dummy implementation that moves machines from zero, through the expected
+			// phases and then eventually to the Running phase.
+			// This allows the CPMS to react to the changes in the machine status and run through its own logic.
+			// We use it here so that we can simulate a full rolling replacement of the control plane which needs
+			// machines to be able to move through the phases to the Running phase.
+
+			machineManager := integration.NewIntegrationMachineManager(integration.MachineManagerOptions{
+				ActionDelay: 500 * time.Millisecond,
+			})
+			Expect(machineManager.SetupWithManager(mgr)).To(Succeed())
+
+			// Wait for the machines to all report running before creating the CPMS.
+			By("Waiting for the machines to become ready")
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", HaveEach(
+				HaveField("Status.Phase", HaveValue(Equal("Running"))),
+			)))
+
+		}, OncePerOrdered)
+
+		Context("when a new Control Plane Machine Set is created with an OnDelete strategy", func() {
+			BeforeEach(func() {
+				// The default CPMS should be sufficient for this test.
+				By("Creating the ControlPlaneMachineSet with the OnDelete strategy")
+				cpms = resourcebuilder.ControlPlaneMachineSet().
+					WithNamespace(namespaceName).
+					WithStrategyType(machinev1.OnDelete).
+					WithMachineTemplateBuilder(tmplBuilder).
+					Build()
+				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+				By("Waiting for the ControlPlaneMachineSet to report a stable status")
+
+				// We expect the CPMS to observe the current state of the cluster.
+				// The cluster has 3 machines in a single failure domain so we expect
+				// it to report 3 replicas, but only 1 updated replica.
+				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(1))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+			}, OncePerOrdered)
+
+			var expectIndexToBeReplacedWithProviderSpec = func(index int, providerSpec *runtime.RawExtension) {
+				By(fmt.Sprintf("Fetching the machine in index %d", index))
+				machine := &machinev1beta1.Machine{}
+				machineKey := client.ObjectKey{Namespace: namespaceName, Name: fmt.Sprintf("master-%d", index)}
+
+				Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+
+				By("Deleting the existing machine")
+				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+
+				By("Checking that a new machine is created in the expected failure domain")
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", ContainElement(SatisfyAll(
+					HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+					HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
+				))))
+			}
+
+			var checkOnDeleteRebalance = func(first, second int) {
+				Context("should rebalance the machines", Ordered, func() {
+					It(fmt.Sprintf("should place index %d in zone B", first), func() {
+						expectIndexToBeReplacedWithProviderSpec(first, usEast1bProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It(fmt.Sprintf("should place index %d in zone C", second), func() {
+						expectIndexToBeReplacedWithProviderSpec(second, usEast1cProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It("should then report a healthy status", func() {
+						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+							HaveField("Replicas", Equal(int32(3))),
+							HaveField("UpdatedReplicas", Equal(int32(3))),
+							HaveField("ReadyReplicas", Equal(int32(3))),
+							HaveField("UnavailableReplicas", Equal(int32(0))),
+						)))
+					})
+				})
+			}
+
+			var checkOnDeleteRebalanceIndex2 = func(second int) {
+				Context("should rebalance the machines", Ordered, func() {
+					It("should place index 2 in zone C", func() {
+						expectIndexToBeReplacedWithProviderSpec(2, usEast1cProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It(fmt.Sprintf("should place index %d in zone B", second), func() {
+						expectIndexToBeReplacedWithProviderSpec(second, usEast1bProviderSpecBuilder.BuildRawExtension())
+					})
+
+					It("should then report a healthy status", func() {
+						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+							HaveField("Replicas", Equal(int32(3))),
+							HaveField("UpdatedReplicas", Equal(int32(3))),
+							HaveField("ReadyReplicas", Equal(int32(3))),
+							HaveField("UnavailableReplicas", Equal(int32(0))),
+						)))
+					})
+				})
+			}
+
+			// Check all combinations where we delete 0 or 1 first.
+			checkOnDeleteRebalance(0, 1)
+			checkOnDeleteRebalance(0, 2)
+			checkOnDeleteRebalance(1, 0)
+			checkOnDeleteRebalance(1, 2)
+
+			// When all machines are currently in the same index,
+			// index 2 will always be moved to zone C.
+			checkOnDeleteRebalanceIndex2(0)
+			checkOnDeleteRebalanceIndex2(1)
+		})
+
+		Context("when a new Control Plane Machine Set is created with a RollingUpdate strategy", func() {
+			BeforeEach(func() {
+				// The default CPMS should be sufficient for this test.
+				By("Creating an Inactive ControlPlaneMachineSet with RollingUpdate strategy")
+				cpms = resourcebuilder.ControlPlaneMachineSet().
+					WithNamespace(namespaceName).
+					WithStrategyType(machinev1.RollingUpdate).
+					WithMachineTemplateBuilder(tmplBuilder).
+					WithState(machinev1.ControlPlaneMachineSetStateInactive).
+					Build()
+				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+				By("Waiting for the ControlPlaneMachineSet to report two machines needing an update")
+
+				// We expect the CPMS to observe the current state of the cluster.
+				// The cluster has 3 machines in a single failure domain so we expect
+				// it to report 3 replicas, but only 1 updated replica.
+				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(1))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+
+			}, OncePerOrdered)
+
+			Context("should rebalance the machines", Ordered, func() {
+				BeforeAll(func() {
+					By("Activating the ControlPlaneMachineSet")
+
+					Eventually(komega.Update(cpms, func() {
+						cpms.Spec.State = machinev1.ControlPlaneMachineSetStateActive
+					})).Should(Succeed())
+				})
+
+				var expectIndexToBeReplacedWithProviderSpec = func(index int, oldProviderSpec, providerSpec *runtime.RawExtension) {
+					By(fmt.Sprintf("Checking that machine with index %d is rebalanced (deleted, recreated) across failure domains", index))
+					Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(
+						SatisfyAll(
+							// A machine with this index and the old, unbalanced providerSpec, shouldn't
+							// exist anymore as it should be deleted.
+							HaveField("Items", Not(ContainElement(SatisfyAll(
+								HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+								HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(oldProviderSpec.Raw)),
+							)))),
+							// A new, replacement machine with this index should exist and have been rebalanced to a new
+							// failure domain, hence having an updated providerSpec.
+							HaveField("Items", ContainElement(SatisfyAll(
+								HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
+								HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
+							))),
+						),
+					)
+				}
+
+				It("should delete two machines and create two new ones rebalancing them across failure domains", func() {
+					expectIndexToBeReplacedWithProviderSpec(1, usEast1aProviderSpecBuilder.BuildRawExtension(), usEast1bProviderSpecBuilder.BuildRawExtension())
+					expectIndexToBeReplacedWithProviderSpec(2, usEast1aProviderSpecBuilder.BuildRawExtension(), usEast1cProviderSpecBuilder.BuildRawExtension())
+				})
+
+				It("should then report a healthy status", func() {
+					By("Waiting for the ControlPlaneMachineSet to report a stable status (machines rebalanced)")
+					Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+						HaveField("Replicas", Equal(int32(3))),
+						HaveField("UpdatedReplicas", Equal(int32(3))),
+						HaveField("ReadyReplicas", Equal(int32(3))),
+						HaveField("UnavailableReplicas", Equal(int32(0))),
+					)))
+				})
 			})
 		})
 	})

@@ -95,6 +95,7 @@ linters-settings:
     # https://staticcheck.io/docs/options#checks
     checks: ["all", "-ST1000"]
     dot-import-whitelist:
+      - "github.com/onsi/ginkgo/v2"
       - "github.com/onsi/gomega"
 issues:
   exclude:
