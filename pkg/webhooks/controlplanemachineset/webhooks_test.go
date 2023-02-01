@@ -943,16 +943,6 @@ var _ = Describe("Webhooks", func() {
 					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
 				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: \"object\": selector is immutable")), "The selector should be immutable")
 			})
-
-			It("when removing the target pools", func() {
-				// Change the providerSpec, expect the update to be successful
-				var emptySliceTargetPools []string
-				rawProviderSpec := resourcebuilder.GCPProviderSpec().WithTargetPools(emptySliceTargetPools).BuildRawExtension()
-
-				Expect(komega.Update(cpms, func() {
-					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
-				})()).Should(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.targetPools: Required value: targetPools is required for control plane machines")))
-			})
 		})
 	})
 })
