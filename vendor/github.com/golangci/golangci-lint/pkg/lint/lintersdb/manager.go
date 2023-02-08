@@ -38,7 +38,7 @@ func NewManager(cfg *config.Config, log logutils.Log) *Manager {
 // WithCustomLinters loads private linters that are specified in the golangci config file.
 func (m *Manager) WithCustomLinters() *Manager {
 	if m.log == nil {
-		m.log = report.NewLogWrapper(logutils.NewStderrLog(""), &report.Data{})
+		m.log = report.NewLogWrapper(logutils.NewStderrLog(logutils.DebugKeyEmpty), &report.Data{})
 	}
 	if m.cfg != nil {
 		for name, settings := range m.cfg.LintersSettings.Custom {
@@ -108,6 +108,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		depGuardCfg         *config.DepGuardSettings
 		dogsledCfg          *config.DogsledSettings
 		duplCfg             *config.DuplSettings
+		dupwordCfg          *config.DupWordSettings
 		errcheckCfg         *config.ErrcheckSettings
 		errchkjsonCfg       *config.ErrChkJSONSettings
 		errorlintCfg        *config.ErrorLintSettings
@@ -117,6 +118,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		forbidigoCfg        *config.ForbidigoSettings
 		funlenCfg           *config.FunlenSettings
 		gciCfg              *config.GciSettings
+		ginkgolinterCfg     *config.GinkgoLinterSettings
 		gocognitCfg         *config.GocognitSettings
 		goconstCfg          *config.GoConstSettings
 		gocriticCfg         *config.GoCriticSettings
@@ -140,10 +142,12 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		interfaceBloatCfg   *config.InterfaceBloatSettings
 		ireturnCfg          *config.IreturnSettings
 		lllCfg              *config.LllSettings
+		loggerCheckCfg      *config.LoggerCheckSettings
 		maintIdxCfg         *config.MaintIdxSettings
 		makezeroCfg         *config.MakezeroSettings
 		malignedCfg         *config.MalignedSettings
 		misspellCfg         *config.MisspellSettings
+		musttagCfg          *config.MustTagSettings
 		nakedretCfg         *config.NakedretSettings
 		nestifCfg           *config.NestifSettings
 		nilNilCfg           *config.NilNilSettings
@@ -182,6 +186,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		depGuardCfg = &m.cfg.LintersSettings.Depguard
 		dogsledCfg = &m.cfg.LintersSettings.Dogsled
 		duplCfg = &m.cfg.LintersSettings.Dupl
+		dupwordCfg = &m.cfg.LintersSettings.DupWord
 		errcheckCfg = &m.cfg.LintersSettings.Errcheck
 		errchkjsonCfg = &m.cfg.LintersSettings.ErrChkJSON
 		errorlintCfg = &m.cfg.LintersSettings.ErrorLint
@@ -191,6 +196,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		forbidigoCfg = &m.cfg.LintersSettings.Forbidigo
 		funlenCfg = &m.cfg.LintersSettings.Funlen
 		gciCfg = &m.cfg.LintersSettings.Gci
+		ginkgolinterCfg = &m.cfg.LintersSettings.GinkgoLinter
 		gocognitCfg = &m.cfg.LintersSettings.Gocognit
 		goconstCfg = &m.cfg.LintersSettings.Goconst
 		gocriticCfg = &m.cfg.LintersSettings.Gocritic
@@ -214,10 +220,12 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		interfaceBloatCfg = &m.cfg.LintersSettings.InterfaceBloat
 		ireturnCfg = &m.cfg.LintersSettings.Ireturn
 		lllCfg = &m.cfg.LintersSettings.Lll
+		loggerCheckCfg = &m.cfg.LintersSettings.LoggerCheck
 		maintIdxCfg = &m.cfg.LintersSettings.MaintIdx
 		makezeroCfg = &m.cfg.LintersSettings.Makezero
 		malignedCfg = &m.cfg.LintersSettings.Maligned
 		misspellCfg = &m.cfg.LintersSettings.Misspell
+		musttagCfg = &m.cfg.LintersSettings.MustTag
 		nakedretCfg = &m.cfg.LintersSettings.Nakedret
 		nestifCfg = &m.cfg.LintersSettings.Nestif
 		nilNilCfg = &m.cfg.LintersSettings.NilNil
@@ -304,7 +312,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithSince("v1.43.0").
 			WithPresets(linter.PresetBugs).
 			WithLoadForGoAnalysis().
-			WithURL("https://github.com/sylvia7788/contextcheck"),
+			WithURL("https://github.com/kkHAIKE/contextcheck"),
 
 		linter.NewConfig(golinters.NewCyclop(cyclopCfg)).
 			WithSince("v1.37.0").
@@ -338,6 +346,12 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithSince("v1.0.0").
 			WithPresets(linter.PresetStyle).
 			WithURL("https://github.com/mibk/dupl"),
+
+		linter.NewConfig(golinters.NewDupWord(dupwordCfg)).
+			WithSince("1.50.0").
+			WithPresets(linter.PresetComment).
+			WithAutoFix().
+			WithURL("https://github.com/Abirdcfly/dupword"),
 
 		linter.NewConfig(golinters.NewDurationCheck()).
 			WithSince("v1.37.0").
@@ -420,15 +434,26 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithPresets(linter.PresetFormatting, linter.PresetImport).
 			WithURL("https://github.com/daixiang0/gci"),
 
+		linter.NewConfig(golinters.NewGinkgoLinter(ginkgolinterCfg)).
+			WithSince("v1.51.0").
+			WithLoadForGoAnalysis().
+			WithPresets(linter.PresetStyle).
+			WithURL("https://github.com/nunnatsa/ginkgolinter"),
+
+		linter.NewConfig(golinters.NewGoCheckCompilerDirectives()).
+			WithSince("v1.51.0").
+			WithPresets(linter.PresetBugs).
+			WithURL("https://github.com/leighmcculloch/gocheckcompilerdirectives"),
+
 		linter.NewConfig(golinters.NewGochecknoglobals()).
 			WithSince("v1.12.0").
 			WithPresets(linter.PresetStyle).
+			WithLoadForGoAnalysis().
 			WithURL("https://github.com/leighmcculloch/gochecknoglobals"),
 
 		linter.NewConfig(golinters.NewGochecknoinits()).
 			WithSince("v1.12.0").
-			WithPresets(linter.PresetStyle).
-			WithURL("https://github.com/leighmcculloch/gochecknoinits"),
+			WithPresets(linter.PresetStyle),
 
 		linter.NewConfig(golinters.NewGocognit(gocognitCfg)).
 			WithSince("v1.20.0").
@@ -583,11 +608,12 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithSince("v1.8.0").
 			WithPresets(linter.PresetStyle),
 
-		linter.NewConfig(golinters.NewLogrLint()).
+		linter.NewConfig(golinters.NewLoggerCheck(loggerCheckCfg)).
 			WithSince("v1.49.0").
 			WithLoadForGoAnalysis().
-			WithPresets(linter.PresetBugs).
-			WithURL("https://github.com/timonwong/logrlint"),
+			WithPresets(linter.PresetStyle, linter.PresetBugs).
+			WithAlternativeNames("logrlint").
+			WithURL("https://github.com/timonwong/loggercheck"),
 
 		linter.NewConfig(golinters.NewMaintIdx(maintIdxCfg)).
 			WithSince("v1.44.0").
@@ -612,6 +638,12 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithPresets(linter.PresetStyle, linter.PresetComment).
 			WithAutoFix().
 			WithURL("https://github.com/client9/misspell"),
+
+		linter.NewConfig(golinters.NewMustTag(musttagCfg)).
+			WithSince("v1.51.0").
+			WithLoadForGoAnalysis().
+			WithPresets(linter.PresetStyle, linter.PresetBugs).
+			WithURL("https://github.com/junk1tm/musttag"),
 
 		linter.NewConfig(golinters.NewNakedret(nakedretCfg)).
 			WithSince("v1.19.0").
@@ -687,6 +719,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 		linter.NewConfig(golinters.NewReassign(reassignCfg)).
 			WithSince("1.49.0").
 			WithPresets(linter.PresetBugs).
+			WithLoadForGoAnalysis().
 			WithURL("https://github.com/curioswitch/go-reassign"),
 
 		linter.NewConfig(golinters.NewRevive(reviveCfg)).
@@ -712,8 +745,7 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithSince("v1.28.0").
 			WithPresets(linter.PresetBugs, linter.PresetSQL).
 			WithLoadForGoAnalysis().
-			WithURL("https://github.com/ryanrolds/sqlclosecheck").
-			WithNoopFallback(m.cfg),
+			WithURL("https://github.com/ryanrolds/sqlclosecheck"),
 
 		linter.NewConfig(golinters.NewStaticcheck(staticcheckCfg)).
 			WithSince("v1.0.0").
@@ -746,6 +778,11 @@ func (m Manager) GetAllSupportedLinterConfigs() []*linter.Config {
 			WithPresets(linter.PresetStyle).
 			WithLoadForGoAnalysis().
 			WithURL("https://github.com/sivchari/tenv"),
+
+		linter.NewConfig(golinters.NewTestableexamples()).
+			WithSince("v1.50.0").
+			WithPresets(linter.PresetTest).
+			WithURL("https://github.com/maratori/testableexamples"),
 
 		linter.NewConfig(golinters.NewTestpackage(testpackageCfg)).
 			WithSince("v1.25.0").
@@ -878,6 +915,10 @@ func linterConfigsToMap(lcs []*linter.Config) map[string]*linter.Config {
 func (m Manager) GetAllLinterConfigsForPreset(p string) []*linter.Config {
 	var ret []*linter.Config
 	for _, lc := range m.GetAllSupportedLinterConfigs() {
+		if lc.IsDeprecated() {
+			continue
+		}
+
 		for _, ip := range lc.InPresets {
 			if p == ip {
 				ret = append(ret, lc)

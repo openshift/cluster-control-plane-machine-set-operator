@@ -1354,7 +1354,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 			cpmsBuilder             resourcebuilder.ControlPlaneMachineSetInterface
 			machines                []*machinev1beta1.Machine
 			deleteMachines          []int
-			expectedDeletingIndexes sets.Int32
+			expectedDeletingIndexes sets.Set[int32]
 			expectedError           error
 			expectedMapping         map[int32]failuredomain.FailureDomain
 			expectedLogs            []test.LogEntry
@@ -1401,7 +1401,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1416,7 +1416,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
@@ -1431,7 +1431,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-c").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 				},
@@ -1459,7 +1459,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-1").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1474,7 +1474,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-replacement-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
@@ -1488,7 +1488,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-replacement-0").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
@@ -1513,7 +1513,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					resourcebuilder.Machine().AsWorker().WithName("machine-1").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 					resourcebuilder.Machine().AsWorker().WithName("machine-2").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 				},
@@ -1526,7 +1526,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-5").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1541,7 +1541,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build(),
 					machineBuilder.WithName("machine-4").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1557,7 +1557,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
 				deleteMachines:          []int{0},
-				expectedDeletingIndexes: sets.NewInt32(0),
+				expectedDeletingIndexes: sets.New[int32](0),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1573,7 +1573,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
 				deleteMachines:          []int{0, 2},
-				expectedDeletingIndexes: sets.NewInt32(0, 2),
+				expectedDeletingIndexes: sets.New[int32](0, 2),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1590,7 +1590,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					machineBuilder.WithName("machine-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build(),
 				},
 				deleteMachines:          []int{0},
-				expectedDeletingIndexes: sets.NewInt32(),
+				expectedDeletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1605,7 +1605,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 		type reconcileMappingsTableInput struct {
 			baseMapping     map[int32]failuredomain.FailureDomain
 			machineMapping  map[int32]failuredomain.FailureDomain
-			deletingIndexes sets.Int32
+			deletingIndexes sets.Set[int32]
 			expectedMapping map[int32]failuredomain.FailureDomain
 			expectedLogs    []test.LogEntry
 		}
@@ -1632,7 +1632,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1655,7 +1655,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1694,7 +1694,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1717,7 +1717,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1738,7 +1738,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1766,7 +1766,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1795,7 +1795,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(1),
+				deletingIndexes: sets.New[int32](1),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
@@ -1824,7 +1824,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(2),
+				deletingIndexes: sets.New[int32](2),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1852,7 +1852,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1871,7 +1871,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1894,7 +1894,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -1927,7 +1927,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 					3: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					1: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1947,7 +1947,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					5: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					3: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1966,7 +1966,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
@@ -1987,7 +1987,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					3: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					4: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
@@ -2009,7 +2009,7 @@ var _ = Describe("Failure Domain Mapping", func() {
 					4: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
 					6: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
 				},
-				deletingIndexes: sets.NewInt32(),
+				deletingIndexes: sets.New[int32](),
 				expectedMapping: map[int32]failuredomain.FailureDomain{
 					0: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
 					2: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
