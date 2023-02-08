@@ -112,8 +112,7 @@ func ensureInactiveControlPlaneMachineSet(testFramework framework.Framework, gom
 
 	By("Checking the control plane machine set exists")
 
-	checkExistsArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
-	Eventually(checkExistsArgs...).Should(Succeed(), "control plane machine set should exist")
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
 
 	if cpms.Spec.State != machinev1.ControlPlaneMachineSetStateInactive {
 		DeleteControlPlaneMachineSet(testFramework, ctx, cpms)
@@ -121,8 +120,7 @@ func ensureInactiveControlPlaneMachineSet(testFramework framework.Framework, gom
 
 	By("Checking the control plane machine set is inactive")
 
-	checkStateArgs := append([]interface{}{komega.Object(cpms)}, gomegaArgs...)
-	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateInactive)), "control plane machine set should be inactive")
+	Eventually(komega.Object(cpms), gomegaArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateInactive)), "control plane machine set should be inactive")
 }
 
 // ensureActiveControlPlaneMachineSet checks that a CPMS exists and then, if it is not active, activates it.
@@ -131,25 +129,19 @@ func ensureActiveControlPlaneMachineSet(testFramework framework.Framework, gomeg
 
 	By("Checking the control plane machine set exists")
 
-	checkExistsArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
-	Eventually(checkExistsArgs...).Should(Succeed(), "control plane machine set should exist")
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
 
 	if cpms.Spec.State != machinev1.ControlPlaneMachineSetStateActive {
 		By("Activating the control plane machine set")
 
-		updateStateArgs := append([]interface{}{
-			komega.Update(cpms, func() {
-				cpms.Spec.State = machinev1.ControlPlaneMachineSetStateActive
-			}),
-		}, gomegaArgs...)
-
-		Eventually(updateStateArgs...).Should(Succeed(), "control plane machine set should be able to be actived")
+		Eventually(komega.Update(cpms, func() {
+			cpms.Spec.State = machinev1.ControlPlaneMachineSetStateActive
+		}), gomegaArgs...).Should(Succeed(), "control plane machine set should be able to be actived")
 	}
 
 	By("Checking the control plane machine set is active")
 
-	checkStateArgs := append([]interface{}{komega.Object(cpms)}, gomegaArgs...)
-	Eventually(checkStateArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateActive)), "control plane machine set should be active")
+	Eventually(komega.Object(cpms), gomegaArgs...).Should(HaveField("Spec.State", Equal(machinev1.ControlPlaneMachineSetStateActive)), "control plane machine set should be active")
 }
 
 // ensureManualActiveControlPlaneMachineSet creates a CPMS if required and then activates it.
@@ -221,14 +213,11 @@ func EnsureControlPlaneMachineSetUpdateStrategy(testFramework framework.Framewor
 		return originalStrategy
 	}
 
-	updateArgs := append([]interface{}{
-		komega.Update(cpms, func() {
-			cpms.Spec.Strategy.Type = strategy
-		}),
-	}, gomegaArgs...)
-
 	By(fmt.Sprintf("Updating the control plane machine set strategy to %s", strategy))
-	Eventually(updateArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+
+	Eventually(komega.Update(cpms, func() {
+		cpms.Spec.Strategy.Type = strategy
+	}), gomegaArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
 
 	return originalStrategy
 }
@@ -311,8 +300,7 @@ func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, testFr
 func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
 	cpms := testFramework.NewEmptyControlPlaneMachineSet()
 
-	getCPMSArgs := append([]interface{}{komega.Get(cpms)}, gomegaArgs...)
-	Eventually(getCPMSArgs...).Should(Succeed(), "control plane machine set should exist")
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
 
 	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
 
@@ -321,10 +309,9 @@ func IncreaseControlPlaneMachineSetInstanceSize(testFramework framework.Framewor
 
 	By("Increasing the control plane machine set instance size")
 
-	updateCPMSArgs := append([]interface{}{komega.Update(cpms, func() {
+	Eventually(komega.Update(cpms, func() {
 		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
-	})}, gomegaArgs...)
-	Eventually(updateCPMSArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+	}), gomegaArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
 
 	return originalProviderSpec
 }
