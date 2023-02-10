@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import (
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,61 +43,61 @@ var _ = Describe("mergeMachineSlices tests", func() {
 		},
 		Entry("when there are no duplicates", mergeMachineSlicesTableInput{
 			sliceA: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-0").Build(),
-				*resourcebuilder.Machine().WithName("machine-1").Build(),
-				*resourcebuilder.Machine().WithName("machine-2").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-0").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-2").Build(),
 			},
 			sliceB: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-3").Build(),
-				*resourcebuilder.Machine().WithName("machine-4").Build(),
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-3").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-4").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
 			},
 			expected: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-0").Build(),
-				*resourcebuilder.Machine().WithName("machine-1").Build(),
-				*resourcebuilder.Machine().WithName("machine-2").Build(),
-				*resourcebuilder.Machine().WithName("machine-3").Build(),
-				*resourcebuilder.Machine().WithName("machine-4").Build(),
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-0").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-2").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-3").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-4").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
 			},
 		}),
 		Entry("when order is mixed up", mergeMachineSlicesTableInput{
 			sliceA: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-0").Build(),
-				*resourcebuilder.Machine().WithName("machine-1").Build(),
-				*resourcebuilder.Machine().WithName("machine-2").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-0").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-2").Build(),
 			},
 			sliceB: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
-				*resourcebuilder.Machine().WithName("machine-4").Build(),
-				*resourcebuilder.Machine().WithName("machine-6").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-4").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").Build(),
 			},
 			expected: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-0").Build(),
-				*resourcebuilder.Machine().WithName("machine-1").Build(),
-				*resourcebuilder.Machine().WithName("machine-2").Build(),
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
-				*resourcebuilder.Machine().WithName("machine-4").Build(),
-				*resourcebuilder.Machine().WithName("machine-6").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-0").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-2").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-4").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").Build(),
 			},
 		}),
 		Entry("when there are duplicates", mergeMachineSlicesTableInput{
 			sliceA: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-0").Build(),
-				*resourcebuilder.Machine().WithName("machine-1").Build(),
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-0").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
 			},
 			sliceB: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-4").Build(),
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
-				*resourcebuilder.Machine().WithName("machine-6").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-4").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").Build(),
 			},
 			expected: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-0").Build(),
-				*resourcebuilder.Machine().WithName("machine-1").Build(),
-				*resourcebuilder.Machine().WithName("machine-5").Build(),
-				*resourcebuilder.Machine().WithName("machine-4").Build(),
-				*resourcebuilder.Machine().WithName("machine-6").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-0").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-5").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-4").Build(),
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").Build(),
 			},
 		}),
 	)
@@ -127,19 +128,19 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 			},
 		}
 
-		usEast1aProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+		usEast1aProviderSpecBuilderAWS = machinev1beta1resourcebuilder.AWSProviderSpec().
 						WithAvailabilityZone("us-east-1a").
 						WithSubnet(usEast1aSubnetAWS)
 
-		usEast1bProviderSpecBuilderAWS = resourcebuilder.AWSProviderSpec().
+		usEast1bProviderSpecBuilderAWS = machinev1beta1resourcebuilder.AWSProviderSpec().
 						WithAvailabilityZone("us-east-1b").
 						WithSubnet(usEast1bSubnetAWS)
 	)
 
 	type compareControlPlaneMachineSetsTableInput struct {
 		platformType  configv1.PlatformType
-		cpmsABuilder  resourcebuilder.ControlPlaneMachineSetInterface
-		cpmsBBuilder  resourcebuilder.ControlPlaneMachineSetInterface
+		cpmsABuilder  machinev1resourcebuilder.ControlPlaneMachineSetInterface
+		cpmsBBuilder  machinev1resourcebuilder.ControlPlaneMachineSetInterface
 		expectedError error
 		expectedDiff  []string
 	}
@@ -156,18 +157,18 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 		},
 		Entry("with two identical ControlPlaneMachineSets should find no diff", compareControlPlaneMachineSetsTableInput{
 			platformType:  configv1.AWSPlatformType,
-			cpmsABuilder:  resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template()),
-			cpmsBBuilder:  resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template()),
+			cpmsABuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template()),
+			cpmsBBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template()),
 			expectedError: nil,
 			expectedDiff:  nil,
 		}),
 		Entry("with two differing ControlPlaneMachineSets should find diff", compareControlPlaneMachineSetsTableInput{
 			platformType: configv1.AWSPlatformType,
-			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsABuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					usEast1aProviderSpecBuilderAWS,
 				)),
-			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsBBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					usEast1bProviderSpecBuilderAWS,
 				)),
@@ -179,11 +180,11 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 		}),
 		Entry("with two differing ControlPlaneMachineSet machine's provider specs should find diff", compareControlPlaneMachineSetsTableInput{
 			platformType: configv1.AWSPlatformType,
-			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsABuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.large"),
 				)),
-			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsBBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge"),
 				)),
@@ -194,11 +195,11 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 		}),
 		Entry("with the first ControlPlaneMachineSet machine's provider spec being empty it should error", compareControlPlaneMachineSetsTableInput{
 			platformType: configv1.AWSPlatformType,
-			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsABuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					nil,
 				)),
-			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsBBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge"),
 				)),
@@ -208,11 +209,11 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 		}),
 		Entry("with the second ControlPlaneMachineSet machine's provider spec being empty it should error", compareControlPlaneMachineSetsTableInput{
 			platformType: configv1.AWSPlatformType,
-			cpmsABuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsABuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					usEast1aProviderSpecBuilderAWS.WithInstanceType("c5.xlarge"),
 				)),
-			cpmsBBuilder: resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(resourcebuilder.OpenShiftMachineV1Beta1Template().
+			cpmsBBuilder: machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithProviderSpecBuilder(
 					nil,
 				)),
@@ -240,37 +241,37 @@ var _ = Describe("sortMachineSetsByCreationTimeDescending tests", func() {
 		},
 		Entry("when the input is not sorted by time", sortMachineSetsByCreationTimeAscendingTableInput{
 			input: []machinev1beta1.MachineSet{
-				*resourcebuilder.MachineSet().WithName("machine-6").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
 					WithCreationTimestamp(timeThird).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-3").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
 					WithCreationTimestamp(timeSecond).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-1").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
 			},
 			expected: []machinev1beta1.MachineSet{
-				*resourcebuilder.MachineSet().WithName("machine-1").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-3").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
 					WithCreationTimestamp(timeSecond).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-6").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
 					WithCreationTimestamp(timeThird).Build(),
 			},
 		}),
 		Entry("when the time is the same, input is not sorted by name", sortMachineSetsByCreationTimeAscendingTableInput{
 			input: []machinev1beta1.MachineSet{
-				*resourcebuilder.MachineSet().WithName("machine-6").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-1").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-3").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
 					WithCreationTimestamp(timeFirst).Build(),
 			},
 			expected: []machinev1beta1.MachineSet{
-				*resourcebuilder.MachineSet().WithName("machine-1").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-3").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.MachineSet().WithName("machine-6").
+				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
 					WithCreationTimestamp(timeFirst).Build(),
 			},
 		}),
@@ -295,37 +296,37 @@ var _ = Describe("sortMachineByCreationTimeDescending tests", func() {
 		},
 		Entry("when the input is not sorted (descending) by time", sortMachinesByCreationTimeDescendingTableInput{
 			input: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-1").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.Machine().WithName("machine-3").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-3").
 					WithCreationTimestamp(timeSecond).Build(),
-				*resourcebuilder.Machine().WithName("machine-6").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").
 					WithCreationTimestamp(timeThird).Build(),
 			},
 			expected: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-6").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").
 					WithCreationTimestamp(timeThird).Build(),
-				*resourcebuilder.Machine().WithName("machine-3").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-3").
 					WithCreationTimestamp(timeSecond).Build(),
-				*resourcebuilder.Machine().WithName("machine-1").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
 			},
 		}),
 		Entry("when the time is the same, input is not sorted (descending) by name", sortMachinesByCreationTimeDescendingTableInput{
 			input: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-6").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.Machine().WithName("machine-1").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.Machine().WithName("machine-3").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-3").
 					WithCreationTimestamp(timeFirst).Build(),
 			},
 			expected: []machinev1beta1.Machine{
-				*resourcebuilder.Machine().WithName("machine-6").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-6").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.Machine().WithName("machine-3").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-3").
 					WithCreationTimestamp(timeFirst).Build(),
-				*resourcebuilder.Machine().WithName("machine-1").
+				*machinev1beta1resourcebuilder.Machine().WithName("machine-1").
 					WithCreationTimestamp(timeFirst).Build(),
 			},
 		}),

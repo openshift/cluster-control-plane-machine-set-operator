@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,8 +25,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
+	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	metav1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -35,14 +38,14 @@ import (
 )
 
 var (
-	statusConditionAvailable    = resourcebuilder.StatusCondition().WithType(conditionAvailable).WithStatus(metav1.ConditionTrue).WithReason(reasonAllReplicasAvailable).Build()
-	statusConditionNotAvailable = resourcebuilder.StatusCondition().WithType(conditionAvailable).WithStatus(metav1.ConditionFalse).WithReason(reasonUnavailableReplicas).WithMessage("Missing 3 available replica(s)").Build()
+	statusConditionAvailable    = metav1resourcebuilder.Condition().WithType(conditionAvailable).WithStatus(metav1.ConditionTrue).WithReason(reasonAllReplicasAvailable).Build()
+	statusConditionNotAvailable = metav1resourcebuilder.Condition().WithType(conditionAvailable).WithStatus(metav1.ConditionFalse).WithReason(reasonUnavailableReplicas).WithMessage("Missing 3 available replica(s)").Build()
 
-	statusConditionProgressing    = resourcebuilder.StatusCondition().WithType(conditionProgressing).WithStatus(metav1.ConditionTrue).WithReason(reasonNeedsUpdateReplicas).WithMessage("Observed 1 replica(s) in need of update").Build()
-	statusConditionNotProgressing = resourcebuilder.StatusCondition().WithType(conditionProgressing).WithStatus(metav1.ConditionFalse).WithReason(reasonAllReplicasUpdated).Build()
+	statusConditionProgressing    = metav1resourcebuilder.Condition().WithType(conditionProgressing).WithStatus(metav1.ConditionTrue).WithReason(reasonNeedsUpdateReplicas).WithMessage("Observed 1 replica(s) in need of update").Build()
+	statusConditionNotProgressing = metav1resourcebuilder.Condition().WithType(conditionProgressing).WithStatus(metav1.ConditionFalse).WithReason(reasonAllReplicasUpdated).Build()
 
-	statusConditionDegraded    = resourcebuilder.StatusCondition().WithType(conditionDegraded).WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 3 unmanaged node(s)").Build()
-	statusConditionNotDegraded = resourcebuilder.StatusCondition().WithType(conditionDegraded).WithStatus(metav1.ConditionFalse).WithReason(reasonAsExpected).Build()
+	statusConditionDegraded    = metav1resourcebuilder.Condition().WithType(conditionDegraded).WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 3 unmanaged node(s)").Build()
+	statusConditionNotDegraded = metav1resourcebuilder.Condition().WithType(conditionDegraded).WithStatus(metav1.ConditionFalse).WithReason(reasonAsExpected).Build()
 )
 
 var _ = Describe("Cluster Operator Status with a running controller", func() {
@@ -57,7 +60,7 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
@@ -93,7 +96,7 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 		}()
 
 		// CVO will create a blank cluster operator for us before the operator starts.
-		co = resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+		co = configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 		Expect(k8sClient.Create(ctx, co)).To(Succeed())
 	})
 
@@ -103,7 +106,7 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 		<-mgrDone
 
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&corev1.Node{},
 			&configv1.ClusterOperator{},
 			&machinev1beta1.Machine{},
@@ -113,9 +116,9 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 
 	Context("with no ControlPlaneMachineSet", func() {
 		It("Set the cluster operator available", func() {
-			co := resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+			co := configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 
-			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", testutils.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 				{
 					Type:    configv1.OperatorAvailable,
 					Status:  configv1.ConditionTrue,
@@ -143,14 +146,14 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 
 		Context("And an invalid cluster operator", func() {
 			BeforeEach(func() {
-				coStatus := resourcebuilder.ClusterOperatorStatus().Build()
+				coStatus := configv1resourcebuilder.ClusterOperatorStatus().Build()
 				Eventually(komega.UpdateStatus(co, func() {
 					co.Status = coStatus
 				})).Should(Succeed())
 			})
 
 			It("Set the cluster operator available", func() {
-				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", testutils.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,
 						Status:  configv1.ConditionTrue,
@@ -183,18 +186,18 @@ var _ = Describe("Cluster Operator Status", func() {
 	const operatorName = "control-plane-machine-set"
 	var co *configv1.ClusterOperator
 	var reconciler *ControlPlaneMachineSetReconciler
-	var logger test.TestLogger
+	var logger testutils.TestLogger
 	var namespaceName string
 
-	var cpmsBuilder resourcebuilder.ControlPlaneMachineSetBuilder
+	var cpmsBuilder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-cluster-operator-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
-		cpmsBuilder = resourcebuilder.ControlPlaneMachineSet().WithName(clusterControlPlaneMachineSetName).WithNamespace(namespaceName)
+		cpmsBuilder = machinev1resourcebuilder.ControlPlaneMachineSet().WithName(clusterControlPlaneMachineSetName).WithNamespace(namespaceName)
 
 		reconciler = &ControlPlaneMachineSetReconciler{
 			Client:         k8sClient,
@@ -204,14 +207,14 @@ var _ = Describe("Cluster Operator Status", func() {
 		}
 
 		// CVO will create a blank cluster operator for us before the operator starts.
-		co = resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+		co = configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 		Expect(k8sClient.Create(ctx, co)).To(Succeed())
 
-		logger = test.NewTestLogger()
+		logger = testutils.NewTestLogger()
 	})
 
 	AfterEach(func() {
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&configv1.ClusterOperator{},
 			&machinev1.ControlPlaneMachineSet{},
 		)
@@ -219,10 +222,10 @@ var _ = Describe("Cluster Operator Status", func() {
 
 	Context("updateClusterOperatorStatus", func() {
 		type updateClusterOperatorStatusTableInput struct {
-			cpmsBuilder        resourcebuilder.ControlPlaneMachineSetInterface
+			cpmsBuilder        machinev1resourcebuilder.ControlPlaneMachineSetInterface
 			expectedConditions []configv1.ClusterOperatorStatusCondition
 			expectedError      error
-			expectedLogs       []test.LogEntry
+			expectedLogs       []testutils.LogEntry
 		}
 
 		DescribeTable("should update the cluster operator status based on the ControlPlaneMachineSet conditions", func(in updateClusterOperatorStatusTableInput) {
@@ -237,7 +240,7 @@ var _ = Describe("Cluster Operator Status", func() {
 				Expect(err).ToNot(HaveOccurred())
 			}
 
-			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions(in.expectedConditions)))
+			Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", testutils.MatchClusterOperatorStatusConditions(in.expectedConditions)))
 			Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
 			Expect(cpms).To(Equal(originalCPMS), "The update functions should not modify the ControlPlaneMachineSet in any way")
 		},
@@ -267,7 +270,7 @@ var _ = Describe("Cluster Operator Status", func() {
 						Message: "cluster operator is upgradable",
 					},
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level:   4,
 						Message: "Syncing cluster operator status",
@@ -307,7 +310,7 @@ var _ = Describe("Cluster Operator Status", func() {
 						Message: "cluster operator is not upgradable",
 					},
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level:   4,
 						Message: "Syncing cluster operator status",
@@ -347,7 +350,7 @@ var _ = Describe("Cluster Operator Status", func() {
 						Message: "cluster operator is not upgradable",
 					},
 				},
-				expectedLogs: []test.LogEntry{
+				expectedLogs: []testutils.LogEntry{
 					{
 						Level:   4,
 						Message: "Syncing cluster operator status",

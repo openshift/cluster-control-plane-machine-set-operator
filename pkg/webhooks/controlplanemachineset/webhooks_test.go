@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,8 +26,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -52,7 +55,7 @@ var _ = Describe("Webhooks", func() {
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
@@ -88,24 +91,24 @@ var _ = Describe("Webhooks", func() {
 		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 		<-mgrDone
 
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 			&machinev1.ControlPlaneMachineSet{},
 		)
 	})
 
 	Context("on create", func() {
-		var builder resourcebuilder.ControlPlaneMachineSetBuilder
-		var machineTemplate resourcebuilder.OpenShiftMachineV1Beta1TemplateBuilder
+		var builder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
+		var machineTemplate machinev1resourcebuilder.OpenShiftMachineV1Beta1TemplateBuilder
 
 		Context("when validating without failure domains", func() {
 			BeforeEach(func() {
-				providerSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
-				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				providerSpec := machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
+				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid, individual tests will override to make it invalid
-				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				builder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
 				By("Creating a selection of Machines")
 				for i := 0; i < 3; i++ {
@@ -135,7 +138,7 @@ var _ = Describe("Webhooks", func() {
 					MatchLabels: map[string]string{
 						openshiftMachineRoleLabel:            masterMachineRole,
 						openshiftMachineTypeLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					},
 				}).WithMachineTemplateBuilder(
 					machineTemplate.WithLabels(map[string]string{
@@ -168,12 +171,12 @@ var _ = Describe("Webhooks", func() {
 				cpms := builder.WithSelector(metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						openshiftMachineTypeLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					},
 				}).WithMachineTemplateBuilder(
 					machineTemplate.WithLabels(map[string]string{
 						openshiftMachineTypeLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					}),
 				).Build()
 
@@ -185,13 +188,13 @@ var _ = Describe("Webhooks", func() {
 					MatchLabels: map[string]string{
 						openshiftMachineRoleLabel:            "worker",
 						openshiftMachineTypeLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					},
 				}).WithMachineTemplateBuilder(
 					machineTemplate.WithLabels(map[string]string{
 						openshiftMachineRoleLabel:            "worker",
 						openshiftMachineTypeLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					}),
 				).Build()
 
@@ -202,12 +205,12 @@ var _ = Describe("Webhooks", func() {
 				cpms := builder.WithSelector(metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						openshiftMachineRoleLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					},
 				}).WithMachineTemplateBuilder(
 					machineTemplate.WithLabels(map[string]string{
 						openshiftMachineRoleLabel:            masterMachineRole,
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					}),
 				).Build()
 
@@ -219,13 +222,13 @@ var _ = Describe("Webhooks", func() {
 					MatchLabels: map[string]string{
 						openshiftMachineRoleLabel:            masterMachineRole,
 						openshiftMachineTypeLabel:            "worker",
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					},
 				}).WithMachineTemplateBuilder(
 					machineTemplate.WithLabels(map[string]string{
 						openshiftMachineRoleLabel:            masterMachineRole,
 						openshiftMachineTypeLabel:            "worker",
-						machinev1beta1.MachineClusterIDLabel: "cpms-cluster-test-id",
+						machinev1beta1.MachineClusterIDLabel: resourcebuilder.TestClusterIDValue,
 					}),
 				).Build()
 
@@ -247,8 +250,8 @@ var _ = Describe("Webhooks", func() {
 			})
 
 			It("with machine template zone not matching machines", func() {
-				tempateProviderSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("different-zone-1")
-				templateBuilder := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(tempateProviderSpec)
+				tempateProviderSpec := machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("different-zone-1")
+				templateBuilder := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(tempateProviderSpec)
 				cpms := builder.WithMachineTemplateBuilder(templateBuilder).Build()
 
 				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec: Invalid value: AWSFailureDomain{AvailabilityZone:different-zone-1, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}: Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
@@ -291,7 +294,7 @@ var _ = Describe("Webhooks", func() {
 		})
 
 		Context("when validating failure domains on AWS", func() {
-			var builder resourcebuilder.ControlPlaneMachineSetBuilder
+			var builder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 			var filterSubnet = machinev1.AWSResourceReference{
 				Type: machinev1.AWSFiltersReferenceType,
 				Filters: &[]machinev1.AWSResourceFilter{{
@@ -313,32 +316,32 @@ var _ = Describe("Webhooks", func() {
 				ID:   stringPtr("subnet-us-east-1c"),
 			}
 
-			var usEast1aBuilder = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(filterSubnet)
-			var usEast1bBuilder = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(filterSubnet)
-			var usEast1cBuilder = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(filterSubnet)
-			var usEast1cBuilderWithSubnet = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(filterSubnetDifferent)
-			var usEast1cBuilderWithIDSubnet = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(idSubnet)
-			var usEast1dBuilder = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1d").WithSubnet(filterSubnet)
-			var usEast1eBuilder = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1e").WithSubnet(filterSubnet)
-			var usEast1fBuilder = resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1f").WithSubnet(filterSubnet)
+			var usEast1aBuilder = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(filterSubnet)
+			var usEast1bBuilder = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(filterSubnet)
+			var usEast1cBuilder = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(filterSubnet)
+			var usEast1cBuilderWithSubnet = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(filterSubnetDifferent)
+			var usEast1cBuilderWithIDSubnet = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(idSubnet)
+			var usEast1dBuilder = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1d").WithSubnet(filterSubnet)
+			var usEast1eBuilder = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1e").WithSubnet(filterSubnet)
+			var usEast1fBuilder = machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1f").WithSubnet(filterSubnet)
 
 			BeforeEach(func() {
 				By("Setting up a namespace for the test")
-				ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
+				ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
 				Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 				namespaceName = ns.GetName()
 			})
 
 			Context("with machines spread evenly across failure domains", func() {
 				BeforeEach(func() {
-					providerSpec := resourcebuilder.AWSProviderSpec()
-					machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-					machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+					providerSpec := machinev1beta1resourcebuilder.AWSProviderSpec()
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster()
 					workerMachineBuilder := machineBuilder.WithGenerateName("worker-machine-").AsWorker()
-					machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+					machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 
-					builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					builder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 
 					var filterSubnet = machinev1beta1.AWSResourceReference{
 						Filters: []machinev1beta1.Filter{{
@@ -366,7 +369,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("with a valid failure domains spec", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 							usEast1bBuilder,
 							usEast1cBuilder,
@@ -378,7 +381,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("with a invalid subnet filter - different value", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 							usEast1bBuilder,
 							usEast1cBuilderWithSubnet,
@@ -392,7 +395,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("with a invalid subnet type - different type", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 							usEast1bBuilder,
 							usEast1cBuilderWithIDSubnet,
@@ -406,7 +409,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("when reducing the availability", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 						),
 					)).Build()
@@ -420,7 +423,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("when increasing the availability", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 							usEast1bBuilder,
 							usEast1cBuilder,
@@ -436,7 +439,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("when the availability zones don't match", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1dBuilder,
 							usEast1eBuilder,
 							usEast1fBuilder,
@@ -454,14 +457,14 @@ var _ = Describe("Webhooks", func() {
 
 			Context("with machines spread unevenly across failure domains", func() {
 				BeforeEach(func() {
-					providerSpec := resourcebuilder.AWSProviderSpec()
-					machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-					machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+					providerSpec := machinev1beta1resourcebuilder.AWSProviderSpec()
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster()
 					workerMachineBuilder := machineBuilder.WithGenerateName("worker-machine-").AsWorker()
-					machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+					machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 
-					builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					builder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 
 					var filterSubnet = machinev1beta1.AWSResourceReference{
 						Filters: []machinev1beta1.Filter{{
@@ -489,7 +492,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("with matching failure domains", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 							usEast1bBuilder,
 						),
@@ -500,7 +503,7 @@ var _ = Describe("Webhooks", func() {
 
 				It("with an additional failure domain in the spec", func() {
 					cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-						resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+						machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 							usEast1aBuilder,
 							usEast1bBuilder,
 							usEast1cBuilder,
@@ -515,18 +518,18 @@ var _ = Describe("Webhooks", func() {
 		})
 
 		Context("on Azure", func() {
-			zone1Builder := resourcebuilder.AzureFailureDomain().WithZone("1")
-			zone2Builder := resourcebuilder.AzureFailureDomain().WithZone("2")
-			zone3Builder := resourcebuilder.AzureFailureDomain().WithZone("3")
-			zone4Builder := resourcebuilder.AzureFailureDomain().WithZone("4")
+			zone1Builder := machinev1resourcebuilder.AzureFailureDomain().WithZone("1")
+			zone2Builder := machinev1resourcebuilder.AzureFailureDomain().WithZone("2")
+			zone3Builder := machinev1resourcebuilder.AzureFailureDomain().WithZone("3")
+			zone4Builder := machinev1resourcebuilder.AzureFailureDomain().WithZone("4")
 
 			BeforeEach(func() {
-				providerSpec := resourcebuilder.AzureProviderSpec()
-				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				providerSpec := machinev1beta1resourcebuilder.AzureProviderSpec()
+				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid, individual tests will override to make it invalid
-				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				builder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 
 				By("Creating a selection of Machines")
 				for i := 1; i <= 3; i++ {
@@ -539,7 +542,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with a valid failure domains spec", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
 						zone2Builder,
 						zone3Builder,
@@ -551,7 +554,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with a mismatched failure domains spec", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
 						zone2Builder,
 						zone4Builder,
@@ -565,7 +568,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("when reducing the availability", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
 						zone2Builder,
 					),
@@ -578,7 +581,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("when increasing the availability", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
 						zone2Builder,
 						zone3Builder,
@@ -591,13 +594,13 @@ var _ = Describe("Webhooks", func() {
 
 			It("with an internal load balancer", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
 						zone2Builder,
 						zone3Builder,
 					),
 				).WithProviderSpecBuilder(
-					resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer("internal-load-balancer-12345678"),
+					machinev1beta1resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer("internal-load-balancer-12345678"),
 				),
 				).Build()
 
@@ -606,13 +609,13 @@ var _ = Describe("Webhooks", func() {
 
 			It("without an internal load balancer", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
 						zone2Builder,
 						zone3Builder,
 					),
 				).WithProviderSpecBuilder(
-					resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer(""), // Set to the empty string to remove it.
+					machinev1beta1resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer(""), // Set to the empty string to remove it.
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
@@ -622,18 +625,18 @@ var _ = Describe("Webhooks", func() {
 		})
 
 		Context("on GCP", func() {
-			var usCentral1aBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1a")
-			var usCentral1bBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1b")
-			var usCentral1cBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1c")
-			var usCentral1dBuilder = resourcebuilder.GCPFailureDomain().WithZone("us-central-1d")
+			var usCentral1aBuilder = machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central-1a")
+			var usCentral1bBuilder = machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central-1b")
+			var usCentral1cBuilder = machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central-1c")
+			var usCentral1dBuilder = machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central-1d")
 
 			BeforeEach(func() {
-				providerSpec := resourcebuilder.GCPProviderSpec()
-				machineTemplate = resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				providerSpec := machinev1beta1resourcebuilder.GCPProviderSpec()
+				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid, individual tests will override to make it invalid
-				builder = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				builder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 
 				By("Creating a selection of Machines")
 				for _, az := range []string{"us-central-1a", "us-central-1b", "us-central-1c"} {
@@ -646,7 +649,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with a valid failure domains spec", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
 						usCentral1aBuilder,
 						usCentral1bBuilder,
 						usCentral1cBuilder,
@@ -658,7 +661,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with a mismatched failure domains spec", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
 						usCentral1aBuilder,
 						usCentral1bBuilder,
 						usCentral1dBuilder,
@@ -672,7 +675,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("when reducing the availability", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
 						usCentral1aBuilder,
 						usCentral1bBuilder,
 					),
@@ -685,7 +688,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("when increasing the availability", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
-					resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.GCPFailureDomains().WithFailureDomainBuilders(
 						usCentral1aBuilder,
 						usCentral1bBuilder,
 						usCentral1cBuilder,
@@ -703,12 +706,12 @@ var _ = Describe("Webhooks", func() {
 
 		Context("on AWS", func() {
 			BeforeEach(func() {
-				providerSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
-				machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				providerSpec := machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
+				machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid
-				cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
+				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
 
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
 				By("Creating a selection of Machines")
 				for i := 0; i < 3; i++ {
@@ -722,7 +725,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with an update to the providerSpec", func() {
 				// Change the providerSpec, expect the update to be successful
-				rawProviderSpec := resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-2").BuildRawExtension()
+				rawProviderSpec := machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-2").BuildRawExtension()
 
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
@@ -808,12 +811,12 @@ var _ = Describe("Webhooks", func() {
 
 		Context("on Azure", func() {
 			BeforeEach(func() {
-				providerSpec := resourcebuilder.AzureProviderSpec()
-				machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				providerSpec := machinev1beta1resourcebuilder.AzureProviderSpec()
+				machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid
-				cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
+				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
 
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
 				By("Creating a selection of Machines")
 				for i := 0; i < 3; i++ {
@@ -872,7 +875,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("when removing the internal load balancer", func() {
 				// Change the providerSpec, expect the update to be successful
-				rawProviderSpec := resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer("").BuildRawExtension()
+				rawProviderSpec := machinev1beta1resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer("").BuildRawExtension()
 
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
@@ -882,12 +885,12 @@ var _ = Describe("Webhooks", func() {
 
 		Context("on GCP", func() {
 			BeforeEach(func() {
-				providerSpec := resourcebuilder.GCPProviderSpec()
-				machineTemplate := resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+				providerSpec := machinev1beta1resourcebuilder.GCPProviderSpec()
+				machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid
-				cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
+				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate).Build()
 
-				machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
 				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
 				By("Creating a selection of Machines")
 				for i := 0; i < 3; i++ {

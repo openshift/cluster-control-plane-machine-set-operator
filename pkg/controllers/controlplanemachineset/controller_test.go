@@ -28,9 +28,14 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
+	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
+	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
+	metav1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/meta/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machineprovidersresourcebuilder "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/integration"
@@ -89,19 +94,19 @@ var _ = Describe("With a running controller", func() {
 		},
 	}
 
-	usEast1aProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+	usEast1aProviderSpecBuilder := machinev1beta1resourcebuilder.AWSProviderSpec().
 		WithAvailabilityZone("us-east-1a").
 		WithSubnet(usEast1aSubnet)
 
-	usEast1bProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+	usEast1bProviderSpecBuilder := machinev1beta1resourcebuilder.AWSProviderSpec().
 		WithAvailabilityZone("us-east-1b").
 		WithSubnet(usEast1bSubnet)
 
-	usEast1cProviderSpecBuilder := resourcebuilder.AWSProviderSpec().
+	usEast1cProviderSpecBuilder := machinev1beta1resourcebuilder.AWSProviderSpec().
 		WithAvailabilityZone("us-east-1c").
 		WithSubnet(usEast1cSubnet)
 
-	usEast1aFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+	usEast1aFailureDomainBuilder := machinev1resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1a").
 		WithSubnet(machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
@@ -113,7 +118,7 @@ var _ = Describe("With a running controller", func() {
 			},
 		})
 
-	usEast1bFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+	usEast1bFailureDomainBuilder := machinev1resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1b").
 		WithSubnet(machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
@@ -125,7 +130,7 @@ var _ = Describe("With a running controller", func() {
 			},
 		})
 
-	usEast1cFailureDomainBuilder := resourcebuilder.AWSFailureDomain().
+	usEast1cFailureDomainBuilder := machinev1resourcebuilder.AWSFailureDomain().
 		WithAvailabilityZone("us-east-1c").
 		WithSubnet(machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
@@ -137,20 +142,20 @@ var _ = Describe("With a running controller", func() {
 			},
 		})
 
-	tmplBuilder := resourcebuilder.OpenShiftMachineV1Beta1Template().
-		WithFailureDomainsBuilder(resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
+	tmplBuilder := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
+		WithFailureDomainsBuilder(machinev1resourcebuilder.AWSFailureDomains().WithFailureDomainBuilders(
 			usEast1aFailureDomainBuilder,
 			usEast1bFailureDomainBuilder,
 			usEast1cFailureDomainBuilder,
 		)).
-		WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec())
+		WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec())
 
 	// Running phase for setting machines to running.
 	running := "Running"
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
@@ -186,7 +191,7 @@ var _ = Describe("With a running controller", func() {
 		}()
 
 		// CVO will create a blank cluster operator for us before the operator starts.
-		co = resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+		co = configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 		Expect(k8sClient.Create(ctx, co)).To(Succeed())
 	}, OncePerOrdered)
 
@@ -196,7 +201,7 @@ var _ = Describe("With a running controller", func() {
 		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 		<-mgrDone
 
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&corev1.Node{},
 			&configv1.ClusterOperator{},
 			&machinev1beta1.Machine{},
@@ -211,7 +216,7 @@ var _ = Describe("With a running controller", func() {
 		// various test cases in BeforeEach blocks.
 		JustBeforeEach(func() {
 			// The default CPMS should be sufficient for this test.
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
 
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 		})
@@ -223,7 +228,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with updated and running machines", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -260,7 +265,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with machines indexed 0, 1, 2", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -297,7 +302,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with machines indexed 4, 0, 2", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -334,7 +339,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with machines indexed 3, 4, 5", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -371,7 +376,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with a machine needing an update", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -411,7 +416,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with no running machines", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -433,18 +438,18 @@ var _ = Describe("With a running controller", func() {
 			})
 
 			It("should be degraded", func() {
-				degradedCondition := resourcebuilder.StatusCondition().
+				degradedCondition := metav1resourcebuilder.Condition().
 					WithType(conditionDegraded).
 					WithStatus(metav1.ConditionTrue).
 					WithReason(reasonNoReadyMachines).
 					WithMessage("No ready control plane machines found").
 					Build()
 
-				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(test.MatchCondition(degradedCondition))))
+				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(testutils.MatchCondition(degradedCondition))))
 			})
 
 			It("should mark the cluster operator as degraded", func() {
-				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", testutils.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,
 						Status:  configv1.ConditionFalse,
@@ -480,7 +485,7 @@ var _ = Describe("With a running controller", func() {
 		// various test cases in BeforeEach blocks.
 		JustBeforeEach(func() {
 			// The default CPMS should be sufficient for this test.
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithStrategyType(machinev1.OnDelete).WithMachineTemplateBuilder(tmplBuilder).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithStrategyType(machinev1.OnDelete).WithMachineTemplateBuilder(tmplBuilder).Build()
 
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 		})
@@ -492,7 +497,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with updated and running machines", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -529,7 +534,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with machines indexed 0, 1, 2", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -566,7 +571,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with machines indexed 4, 0, 2", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -605,7 +610,7 @@ var _ = Describe("With a running controller", func() {
 
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 
@@ -669,7 +674,7 @@ var _ = Describe("With a running controller", func() {
 
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				differentMachine = machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build()
 				Expect(k8sClient.Create(ctx, differentMachine)).To(Succeed())
@@ -734,7 +739,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with no running machines", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -756,18 +761,18 @@ var _ = Describe("With a running controller", func() {
 			})
 
 			It("should be degraded", func() {
-				degradedCondition := resourcebuilder.StatusCondition().
+				degradedCondition := metav1resourcebuilder.Condition().
 					WithType(conditionDegraded).
 					WithStatus(metav1.ConditionTrue).
 					WithReason(reasonNoReadyMachines).
 					WithMessage("No ready control plane machines found").
 					Build()
 
-				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(test.MatchCondition(degradedCondition))))
+				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(testutils.MatchCondition(degradedCondition))))
 			})
 
 			It("should mark the cluster operator as degraded", func() {
-				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", testutils.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,
 						Status:  configv1.ConditionFalse,
@@ -803,7 +808,7 @@ var _ = Describe("With a running controller", func() {
 		// various test cases in BeforeEach blocks.
 		JustBeforeEach(func() {
 			// The default CPMS should be sufficient for this test.
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithState(machinev1.ControlPlaneMachineSetStateInactive).WithMachineTemplateBuilder(tmplBuilder).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithState(machinev1.ControlPlaneMachineSetStateInactive).WithMachineTemplateBuilder(tmplBuilder).Build()
 
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 		})
@@ -815,7 +820,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with updated and running machines", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -851,7 +856,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with a machine needing an update", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -891,7 +896,7 @@ var _ = Describe("With a running controller", func() {
 		Context("with no running machines", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -913,18 +918,18 @@ var _ = Describe("With a running controller", func() {
 			})
 
 			It("should be degraded", func() {
-				degradedCondition := resourcebuilder.StatusCondition().
+				degradedCondition := metav1resourcebuilder.Condition().
 					WithType(conditionDegraded).
 					WithStatus(metav1.ConditionTrue).
 					WithReason(reasonNoReadyMachines).
 					WithMessage("No ready control plane machines found").
 					Build()
 
-				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(test.MatchCondition(degradedCondition))))
+				Eventually(komega.Object(cpms)).Should(HaveField("Status.Conditions", ContainElement(testutils.MatchCondition(degradedCondition))))
 			})
 
 			It("should set the cluster operator as available", func() {
-				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", test.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
+				Eventually(komega.Object(co)).Should(HaveField("Status.Conditions", testutils.MatchClusterOperatorStatusConditions([]configv1.ClusterOperatorStatusCondition{
 					{
 						Type:    configv1.OperatorAvailable,
 						Status:  configv1.ConditionTrue,
@@ -957,7 +962,7 @@ var _ = Describe("With a running controller", func() {
 
 		BeforeEach(func() {
 			// The default CPMS should be sufficient for this test.
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
 			// To ensure that at least one reconcile happens, wait for the status to not be empty.
@@ -989,7 +994,7 @@ var _ = Describe("With a running controller", func() {
 
 		BeforeEach(func() {
 			By("Creating Machines owned by the ControlPlaneMachineSet")
-			machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
@@ -1016,7 +1021,7 @@ var _ = Describe("With a running controller", func() {
 
 			// The default CPMS should be sufficient for this test.
 			By("Creating the ControlPlaneMachineSet")
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
 			By("Waiting for the ControlPlaneMachineSet to report a stable status")
@@ -1070,7 +1075,7 @@ var _ = Describe("With a running controller", func() {
 
 		BeforeEach(func() {
 			By("Creating Machines in a single failure domain")
-			machineBuilder := resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
 			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
 			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
@@ -1101,7 +1106,7 @@ var _ = Describe("With a running controller", func() {
 			BeforeEach(func() {
 				// The default CPMS should be sufficient for this test.
 				By("Creating the ControlPlaneMachineSet with the OnDelete strategy")
-				cpms = resourcebuilder.ControlPlaneMachineSet().
+				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().
 					WithNamespace(namespaceName).
 					WithStrategyType(machinev1.OnDelete).
 					WithMachineTemplateBuilder(tmplBuilder).
@@ -1196,7 +1201,7 @@ var _ = Describe("With a running controller", func() {
 			BeforeEach(func() {
 				// The default CPMS should be sufficient for this test.
 				By("Creating an Inactive ControlPlaneMachineSet with RollingUpdate strategy")
-				cpms = resourcebuilder.ControlPlaneMachineSet().
+				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().
 					WithNamespace(namespaceName).
 					WithStrategyType(machinev1.RollingUpdate).
 					WithMachineTemplateBuilder(tmplBuilder).
@@ -1270,12 +1275,12 @@ var _ = Describe("With a running controller", func() {
 
 		BeforeEach(func() {
 			By("Creating a ControlPlaneMachineSet")
-			cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
 			cpms.SetFinalizers([]string{controlPlaneMachineSetFinalizer})
 			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
 			By("Creating Machines owned by the ControlPlaneMachineSet")
-			machineBuilder := resourcebuilder.Machine().AsMaster().WithGenerateName("delete-test-").WithNamespace(namespaceName)
+			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("delete-test-").WithNamespace(namespaceName)
 
 			for i := 0; i < 3; i++ {
 				machine := machineBuilder.Build()
@@ -1309,19 +1314,19 @@ var _ = Describe("ownerRef helpers", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
-		ownerOne = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
-		ownerTwo = resourcebuilder.ClusterOperator().WithName("bar").Build()
-		ownerThree = resourcebuilder.ClusterOperator().WithName("fizz").Build()
+		ownerOne = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+		ownerTwo = configv1resourcebuilder.ClusterOperator().WithName("bar").Build()
+		ownerThree = configv1resourcebuilder.ClusterOperator().WithName("fizz").Build()
 		// Create objects to populate UIDs
 		Expect(k8sClient.Create(ctx, ownerOne)).To(Succeed())
 		Expect(k8sClient.Create(ctx, ownerTwo)).To(Succeed())
 		Expect(k8sClient.Create(ctx, ownerThree)).To(Succeed())
 
-		target = resourcebuilder.Machine().AsMaster().WithGenerateName("owner-ref-test-").WithNamespace(namespaceName).Build()
+		target = machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("owner-ref-test-").WithNamespace(namespaceName).Build()
 		Expect(controllerutil.SetControllerReference(ownerOne, target, testScheme)).To(Succeed())
 		Expect(controllerutil.SetOwnerReference(ownerTwo, target, testScheme)).To(Succeed())
 		Expect(target.GetOwnerReferences()).To(HaveLen(2))
@@ -1352,13 +1357,13 @@ var _ = Describe("ensureFinalizer", func() {
 	var namespaceName string
 	var reconciler *ControlPlaneMachineSetReconciler
 	var cpms *machinev1.ControlPlaneMachineSet
-	var logger test.TestLogger
+	var logger testutils.TestLogger
 
 	const existingFinalizer = "existingFinalizer"
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
@@ -1371,15 +1376,15 @@ var _ = Describe("ensureFinalizer", func() {
 
 		// The ControlPlaneMachineSet should already exist by the time we get here.
 		By("Creating a ControlPlaneMachineSet")
-		cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
+		cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).Build()
 		cpms.ObjectMeta.Finalizers = []string{existingFinalizer}
 		Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 
-		logger = test.NewTestLogger()
+		logger = testutils.NewTestLogger()
 	})
 
 	AfterEach(func() {
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1.ControlPlaneMachineSet{},
 		)
 	})
@@ -1402,7 +1407,7 @@ var _ = Describe("ensureFinalizer", func() {
 
 		It("sets an appropriate log line", func() {
 			Expect(logger.Entries()).To(ConsistOf(
-				test.LogEntry{
+				testutils.LogEntry{
 					Level:   2,
 					Message: "Added finalizer to control plane machine set",
 				},
@@ -1443,7 +1448,7 @@ var _ = Describe("ensureFinalizer", func() {
 
 		It("sets an appropriate log line", func() {
 			Expect(logger.Entries()).To(ConsistOf(
-				test.LogEntry{
+				testutils.LogEntry{
 					Level:   4,
 					Message: "Finalizer already present on control plane machine set",
 				},
@@ -1493,7 +1498,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 	var namespaceName string
 	var reconciler *ControlPlaneMachineSetReconciler
 	var cpms *machinev1.ControlPlaneMachineSet
-	var logger test.TestLogger
+	var logger testutils.TestLogger
 
 	var expectedOwnerReference metav1.OwnerReference
 	var machines []*machinev1beta1.Machine
@@ -1502,7 +1507,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-ensure-owner-references-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-ensure-owner-references-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 
@@ -1516,7 +1521,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 		// The ControlPlaneMachineSet should already exist by the time we get here.
 		By("Creating a ControlPlaneMachineSet")
-		cpms = resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithGeneration(2).Build()
+		cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithGeneration(2).Build()
 		Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
 		// Set TypeMeta because Create() call removes it from the object.
 		cpms.TypeMeta = metav1.TypeMeta{
@@ -1524,9 +1529,9 @@ var _ = Describe("ensureOwnerRefrences", func() {
 			APIVersion: "machine.openshift.io/v1",
 		}
 
-		logger = test.NewTestLogger()
+		logger = testutils.NewTestLogger()
 
-		machine := resourcebuilder.Machine().WithNamespace(namespaceName).Build()
+		machine := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName).Build()
 
 		Expect(controllerutil.SetControllerReference(cpms, machine, testScheme)).To(Succeed())
 		Expect(machine.GetOwnerReferences()).To(HaveLen(1))
@@ -1538,7 +1543,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		By("Creating machines to add owner references to")
 		machines = []*machinev1beta1.Machine{}
 		machineInfos = map[int32][]machineproviders.MachineInfo{}
-		machineBuilder := resourcebuilder.Machine().WithNamespace(namespaceName).WithGenerateName("ensure-owner-references-test-")
+		machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName).WithGenerateName("ensure-owner-references-test-")
 
 		for i := 0; i < 3; i++ {
 			machine := machineBuilder.Build()
@@ -1546,13 +1551,13 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 			machines = append(machines, machine)
 
-			machineInfo := resourcebuilder.MachineInfo().WithMachineGVR(machineGVR).WithMachineName(machine.GetName()).WithMachineNamespace(namespaceName).Build()
+			machineInfo := machineprovidersresourcebuilder.MachineInfo().WithMachineGVR(machineGVR).WithMachineName(machine.GetName()).WithMachineNamespace(namespaceName).Build()
 			machineInfos[int32(i)] = append(machineInfos[int32(i)], machineInfo)
 		}
 	})
 
 	AfterEach(func() {
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&machinev1beta1.Machine{},
 			&machinev1.ControlPlaneMachineSet{},
 		)
@@ -1571,10 +1576,10 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		})
 
 		It("should log that it has updated the owner references", func() {
-			expectedEntries := []test.LogEntry{}
+			expectedEntries := []testutils.LogEntry{}
 
 			for _, machine := range machines {
-				expectedEntries = append(expectedEntries, test.LogEntry{
+				expectedEntries = append(expectedEntries, testutils.LogEntry{
 					KeysAndValues: []interface{}{"machineNamespace", machine.GetNamespace(), "machineName", machine.GetName()},
 					Level:         2,
 					Message:       "Added owner reference to machine",
@@ -1613,10 +1618,10 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		})
 
 		It("should log that no update was needed", func() {
-			expectedEntries := []test.LogEntry{}
+			expectedEntries := []testutils.LogEntry{}
 
 			for _, machine := range machines {
-				expectedEntries = append(expectedEntries, test.LogEntry{
+				expectedEntries = append(expectedEntries, testutils.LogEntry{
 					KeysAndValues: []interface{}{"machineNamespace", machine.GetNamespace(), "machineName", machine.GetName()},
 					Level:         4,
 					Message:       "Owner reference already present on machine",
@@ -1659,14 +1664,14 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		})
 
 		It("should log the update that was needed", func() {
-			expectedEntries := []test.LogEntry{}
+			expectedEntries := []testutils.LogEntry{}
 
 			machineInfos0 := machineInfos[0]
 			Expect(machineInfos0).To(HaveLen(1))
 
 			machineInfo := machineInfos0[0]
 			Expect(machineInfo.MachineRef).ToNot(BeNil())
-			expectedEntries = append(expectedEntries, test.LogEntry{
+			expectedEntries = append(expectedEntries, testutils.LogEntry{
 				KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
 				Level:         2,
 				Message:       "Added owner reference to machine",
@@ -1679,7 +1684,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 
 				for j := range machineInfo {
 					Expect(machineInfo[j].MachineRef).ToNot(BeNil())
-					expectedEntries = append(expectedEntries, test.LogEntry{
+					expectedEntries = append(expectedEntries, testutils.LogEntry{
 						KeysAndValues: []interface{}{"machineNamespace", machineInfo[j].MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo[j].MachineRef.ObjectMeta.GetName()},
 						Level:         4,
 						Message:       "Owner reference already present on machine",
@@ -1715,14 +1720,14 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		})
 
 		It("should log that it has updated the owner references", func() {
-			expectedEntries := []test.LogEntry{}
+			expectedEntries := []testutils.LogEntry{}
 
 			for _, machine := range machines {
 				if machine.GetName() == skipMachine {
 					continue
 				}
 
-				expectedEntries = append(expectedEntries, test.LogEntry{
+				expectedEntries = append(expectedEntries, testutils.LogEntry{
 					KeysAndValues: []interface{}{"machineNamespace", machine.GetNamespace(), "machineName", machine.GetName()},
 					Level:         2,
 					Message:       "Added owner reference to machine",
@@ -1786,14 +1791,14 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		})
 
 		It("should add an error log", func() {
-			expectedEntries := []test.LogEntry{}
+			expectedEntries := []testutils.LogEntry{}
 
 			machineInfo0 := machineInfos[0]
 			Expect(machineInfo0).To(HaveLen(1))
 
 			machineInfo := machineInfo0[0]
 			Expect(machineInfo.MachineRef).ToNot(BeNil())
-			expectedEntries = append(expectedEntries, test.LogEntry{
+			expectedEntries = append(expectedEntries, testutils.LogEntry{
 				Error:         expectedError,
 				KeysAndValues: []interface{}{"machineNamespace", machineInfo.MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo.MachineRef.ObjectMeta.GetName()},
 				Message:       "Cannot add owner reference to machine",
@@ -1805,7 +1810,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 				}
 				for j := range machineInfo {
 					Expect(machineInfo[j].MachineRef).ToNot(BeNil())
-					expectedEntries = append(expectedEntries, test.LogEntry{
+					expectedEntries = append(expectedEntries, testutils.LogEntry{
 						KeysAndValues: []interface{}{"machineNamespace", machineInfo[j].MachineRef.ObjectMeta.GetNamespace(), "machineName", machineInfo[j].MachineRef.ObjectMeta.GetName()},
 						Level:         4,
 						Message:       "Owner reference already present on machine",
@@ -1817,7 +1822,7 @@ var _ = Describe("ensureOwnerRefrences", func() {
 		})
 
 		It("should set the degraded condition on the ControlPlaneMachineSet", func() {
-			Expect(cpms.Status.Conditions).To(ContainElement(test.MatchCondition(
+			Expect(cpms.Status.Conditions).To(ContainElement(testutils.MatchCondition(
 				metav1.Condition{
 					Type:               conditionDegraded,
 					Status:             metav1.ConditionTrue,
@@ -1831,17 +1836,17 @@ var _ = Describe("ensureOwnerRefrences", func() {
 })
 
 var _ = Describe("machineInfosByIndex", func() {
-	i0m0 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-0").Build()
-	i0m1 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-1-0").Build()
-	i0m2 := resourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-2-0").Build()
-	i1m0 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-0-1").Build()
-	i1m1 := resourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-1-1").Build()
-	i2m0 := resourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-0-2").Build()
-	i3m0 := resourcebuilder.MachineInfo().WithIndex(3).WithMachineName("machine-0-3").Build()
-	i4m0 := resourcebuilder.MachineInfo().WithIndex(4).WithMachineName("machine-0-4").Build()
+	i0m0 := machineprovidersresourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-0-0").Build()
+	i0m1 := machineprovidersresourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-1-0").Build()
+	i0m2 := machineprovidersresourcebuilder.MachineInfo().WithIndex(0).WithMachineName("machine-2-0").Build()
+	i1m0 := machineprovidersresourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-0-1").Build()
+	i1m1 := machineprovidersresourcebuilder.MachineInfo().WithIndex(1).WithMachineName("machine-1-1").Build()
+	i2m0 := machineprovidersresourcebuilder.MachineInfo().WithIndex(2).WithMachineName("machine-0-2").Build()
+	i3m0 := machineprovidersresourcebuilder.MachineInfo().WithIndex(3).WithMachineName("machine-0-3").Build()
+	i4m0 := machineprovidersresourcebuilder.MachineInfo().WithIndex(4).WithMachineName("machine-0-4").Build()
 
 	type tableInput struct {
-		cpmsBuilder   resourcebuilder.ControlPlaneMachineSetInterface
+		cpmsBuilder   machinev1resourcebuilder.ControlPlaneMachineSetInterface
 		machineInfos  []machineproviders.MachineInfo
 		expected      map[int32][]machineproviders.MachineInfo
 		expectedError error
@@ -1866,9 +1871,9 @@ var _ = Describe("machineInfosByIndex", func() {
 		Entry("with no replicas in the ControlPlaneMachineSet", tableInput{
 			// Use a custom BuildFunc to set Spec.Replicas to nil,
 			// as that's not possbile with the standard Builder.
-			cpmsBuilder: &resourcebuilder.ControlPlaneMachineSetFuncs{
+			cpmsBuilder: &machinev1resourcebuilder.ControlPlaneMachineSetFuncs{
 				BuildFunc: func() *machinev1.ControlPlaneMachineSet {
-					cpmsBuilder := resourcebuilder.ControlPlaneMachineSet()
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet()
 					cpms := cpmsBuilder.Build()
 					cpms.Spec.Replicas = nil
 
@@ -1878,7 +1883,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			expectedError: errReplicasRequired,
 		}),
 		Entry("no machine infos with 3 replicas", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {},
@@ -1887,7 +1892,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("separately indexed machines", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0},
@@ -1896,7 +1901,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("a mixture of indexed machines", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i2m0, i0m1, i1m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
@@ -1905,14 +1910,14 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("all machines in the same index with 1 replica", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(1),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(1),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
 			},
 		}),
 		Entry("all machines in the same index with 3 replicas", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i0m1, i0m2},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0, i0m1, i0m2},
@@ -1921,7 +1926,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("with machines in indexes 0, 1 and 3", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i1m0, i3m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0},
@@ -1930,7 +1935,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("with machines in indexes 0, 2 and 3", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i0m0, i2m0, i3m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {i0m0},
@@ -1939,7 +1944,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("with machines in indexes 2, 3 and 4", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(3),
 			machineInfos: []machineproviders.MachineInfo{i2m0, i3m0, i4m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				2: {i2m0},
@@ -1948,7 +1953,7 @@ var _ = Describe("machineInfosByIndex", func() {
 			},
 		}),
 		Entry("with machines in indexes 2, 3 and 4 with 5 replicas", tableInput{
-			cpmsBuilder:  resourcebuilder.ControlPlaneMachineSet().WithReplicas(5),
+			cpmsBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithReplicas(5),
 			machineInfos: []machineproviders.MachineInfo{i2m0, i3m0, i4m0},
 			expected: map[int32][]machineproviders.MachineInfo{
 				0: {},
@@ -1964,51 +1969,51 @@ var _ = Describe("machineInfosByIndex", func() {
 var _ = Describe("validateClusterState", func() {
 	var namespaceName string
 
-	cpmsBuilder := resourcebuilder.ControlPlaneMachineSet()
-	masterNodeBuilder := resourcebuilder.Node().AsMaster()
-	workerNodeBuilder := resourcebuilder.Node().AsWorker()
-	degradedConditionBuilder := resourcebuilder.StatusCondition().WithType(conditionDegraded)
-	progressingConditionBuilder := resourcebuilder.StatusCondition().WithType(conditionProgressing)
+	cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet()
+	masterNodeBuilder := corev1resourcebuilder.Node().AsMaster()
+	workerNodeBuilder := corev1resourcebuilder.Node().AsWorker()
+	degradedConditionBuilder := metav1resourcebuilder.Condition().WithType(conditionDegraded)
+	progressingConditionBuilder := metav1resourcebuilder.Condition().WithType(conditionProgressing)
 
 	machineGVR := machinev1beta1.GroupVersion.WithResource("machines")
 	nodeGVR := corev1.SchemeGroupVersion.WithResource("nodes")
 
-	updatedMachineBuilder := resourcebuilder.MachineInfo().
+	updatedMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithNodeGVR(nodeGVR).
 		WithReady(true).
 		WithNeedsUpdate(false)
 
-	pendingMachineBuilder := resourcebuilder.MachineInfo().
+	pendingMachineBuilder := machineprovidersresourcebuilder.MachineInfo().
 		WithMachineGVR(machineGVR).
 		WithReady(false).
 		WithNeedsUpdate(false)
 
 	BeforeEach(func() {
 		By("Setting up a namespace for the test")
-		ns := resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
 	})
 
 	AfterEach(func() {
-		test.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
 			&corev1.Node{},
 			&machinev1beta1.Machine{},
 		)
 	})
 
 	type validateClusterTableInput struct {
-		cpmsBuilder        resourcebuilder.ControlPlaneMachineSetInterface
+		cpmsBuilder        machinev1resourcebuilder.ControlPlaneMachineSetInterface
 		machineInfos       map[int32][]machineproviders.MachineInfo
 		nodes              []*corev1.Node
 		expectedError      error
 		expectedConditions []metav1.Condition
-		expectedLogs       []test.LogEntry
+		expectedLogs       []testutils.LogEntry
 	}
 
 	DescribeTable("should validate the cluster state", func(in validateClusterTableInput) {
-		logger := test.NewTestLogger()
+		logger := testutils.NewTestLogger()
 
 		for _, node := range in.nodes {
 			Expect(k8sClient.Create(ctx, node)).To(Succeed())
@@ -2030,8 +2035,8 @@ var _ = Describe("validateClusterState", func() {
 			Expect(err).ToNot(HaveOccurred())
 		}
 
-		Expect(cpms.Status.Conditions).To(test.MatchConditions(in.expectedConditions))
-		Expect(logger.Entries()).To(ConsistOf(in.expectedLogs))
+		Expect(cpms.Status.Conditions).To(testutils.MatchConditions(in.expectedConditions))
+		Expect(in.expectedLogs).To(ConsistOf(in.expectedLogs))
 	},
 		Entry("with a valid cluster state", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2056,7 +2061,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 			},
-			expectedLogs: []test.LogEntry{},
+			expectedLogs: []testutils.LogEntry{},
 		}),
 		Entry("with a valid cluster state and pre-existing conditions", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2081,7 +2086,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonMachinesAlreadyOwned).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{},
+			expectedLogs: []testutils.LogEntry{},
 		}),
 		Entry("with no machines are ready", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2106,7 +2111,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonNoReadyMachines).WithMessage("No ready control plane machines found").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: errors.New("no ready control plane machines"),
 					KeysAndValues: []interface{}{
@@ -2139,7 +2144,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 2 unmanaged node(s)").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, "master-0, master-2"),
 					KeysAndValues: []interface{}{
@@ -2173,7 +2178,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 1 unmanaged node(s)").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, "master-3"),
 					KeysAndValues: []interface{}{
@@ -2206,7 +2211,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 			},
-			expectedLogs: []test.LogEntry{},
+			expectedLogs: []testutils.LogEntry{},
 		}),
 		Entry("with a failed replacement machine", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2234,7 +2239,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonFailedReplacement).WithMessage("Observed 1 replacement machine(s) in error state").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: fmt.Errorf("%w: %s", errFoundErroredReplacementControlPlaneMachine, "machine-replacement-0"),
 					KeysAndValues: []interface{}{
@@ -2273,7 +2278,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonFailedReplacement).WithMessage("Observed 2 replacement machine(s) in error state").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: fmt.Errorf("%w: %s", errFoundErroredReplacementControlPlaneMachine, "machine-replacement-0, machine-replacement-1"),
 					KeysAndValues: []interface{}{
@@ -2310,7 +2315,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 			},
-			expectedLogs: []test.LogEntry{},
+			expectedLogs: []testutils.LogEntry{},
 		}),
 		Entry("with multiple updated machines in a single index and OnDelete strategy", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2340,7 +2345,7 @@ var _ = Describe("validateClusterState", func() {
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
 
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: fmt.Errorf("%w: %s", errFoundExcessiveUpdatedReplicas, "1 updated replica(s) are in excess for index 0"),
 					KeysAndValues: []interface{}{
@@ -2373,7 +2378,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 			},
-			expectedLogs: []test.LogEntry{},
+			expectedLogs: []testutils.LogEntry{},
 		}),
 		Entry("with a less than desired number of control plane indexes", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2396,7 +2401,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 			},
-			expectedLogs: []test.LogEntry{},
+			expectedLogs: []testutils.LogEntry{},
 		}),
 		Entry("with an excess in number of control plane indexes", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
@@ -2423,7 +2428,7 @@ var _ = Describe("validateClusterState", func() {
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonExcessIndexes).WithMessage("Observed 1 index(es) in excess").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
-			expectedLogs: []test.LogEntry{
+			expectedLogs: []testutils.LogEntry{
 				{
 					Error: fmt.Errorf("%w: %s", errFoundExcessiveIndexes, "1 index(es) are in excess"),
 					KeysAndValues: []interface{}{
@@ -2437,8 +2442,8 @@ var _ = Describe("validateClusterState", func() {
 })
 
 var _ = Describe("isControlPlaneMachineSetDegraded", func() {
-	cpmsBuilder := resourcebuilder.ControlPlaneMachineSet()
-	degradedConditionBuilder := resourcebuilder.StatusCondition().WithType(conditionDegraded)
+	cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet()
+	degradedConditionBuilder := metav1resourcebuilder.Condition().WithType(conditionDegraded)
 
 	DescribeTable("should determine if the ControlPlaneMachineSet is degraded", func(cpms *machinev1.ControlPlaneMachineSet, expectDegraded bool) {
 		Expect(isControlPlaneMachineSetDegraded(cpms)).To(Equal(expectDegraded), "Degraded state of ControlPlaneMachineSet was not as expected")

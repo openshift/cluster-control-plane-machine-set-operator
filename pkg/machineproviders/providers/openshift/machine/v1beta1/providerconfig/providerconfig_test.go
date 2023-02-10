@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,10 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
 )
 
 // stringPtr returns a pointer to the string.
@@ -45,7 +47,7 @@ var _ = Describe("Provider Config", func() {
 		}
 
 		DescribeTable("should extract the config", func(in providerConfigTableInput) {
-			tmpl := resourcebuilder.OpenShiftMachineV1Beta1Template().
+			tmpl := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithFailureDomainsBuilder(in.failureDomainsBuilder).
 				WithProviderSpecBuilder(in.providerSpecBuilder).
 				BuildTemplate()
@@ -74,39 +76,39 @@ var _ = Describe("Provider Config", func() {
 			}),
 			Entry("with an AWS config with failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.AWSPlatformType,
-				failureDomainsBuilder: resourcebuilder.AWSFailureDomains(),
-				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
-				providerConfigMatcher: HaveField("AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
+				failureDomainsBuilder: machinev1resourcebuilder.AWSFailureDomains(),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.AWSProviderSpec(),
+				providerConfigMatcher: HaveField("AWS().Config()", *machinev1beta1resourcebuilder.AWSProviderSpec().Build()),
 			}),
 			Entry("with an AWS config without failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.AWSPlatformType,
 				failureDomainsBuilder: nil,
-				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
-				providerConfigMatcher: HaveField("AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.AWSProviderSpec(),
+				providerConfigMatcher: HaveField("AWS().Config()", *machinev1beta1resourcebuilder.AWSProviderSpec().Build()),
 			}),
 			Entry("with an Azure config with failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.AzurePlatformType,
-				failureDomainsBuilder: resourcebuilder.AzureFailureDomains(),
-				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
-				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
+				failureDomainsBuilder: machinev1resourcebuilder.AzureFailureDomains(),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.AzureProviderSpec(),
+				providerConfigMatcher: HaveField("Azure().Config()", *machinev1beta1resourcebuilder.AzureProviderSpec().Build()),
 			}),
 			Entry("with an Azure config without failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.AzurePlatformType,
 				failureDomainsBuilder: nil,
-				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
-				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.AzureProviderSpec(),
+				providerConfigMatcher: HaveField("Azure().Config()", *machinev1beta1resourcebuilder.AzureProviderSpec().Build()),
 			}),
 			Entry("with a GCP config with failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.GCPPlatformType,
-				failureDomainsBuilder: resourcebuilder.GCPFailureDomains(),
-				providerSpecBuilder:   resourcebuilder.GCPProviderSpec(),
-				providerConfigMatcher: HaveField("GCP().Config()", *resourcebuilder.GCPProviderSpec().Build()),
+				failureDomainsBuilder: machinev1resourcebuilder.GCPFailureDomains(),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.GCPProviderSpec(),
+				providerConfigMatcher: HaveField("GCP().Config()", *machinev1beta1resourcebuilder.GCPProviderSpec().Build()),
 			}),
 			Entry("with a GCP config without failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.GCPPlatformType,
 				failureDomainsBuilder: nil,
-				providerSpecBuilder:   resourcebuilder.GCPProviderSpec(),
-				providerConfigMatcher: HaveField("GCP().Config()", *resourcebuilder.GCPProviderSpec().Build()),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.GCPProviderSpec(),
+				providerConfigMatcher: HaveField("GCP().Config()", *machinev1beta1resourcebuilder.GCPProviderSpec().Build()),
 			}),
 		)
 	})
@@ -136,7 +138,7 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				failureDomain: nil,
@@ -146,7 +148,7 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewAWSFailureDomain(
@@ -160,11 +162,11 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewAWSFailureDomain(
-					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
+					machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").Build(),
 				),
 				matchPath:        "AWS().Config().Placement.AvailabilityZone",
 				matchExpectation: "us-east-1a",
@@ -173,11 +175,11 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewAWSFailureDomain(
-					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build(),
+					machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").Build(),
 				),
 				matchPath:        "AWS().Config().Placement.AvailabilityZone",
 				matchExpectation: "us-east-1b",
@@ -186,11 +188,11 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewAzureFailureDomain(
-					resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+					machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				),
 				matchPath:        "Azure().Config().Zone",
 				matchExpectation: stringPtr("1"),
@@ -199,11 +201,11 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewAzureFailureDomain(
-					resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				),
 				matchPath:        "Azure().Config().Zone",
 				matchExpectation: stringPtr("2"),
@@ -212,11 +214,11 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewGCPFailureDomain(
-					resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+					machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
 				),
 				matchPath:        "GCP().Config().Zone",
 				matchExpectation: "us-central1-a",
@@ -225,11 +227,11 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
 					},
 				},
 				failureDomain: failuredomain.NewGCPFailureDomain(
-					resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
+					machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
 				),
 				matchPath:        "GCP().Config().Zone",
 				matchExpectation: "us-central1-b",
@@ -247,7 +249,7 @@ var _ = Describe("Provider Config", func() {
 		}
 
 		DescribeTable("should extract the config", func(in providerConfigTableInput) {
-			machine := resourcebuilder.Machine().WithProviderSpecBuilder(in.providerSpecBuilder).Build()
+			machine := machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(in.providerSpecBuilder).Build()
 
 			if in.modifyMachine != nil {
 				in.modifyMachine(machine)
@@ -267,23 +269,23 @@ var _ = Describe("Provider Config", func() {
 				modifyMachine: func(in *machinev1beta1.Machine) {
 					in.Spec.ProviderSpec.Value = nil
 				},
-				providerSpecBuilder: resourcebuilder.AWSProviderSpec(),
+				providerSpecBuilder: machinev1beta1resourcebuilder.AWSProviderSpec(),
 				expectedError:       errNilProviderSpec,
 			}),
 			Entry("with an AWS config with failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.AWSPlatformType,
-				providerSpecBuilder:   resourcebuilder.AWSProviderSpec(),
-				providerConfigMatcher: HaveField("AWS().Config()", *resourcebuilder.AWSProviderSpec().Build()),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.AWSProviderSpec(),
+				providerConfigMatcher: HaveField("AWS().Config()", *machinev1beta1resourcebuilder.AWSProviderSpec().Build()),
 			}),
 			Entry("with an Azure config with failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.AzurePlatformType,
-				providerSpecBuilder:   resourcebuilder.AzureProviderSpec(),
-				providerConfigMatcher: HaveField("Azure().Config()", *resourcebuilder.AzureProviderSpec().Build()),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.AzureProviderSpec(),
+				providerConfigMatcher: HaveField("Azure().Config()", *machinev1beta1resourcebuilder.AzureProviderSpec().Build()),
 			}),
 			Entry("with a GCP config with failure domains", providerConfigTableInput{
 				expectedPlatformType:  configv1.GCPPlatformType,
-				providerSpecBuilder:   resourcebuilder.GCPProviderSpec(),
-				providerConfigMatcher: HaveField("GCP().Config()", *resourcebuilder.GCPProviderSpec().Build()),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.GCPProviderSpec(),
+				providerConfigMatcher: HaveField("GCP().Config()", *machinev1beta1resourcebuilder.GCPProviderSpec().Build()),
 			}),
 		)
 	})
@@ -324,31 +326,31 @@ var _ = Describe("Provider Config", func() {
 			}),
 			Entry("with machines", extractFailureDomainsFromMachinesTableInput{
 				machines: []machinev1beta1.Machine{
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
 				},
 				expectedError: nil,
 				expectedFailureDomains: []failuredomain.FailureDomain{
-					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(awsSubnet).Build()),
-					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(awsSubnet).Build()),
-					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
 				},
 			}),
 			Entry("with machines that duplicate failure domains", extractFailureDomainsFromMachinesTableInput{
 				machines: []machinev1beta1.Machine{
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
-					*resourcebuilder.Machine().WithProviderSpecBuilder(resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b")).Build(),
+					*machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1c")).Build(),
 				},
 				expectedError: nil,
 				expectedFailureDomains: []failuredomain.FailureDomain{
-					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(awsSubnet).Build()),
-					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(awsSubnet).Build()),
-					failuredomain.NewAWSFailureDomain(resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(awsSubnet).Build()),
+					failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(awsSubnet).Build()),
 				},
 			}),
 		)
@@ -376,51 +378,51 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").WithSubnet(convertAWSResourceReferenceV1ToV1Beta1(&filterSubnet)).Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").WithSubnet(convertAWSResourceReferenceV1ToV1Beta1(&filterSubnet)).Build(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAWSFailureDomain(
-					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(filterSubnet).Build(),
+					machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(filterSubnet).Build(),
 				),
 			}),
 			Entry("with an AWS us-east-1b failure domain", extractFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").WithSubnet(convertAWSResourceReferenceV1ToV1Beta1(&filterSubnet)).Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").WithSubnet(convertAWSResourceReferenceV1ToV1Beta1(&filterSubnet)).Build(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAWSFailureDomain(
-					resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(filterSubnet).Build(),
+					machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(filterSubnet).Build(),
 				),
 			}),
 			Entry("with an Azure 2 failure domain", extractFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAzureFailureDomain(
-					resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				),
 			}),
 			Entry("with a GCP us-central1-a failure domain", extractFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewGCPFailureDomain(
-					resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
+					machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
 				),
 			}),
 			Entry("with a VSphere dummy failure domain", extractFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				expectedFailureDomain: failuredomain.NewGenericFailureDomain(),
@@ -468,13 +470,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				expectedEqual: true,
@@ -483,13 +485,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1a").Build(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1b").Build(),
 					},
 				},
 				expectedEqual: false,
@@ -498,13 +500,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
 					},
 				},
 				expectedEqual: true,
@@ -513,13 +515,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("1").Build(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithZone("2").Build(),
 					},
 				},
 				expectedEqual: false,
@@ -528,13 +530,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
 					},
 				},
 				expectedEqual: true,
@@ -543,13 +545,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-a").Build(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().WithZone("us-central1-b").Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithZone("us-central1-b").Build(),
 					},
 				},
 				expectedEqual: false,
@@ -558,13 +560,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				expectedEqual: true,
@@ -573,13 +575,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().WithTemplate("different-template").BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("different-template").BuildRawExtension(),
 					},
 				},
 				expectedEqual: false,
@@ -588,13 +590,13 @@ var _ = Describe("Provider Config", func() {
 				basePC: &providerConfig{
 					platformType: configv1.BareMetalPlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				comparePC: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				expectedEqual: false,
@@ -625,37 +627,37 @@ var _ = Describe("Provider Config", func() {
 				providerConfig: &providerConfig{
 					platformType: configv1.AWSPlatformType,
 					aws: AWSProviderConfig{
-						providerConfig: *resourcebuilder.AWSProviderSpec().Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().Build(),
 					},
 				},
-				expectedOut: resourcebuilder.AWSProviderSpec().BuildRawExtension().Raw,
+				expectedOut: machinev1beta1resourcebuilder.AWSProviderSpec().BuildRawExtension().Raw,
 			}),
 			Entry("with an Azure config", rawConfigTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.AzurePlatformType,
 					azure: AzureProviderConfig{
-						providerConfig: *resourcebuilder.AzureProviderSpec().Build(),
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().Build(),
 					},
 				},
-				expectedOut: resourcebuilder.AzureProviderSpec().BuildRawExtension().Raw,
+				expectedOut: machinev1beta1resourcebuilder.AzureProviderSpec().BuildRawExtension().Raw,
 			}),
 			Entry("with a GCP config", rawConfigTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.GCPPlatformType,
 					gcp: GCPProviderConfig{
-						providerConfig: *resourcebuilder.GCPProviderSpec().Build(),
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().Build(),
 					},
 				},
-				expectedOut: resourcebuilder.GCPProviderSpec().BuildRawExtension().Raw,
+				expectedOut: machinev1beta1resourcebuilder.GCPProviderSpec().BuildRawExtension().Raw,
 			}),
 			Entry("with a VSphere config", rawConfigTableInput{
 				providerConfig: providerConfig{
 					platformType: configv1.VSpherePlatformType,
 					generic: GenericProviderConfig{
-						providerSpec: resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
+						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
-				expectedOut: resourcebuilder.VSphereProviderSpec().BuildRawExtension().Raw,
+				expectedOut: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension().Raw,
 			}),
 		)
 	})

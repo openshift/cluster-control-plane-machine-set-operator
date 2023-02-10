@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat, Inc.
+Copyright 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/test/resourcebuilder"
+	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
+	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("Azure Provider Config", func() {
@@ -32,7 +33,7 @@ var _ = Describe("Azure Provider Config", func() {
 	zone2 := "2"
 
 	BeforeEach(func() {
-		machineProviderConfig := resourcebuilder.AzureProviderSpec().
+		machineProviderConfig := machinev1beta1resourcebuilder.AzureProviderSpec().
 			WithZone(zone1).
 			Build()
 
@@ -43,7 +44,7 @@ var _ = Describe("Azure Provider Config", func() {
 
 	Context("ExtractFailureDomain", func() {
 		It("returns the configured failure domain", func() {
-			expected := resourcebuilder.AzureFailureDomain().
+			expected := machinev1resourcebuilder.AzureFailureDomain().
 				WithZone(zone1).
 				Build()
 
@@ -55,7 +56,7 @@ var _ = Describe("Azure Provider Config", func() {
 		var changedProviderConfig AzureProviderConfig
 
 		BeforeEach(func() {
-			changedFailureDomain := resourcebuilder.AzureFailureDomain().
+			changedFailureDomain := machinev1resourcebuilder.AzureFailureDomain().
 				WithZone(zone2).
 				Build()
 
@@ -64,7 +65,7 @@ var _ = Describe("Azure Provider Config", func() {
 
 		Context("ExtractFailureDomain", func() {
 			It("returns the changed failure domain from the changed config", func() {
-				expected := resourcebuilder.AzureFailureDomain().
+				expected := machinev1resourcebuilder.AzureFailureDomain().
 					WithZone(zone2).
 					Build()
 
@@ -72,7 +73,7 @@ var _ = Describe("Azure Provider Config", func() {
 			})
 
 			It("returns the original failure domain from the original config", func() {
-				expected := resourcebuilder.AzureFailureDomain().
+				expected := machinev1resourcebuilder.AzureFailureDomain().
 					WithZone(zone1).
 					Build()
 
@@ -86,7 +87,7 @@ var _ = Describe("Azure Provider Config", func() {
 		var expectedAzureConfig machinev1beta1.AzureMachineProviderSpec
 
 		BeforeEach(func() {
-			configBuilder := resourcebuilder.AzureProviderSpec()
+			configBuilder := machinev1beta1resourcebuilder.AzureProviderSpec()
 			expectedAzureConfig = *configBuilder.Build()
 			rawConfig := configBuilder.BuildRawExtension()
 
