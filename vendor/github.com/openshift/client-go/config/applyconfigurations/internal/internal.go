@@ -2692,10 +2692,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.config.v1.Update
   map:
     fields:
-    - name: architecture
-      type:
-        scalar: string
-      default: ""
     - name: force
       type:
         scalar: boolean

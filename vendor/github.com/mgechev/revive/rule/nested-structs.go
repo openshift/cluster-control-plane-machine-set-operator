@@ -43,11 +43,6 @@ func (l *lintNestedStructs) Visit(n ast.Node) ast.Visitor {
 		}
 		return nil
 	case *ast.Field:
-		_, isChannelField := v.Type.(*ast.ChanType)
-		if isChannelField {
-			return nil
-		}
-
 		filter := func(n ast.Node) bool {
 			switch n.(type) {
 			case *ast.StructType:

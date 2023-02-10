@@ -135,14 +135,15 @@ func ConfigureClusterWideProxy(testFramework framework.Framework, gomegaArgs ...
 	proxy := &configv1.Proxy{}
 	Eventually(k8sClient.Get(ctx, client.ObjectKey{Name: "cluster"}, proxy)).Should(Succeed())
 
-	Eventually(komega.Update(proxy, func() {
+	updateProxyArgs := append([]interface{}{komega.Update(proxy, func() {
 		proxy.Spec.HTTPProxy = "http://" + services.Items[0].Spec.ClusterIP + ":8080"
 		proxy.Spec.HTTPSProxy = "http://" + services.Items[0].Spec.ClusterIP + ":8080"
 		proxy.Spec.NoProxy = ".org,.com,.net,quay.io,registry.redhat.io"
 		proxy.Spec.TrustedCA = configv1.ConfigMapNameReference{
 			Name: mitmCustomPKIName,
 		}
-	}), gomegaArgs...).Should(Succeed(), "cluster wide proxy set be able to be updated")
+	})}, gomegaArgs...)
+	Eventually(updateProxyArgs...).Should(Succeed(), "cluster wide proxy set be able to be updated")
 
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

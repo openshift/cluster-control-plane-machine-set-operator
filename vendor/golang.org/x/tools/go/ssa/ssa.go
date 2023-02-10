@@ -294,15 +294,16 @@ type Node interface {
 //
 // Type() returns the function's Signature.
 //
-// A generic function is a function or method that has uninstantiated type
-// parameters (TypeParams() != nil). Consider a hypothetical generic
-// method, (*Map[K,V]).Get. It may be instantiated with all ground
-// (non-parameterized) types as (*Map[string,int]).Get or with
-// parameterized types as (*Map[string,U]).Get, where U is a type parameter.
-// In both instantiations, Origin() refers to the instantiated generic
-// method, (*Map[K,V]).Get, TypeParams() refers to the parameters [K,V] of
-// the generic method. TypeArgs() refers to [string,U] or [string,int],
-// respectively, and is nil in the generic method.
+// A function is generic iff it has a non-empty TypeParams list and an
+// empty TypeArgs list. TypeParams lists the type parameters of the
+// function's Signature or the receiver's type parameters for a method.
+//
+// The instantiation of a generic function is a concrete function. These
+// are a list of n>0 TypeParams and n TypeArgs. An instantiation will
+// have a generic Origin function. There is at most one instantiation
+// of each origin type per Identical() type list. Instantiations do not
+// belong to any Pkg. The generic function and the instantiations will
+// share the same source Pos for the functions and the instructions.
 type Function struct {
 	name      string
 	object    types.Object // a declared *types.Func or one of its wrappers
@@ -323,11 +324,10 @@ type Function struct {
 	AnonFuncs []*Function   // anonymous functions directly beneath this one
 	referrers []Instruction // referring instructions (iff Parent() != nil)
 	built     bool          // function has completed both CREATE and BUILD phase.
-	anonIdx   int32         // position of a nested function in parent's AnonFuncs. fn.Parent()!=nil => fn.Parent().AnonFunc[fn.anonIdx] == fn.
 
-	typeparams     *typeparams.TypeParamList // type parameters of this function. typeparams.Len() > 0 => generic or instance of generic function
-	typeargs       []types.Type              // type arguments that instantiated typeparams. len(typeargs) > 0 => instance of generic function
-	topLevelOrigin *Function                 // the origin function if this is an instance of a source function. nil if Parent()!=nil.
+	_Origin     *Function               // the origin function if this the instantiation of a generic function. nil if Parent() != nil.
+	_TypeParams []*typeparams.TypeParam // the type paramaters of this function. len(TypeParams) == len(_TypeArgs) => runtime function
+	_TypeArgs   []types.Type            // type arguments for for an instantiation. len(_TypeArgs) != 0 => instantiation
 
 	// The following fields are set transiently during building,
 	// then cleared.
@@ -337,7 +337,7 @@ type Function struct {
 	targets      *targets                 // linked stack of branch targets
 	lblocks      map[types.Object]*lblock // labelled blocks
 	info         *types.Info              // *types.Info to build from. nil for wrappers.
-	subst        *subster                 // non-nil => expand generic body using this type substitution of ground types
+	subst        *subster                 // type substitution cache
 }
 
 // BasicBlock represents an SSA basic block.
@@ -409,28 +409,26 @@ type Parameter struct {
 	referrers []Instruction
 }
 
-// A Const represents a value known at build time.
+// A Const represents the value of a constant expression.
 //
-// Consts include true constants of boolean, numeric, and string types, as
-// defined by the Go spec; these are represented by a non-nil Value field.
+// The underlying type of a constant may be any boolean, numeric, or
+// string type.  In addition, a Const may represent the nil value of
+// any reference type---interface, map, channel, pointer, slice, or
+// function---but not "untyped nil".
 //
-// Consts also include the "zero" value of any type, of which the nil values
-// of various pointer-like types are a special case; these are represented
-// by a nil Value field.
+// All source-level constant expressions are represented by a Const
+// of the same type and value.
+//
+// Value holds the value of the constant, independent of its Type(),
+// using go/constant representation, or nil for a typed nil value.
 //
 // Pos() returns token.NoPos.
 //
-// Example printed forms:
+// Example printed form:
 //
-//		42:int
-//		"hello":untyped string
-//		3+4i:MyComplex
-//		nil:*int
-//		nil:[]string
-//		[3]int{}:[3]int
-//		struct{x string}{}:struct{x string}
-//	    0:interface{int|int64}
-//	    nil:interface{bool|int} // no go/constant representation
+//	42:int
+//	"hello":untyped string
+//	3+4i:MyComplex
 type Const struct {
 	typ   types.Type
 	Value constant.Value
@@ -605,16 +603,8 @@ type UnOp struct {
 //   - between (possibly named) pointers to identical base types.
 //   - from a bidirectional channel to a read- or write-channel,
 //     optionally adding/removing a name.
-//   - between a type (t) and an instance of the type (tσ), i.e.
-//     Type() == σ(X.Type()) (or X.Type()== σ(Type())) where
-//     σ is the type substitution of Parent().TypeParams by
-//     Parent().TypeArgs.
 //
 // This operation cannot fail dynamically.
-//
-// Type changes may to be to or from a type parameter (or both). All
-// types in the type set of X.Type() have a value-preserving type
-// change to all types in the type set of Type().
 //
 // Pos() returns the ast.CallExpr.Lparen, if the instruction arose
 // from an explicit conversion in the source.
@@ -640,10 +630,6 @@ type ChangeType struct {
 //   - from (Unicode) integer to (UTF-8) string.
 //
 // A conversion may imply a type name change also.
-//
-// Conversions may to be to or from a type parameter. All types in
-// the type set of X.Type() can be converted to all types in the type
-// set of Type().
 //
 // This operation cannot fail dynamically.
 //
@@ -683,11 +669,6 @@ type ChangeInterface struct {
 //
 // Pos() returns the ast.CallExpr.Lparen, if the instruction arose
 // from an explicit conversion in the source.
-//
-// Conversion may to be to or from a type parameter. All types in
-// the type set of X.Type() must be a slice types that can be converted to
-// all types in the type set of Type() which must all be pointer to array
-// types.
 //
 // Example printed form:
 //
@@ -828,9 +809,7 @@ type Slice struct {
 //
 // Pos() returns the position of the ast.SelectorExpr.Sel for the
 // field, if explicit in the source. For implicit selections, returns
-// the position of the inducing explicit selection. If produced for a
-// struct literal S{f: e}, it returns the position of the colon; for
-// S{e} it returns the start of expression e.
+// the position of the inducing explicit selection.
 //
 // Example printed form:
 //
@@ -838,7 +817,7 @@ type Slice struct {
 type FieldAddr struct {
 	register
 	X     Value // *struct
-	Field int   // field is typeparams.CoreType(X.Type().Underlying().(*types.Pointer).Elem()).(*types.Struct).Field(Field)
+	Field int   // field is X.Type().Underlying().(*types.Pointer).Elem().Underlying().(*types.Struct).Field(Field)
 }
 
 // The Field instruction yields the Field of struct X.
@@ -857,14 +836,14 @@ type FieldAddr struct {
 type Field struct {
 	register
 	X     Value // struct
-	Field int   // index into typeparams.CoreType(X.Type()).(*types.Struct).Fields
+	Field int   // index into X.Type().(*types.Struct).Fields
 }
 
 // The IndexAddr instruction yields the address of the element at
 // index Index of collection X.  Index is an integer expression.
 //
-// The elements of maps and strings are not addressable; use Lookup (map),
-// Index (string), or MapUpdate instead.
+// The elements of maps and strings are not addressable; use Lookup or
+// MapUpdate instead.
 //
 // Dynamically, this instruction panics if X evaluates to a nil *array
 // pointer.
@@ -879,13 +858,11 @@ type Field struct {
 //	t2 = &t0[t1]
 type IndexAddr struct {
 	register
-	X     Value // *array, slice or type parameter with types array, *array, or slice.
+	X     Value // slice or *array,
 	Index Value // numeric index
 }
 
-// The Index instruction yields element Index of collection X, an array,
-// string or type parameter containing an array, a string, a pointer to an,
-// array or a slice.
+// The Index instruction yields element Index of array X.
 //
 // Pos() returns the ast.IndexExpr.Lbrack for the index operation, if
 // explicit in the source.
@@ -895,12 +872,13 @@ type IndexAddr struct {
 //	t2 = t0[t1]
 type Index struct {
 	register
-	X     Value // array, string or type parameter with types array, *array, slice, or string.
+	X     Value // array
 	Index Value // integer index
 }
 
-// The Lookup instruction yields element Index of collection map X.
-// Index is the appropriate key type.
+// The Lookup instruction yields element Index of collection X, a map
+// or string.  Index is an integer expression if X is a string or the
+// appropriate key type if X is a map.
 //
 // If CommaOk, the result is a 2-tuple of the value above and a
 // boolean indicating the result of a map membership test for the key.
@@ -914,8 +892,8 @@ type Index struct {
 //	t5 = t3[t4],ok
 type Lookup struct {
 	register
-	X       Value // map
-	Index   Value // key-typed index
+	X       Value // string or map
+	Index   Value // numeric or key-typed index
 	CommaOk bool  // return a value,ok pair
 }
 
@@ -1359,10 +1337,9 @@ type anInstruction struct {
 // 2. "invoke" mode: when Method is non-nil (IsInvoke), a CallCommon
 // represents a dynamically dispatched call to an interface method.
 // In this mode, Value is the interface value and Method is the
-// interface's abstract method. The interface value may be a type
-// parameter. Note: an abstract method may be shared by multiple
-// interfaces due to embedding; Value.Type() provides the specific
-// interface used for this call.
+// interface's abstract method.  Note: an abstract method may be
+// shared by multiple interfaces due to embedding; Value.Type()
+// provides the specific interface used for this call.
 //
 // Value is implicitly supplied to the concrete method implementation
 // as the receiver parameter; in other words, Args[0] holds not the
@@ -1401,7 +1378,7 @@ func (c *CallCommon) Signature() *types.Signature {
 	if c.Method != nil {
 		return c.Method.Type().(*types.Signature)
 	}
-	return typeparams.CoreType(c.Value.Type()).(*types.Signature)
+	return c.Value.Type().Underlying().(*types.Signature)
 }
 
 // StaticCallee returns the callee if this is a trivially static
@@ -1490,29 +1467,6 @@ func (v *Function) Referrers() *[]Instruction {
 		return &v.referrers
 	}
 	return nil
-}
-
-// TypeParams are the function's type parameters if generic or the
-// type parameters that were instantiated if fn is an instantiation.
-//
-// TODO(taking): declare result type as *types.TypeParamList
-// after we drop support for go1.17.
-func (fn *Function) TypeParams() *typeparams.TypeParamList {
-	return fn.typeparams
-}
-
-// TypeArgs are the types that TypeParams() were instantiated by to create fn
-// from fn.Origin().
-func (fn *Function) TypeArgs() []types.Type { return fn.typeargs }
-
-// Origin is the function fn is an instantiation of. Returns nil if fn is not
-// an instantiation.
-func (fn *Function) Origin() *Function {
-	if fn.parent != nil && len(fn.typeargs) > 0 {
-		// Nested functions are BUILT at a different time than there instances.
-		return fn.parent.Origin().AnonFuncs[fn.anonIdx]
-	}
-	return fn.topLevelOrigin
 }
 
 func (v *Parameter) Type() types.Type          { return v.typ }

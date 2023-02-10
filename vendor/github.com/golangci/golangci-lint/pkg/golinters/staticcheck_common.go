@@ -12,7 +12,7 @@ import (
 	"github.com/golangci/golangci-lint/pkg/logutils"
 )
 
-var debugf = logutils.Debug(logutils.DebugKeyMegacheck)
+var debugf = logutils.Debug("megacheck")
 
 func getGoVersion(settings *config.StaticCheckSettings) string {
 	var goVersion string

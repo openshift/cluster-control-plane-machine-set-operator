@@ -116,7 +116,7 @@ func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, fail
 // createMachineMapping inspects the state of the Machines on the cluster, selected by the ControlPlaneMachineSet, and
 // creates a mapping of their indexes (if available) to their failure domain to allow the mapping to be customised
 // to the state of the cluster.
-func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (map[int32]failuredomain.FailureDomain, sets.Set[int32], error) {
+func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (map[int32]failuredomain.FailureDomain, sets.Int32, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not convert label selector to selector: %w", err)
@@ -193,8 +193,8 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *mach
 
 // listDeletingIndexes creates a list of indexes for machines which are being deleted.
 // Indexes in the list only have machines in them that are being deleted.
-func listDeletingIndexes(machines []machinev1beta1.Machine) sets.Set[int32] {
-	indexes := sets.New[int32]()
+func listDeletingIndexes(machines []machinev1beta1.Machine) sets.Int32 {
+	indexes := sets.NewInt32()
 
 	// Add all machines that are being deleted to the set.
 	for _, machine := range machines {
@@ -232,7 +232,7 @@ func listDeletingIndexes(machines []machinev1beta1.Machine) sets.Set[int32] {
 // When processing the indexes, everything must be sorted to ensure the output is stable (note iterating over a map
 // is randomised by golang).
 // The base mapping should always be at least as long as the machine mapping for this to work.
-func reconcileMappings(logger logr.Logger, base, machines map[int32]failuredomain.FailureDomain, deletingIndexes sets.Set[int32]) map[int32]failuredomain.FailureDomain {
+func reconcileMappings(logger logr.Logger, base, machines map[int32]failuredomain.FailureDomain, deletingIndexes sets.Int32) map[int32]failuredomain.FailureDomain {
 	if len(base) < len(machines) {
 		// This is a programming error since user input doesn't affect this.
 		panic("base must have at least as many indexes as machines")
@@ -271,8 +271,8 @@ func reconcileMappings(logger logr.Logger, base, machines map[int32]failuredomai
 
 // createUnmatchedIndexes creates a set of indexes that haven't been matched to a machine
 // from the list of candidates.
-func createUnmatchedIndexes(candidates map[int32]failuredomain.FailureDomain) sets.Set[int32] {
-	out := sets.New[int32]()
+func createUnmatchedIndexes(candidates map[int32]failuredomain.FailureDomain) sets.Int32 {
+	out := sets.NewInt32()
 
 	for idx := range candidates {
 		out.Insert(idx)
@@ -285,7 +285,7 @@ func createUnmatchedIndexes(candidates map[int32]failuredomain.FailureDomain) se
 // If the candidate index differs from the output index, swap these and then use the candidate.
 // This matches and cements this index to a particular failure domain.
 // Any unmatched indexes will be handled separately later.
-func matchMachinesToCandidates(out, candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes, deletingIndexes sets.Set[int32]) {
+func matchMachinesToCandidates(out, candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes, deletingIndexes sets.Int32) {
 	for _, idy := range sortedIndexes(out) {
 		// Ignore any indexes that only contain deleting machines.
 		// This allows other indexes to take precedence for keeping their failure domain stable.
@@ -315,7 +315,7 @@ func matchMachinesToCandidates(out, candidates map[int32]failuredomain.FailureDo
 // - The failure domain from the machine mapping was removed from the base.
 // - A new failure domain was added to the base mapping.
 // - The machine mapping is balanced in a different weighting to the machine mapping.
-func handleUnmatchedIndex(logger logr.Logger, idx int32, out, base, candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes sets.Set[int32], maxPerFailureDomain int) {
+func handleUnmatchedIndex(logger logr.Logger, idx int32, out, base, candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes sets.Int32, maxPerFailureDomain int) {
 	switch {
 	case !indexExists(out, idx):
 		// There is no machine in this index presently,
@@ -385,7 +385,7 @@ func reconcileIndexes(reconciled, preferred map[int32]failuredomain.FailureDomai
 
 // useCandidate is used when we have matched a candidate with a machine mapping. It removes it from the list of
 // candidates and "matches" the index.
-func useCandidate(candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes sets.Set[int32], idx int32) {
+func useCandidate(candidates map[int32]failuredomain.FailureDomain, unmatchedIndexes sets.Int32, idx int32) {
 	unmatchedIndexes.Delete(idx)
 	delete(candidates, idx)
 }

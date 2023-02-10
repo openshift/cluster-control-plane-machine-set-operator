@@ -11,12 +11,10 @@ import (
 func NewInterfaceBloat(settings *config.InterfaceBloatSettings) *goanalysis.Linter {
 	a := analyzer.New()
 
-	var cfg map[string]map[string]interface{}
+	cfgMap := make(map[string]map[string]interface{})
 	if settings != nil {
-		cfg = map[string]map[string]interface{}{
-			a.Name: {
-				analyzer.InterfaceMaxMethodsFlag: settings.Max,
-			},
+		cfgMap[a.Name] = map[string]interface{}{
+			analyzer.InterfaceMaxMethodsFlag: settings.Max,
 		}
 	}
 
@@ -24,6 +22,6 @@ func NewInterfaceBloat(settings *config.InterfaceBloatSettings) *goanalysis.Lint
 		a.Name,
 		a.Doc,
 		[]*analysis.Analyzer{a},
-		cfg,
+		nil,
 	).WithLoadMode(goanalysis.LoadModeSyntax)
 }

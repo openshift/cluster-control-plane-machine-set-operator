@@ -7,7 +7,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/gobwas/glob"
 	"golang.org/x/tools/go/loader"
@@ -62,9 +61,6 @@ type Depguard struct {
 	globIgnoreFileRules   []negatableGlob
 
 	prefixRoot []string
-
-	isInitialized      bool
-	isInitializedMutex sync.Mutex
 }
 
 // Run checks for dependencies given the program and validates them against
@@ -106,13 +102,6 @@ func (dg *Depguard) Run(config *loader.Config, prog *loader.Program) ([]*Issue, 
 }
 
 func (dg *Depguard) initialize(config *loader.Config, prog *loader.Program) error {
-	dg.isInitializedMutex.Lock()
-	defer dg.isInitializedMutex.Unlock()
-
-	if dg.isInitialized {
-		return nil
-	}
-
 	// parse ordinary guarded packages
 	for _, pkg := range dg.Packages {
 		if strings.ContainsAny(pkg, "!?*[]{}") {
@@ -179,7 +168,6 @@ func (dg *Depguard) initialize(config *loader.Config, prog *loader.Program) erro
 		}
 	}
 
-	dg.isInitialized = true
 	return nil
 }
 

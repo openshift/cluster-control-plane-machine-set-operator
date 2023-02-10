@@ -34,7 +34,7 @@ func NewGoimports(settings *config.GoImportsSettings) *goanalysis.Linter {
 		imports.LocalPrefix = settings.LocalPrefixes
 
 		analyzer.Run = func(pass *analysis.Pass) (interface{}, error) {
-			issues, err := runGoImports(lintCtx, pass)
+			issues, err := runGoiImports(lintCtx, pass)
 			if err != nil {
 				return nil, err
 			}
@@ -54,7 +54,7 @@ func NewGoimports(settings *config.GoImportsSettings) *goanalysis.Linter {
 	}).WithLoadMode(goanalysis.LoadModeSyntax)
 }
 
-func runGoImports(lintCtx *linter.Context, pass *analysis.Pass) ([]goanalysis.Issue, error) {
+func runGoiImports(lintCtx *linter.Context, pass *analysis.Pass) ([]goanalysis.Issue, error) {
 	fileNames := getFileNames(pass)
 
 	var issues []goanalysis.Issue

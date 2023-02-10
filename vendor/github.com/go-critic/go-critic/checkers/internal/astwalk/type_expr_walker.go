@@ -97,10 +97,7 @@ func (w *typeExprWalker) walk(x ast.Node) bool {
 
 func (w *typeExprWalker) inspectInner(x ast.Expr) bool {
 	parens, ok := x.(*ast.ParenExpr)
-	shouldInspect := ok &&
-		typep.IsTypeExpr(w.info, parens.X) &&
-		(astp.IsStarExpr(parens.X) || astp.IsFuncType(parens.X))
-	if shouldInspect {
+	if ok && typep.IsTypeExpr(w.info, parens.X) && astp.IsStarExpr(parens.X) {
 		ast.Inspect(parens.X, w.walk)
 		return false
 	}

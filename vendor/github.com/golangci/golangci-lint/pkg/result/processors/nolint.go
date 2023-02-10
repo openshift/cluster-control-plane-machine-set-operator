@@ -16,7 +16,7 @@ import (
 	"github.com/golangci/golangci-lint/pkg/result"
 )
 
-var nolintDebugf = logutils.Debug(logutils.DebugKeyNolint)
+var nolintDebugf = logutils.Debug("nolint")
 var nolintRe = regexp.MustCompile(`^nolint( |:|$)`)
 
 type ignoredRange struct {

@@ -44,8 +44,6 @@ import (
 	"go/types"
 	"math/big"
 	"os"
-
-	"golang.org/x/tools/internal/typeparams"
 )
 
 // If true, show diagnostic information at each step of lifting.
@@ -383,9 +381,10 @@ type newPhiMap map[*BasicBlock][]newPhi
 //
 // fresh is a source of fresh ids for phi nodes.
 func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool {
-	// TODO(taking): zero constants of aggregated types can now be lifted.
+	// Don't lift aggregates into registers, because we don't have
+	// a way to express their zero-constants.
 	switch deref(alloc.Type()).Underlying().(type) {
-	case *types.Array, *types.Struct, *typeparams.TypeParam:
+	case *types.Array, *types.Struct:
 		return false
 	}
 

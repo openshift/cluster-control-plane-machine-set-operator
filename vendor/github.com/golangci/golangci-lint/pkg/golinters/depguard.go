@@ -10,7 +10,6 @@ import (
 	"golang.org/x/tools/go/loader" //nolint:staticcheck // require changes in github.com/OpenPeeDeeP/depguard
 
 	"github.com/golangci/golangci-lint/pkg/config"
-	"github.com/golangci/golangci-lint/pkg/fsutils"
 	"github.com/golangci/golangci-lint/pkg/golinters/goanalysis"
 	"github.com/golangci/golangci-lint/pkg/lint/linter"
 	"github.com/golangci/golangci-lint/pkg/result"
@@ -111,15 +110,10 @@ type guardian struct {
 }
 
 func newGuardian(settings *config.DepGuardSettings) (*guardian, error) {
-	var ignoreFileRules []string
-	for _, rule := range settings.IgnoreFileRules {
-		ignoreFileRules = append(ignoreFileRules, fsutils.NormalizePathInRegex(rule))
-	}
-
 	dg := &depguard.Depguard{
 		Packages:        settings.Packages,
 		IncludeGoRoot:   settings.IncludeGoRoot,
-		IgnoreFileRules: ignoreFileRules,
+		IgnoreFileRules: settings.IgnoreFileRules,
 	}
 
 	var err error

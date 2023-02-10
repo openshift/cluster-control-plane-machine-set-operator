@@ -2,8 +2,6 @@ package nodetag
 
 import (
 	"go/ast"
-
-	"golang.org/x/exp/typeparams"
 )
 
 type Value int
@@ -39,7 +37,6 @@ const (
 	ImportSpec
 	IncDecStmt
 	IndexExpr
-	IndexListExpr
 	InterfaceType
 	KeyValueExpr
 	LabeledStmt
@@ -129,8 +126,6 @@ func FromNode(n ast.Node) Value {
 		return IncDecStmt
 	case *ast.IndexExpr:
 		return IndexExpr
-	case *typeparams.IndexListExpr:
-		return IndexListExpr
 	case *ast.InterfaceType:
 		return InterfaceType
 	case *ast.KeyValueExpr:
@@ -241,8 +236,6 @@ func FromString(s string) Value {
 		return IncDecStmt
 	case "IndexExpr":
 		return IndexExpr
-	case "IndexListExpr":
-		return IndexListExpr
 	case "InterfaceType":
 		return InterfaceType
 	case "KeyValueExpr":

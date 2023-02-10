@@ -36,10 +36,11 @@ func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 	// The list "Items", all (ConsistOf) have a field "Status.Conditions",
 	// that contain elements that are both "Type" something and "Status" something.
 	clusterOperators := &configv1.ClusterOperatorList{}
+	gomegaArgs = append([]interface{}{komega.ObjectList(clusterOperators)}, gomegaArgs...)
 
 	By("Waiting for the cluster operators to stabilise")
 
-	Eventually(komega.ObjectList(clusterOperators), gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
+	Eventually(gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
 		SatisfyAll(
 			ContainElement(And(HaveField("Type", Equal(configv1.OperatorAvailable)), HaveField("Status", Equal(configv1.ConditionTrue)))),
 			ContainElement(And(HaveField("Type", Equal(configv1.OperatorProgressing)), HaveField("Status", Equal(configv1.ConditionFalse)))),

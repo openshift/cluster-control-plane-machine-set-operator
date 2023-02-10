@@ -19,26 +19,30 @@ func NewWSL(settings *config.WSLSettings) *goanalysis.Linter {
 	var mu sync.Mutex
 	var resIssues []goanalysis.Issue
 
-	conf := wsl.DefaultConfig()
+	conf := &wsl.Configuration{
+		AllowCuddleWithCalls: []string{"Lock", "RLock"},
+		AllowCuddleWithRHS:   []string{"Unlock", "RUnlock"},
+		ErrorVariableNames:   []string{"err"},
+	}
 
 	if settings != nil {
 		conf.StrictAppend = settings.StrictAppend
 		conf.AllowAssignAndCallCuddle = settings.AllowAssignAndCallCuddle
 		conf.AllowAssignAndAnythingCuddle = settings.AllowAssignAndAnythingCuddle
 		conf.AllowMultiLineAssignCuddle = settings.AllowMultiLineAssignCuddle
-		conf.ForceCaseTrailingWhitespaceLimit = settings.ForceCaseTrailingWhitespaceLimit
+		conf.AllowCuddleDeclaration = settings.AllowCuddleDeclaration
 		conf.AllowTrailingComment = settings.AllowTrailingComment
 		conf.AllowSeparatedLeadingComment = settings.AllowSeparatedLeadingComment
-		conf.AllowCuddleDeclaration = settings.AllowCuddleDeclaration
-		conf.AllowCuddleWithCalls = settings.AllowCuddleWithCalls
-		conf.AllowCuddleWithRHS = settings.AllowCuddleWithRHS
+		conf.ForceCuddleErrCheckAndAssign = settings.ForceCuddleErrCheckAndAssign
+		conf.ForceCaseTrailingWhitespaceLimit = settings.ForceCaseTrailingWhitespaceLimit
+		conf.ForceExclusiveShortDeclarations = settings.ForceExclusiveShortDeclarations
 	}
 
 	analyzer := &analysis.Analyzer{
 		Name: goanalysis.TheOnlyAnalyzerName,
 		Doc:  goanalysis.TheOnlyanalyzerDoc,
 		Run: func(pass *analysis.Pass) (interface{}, error) {
-			issues := runWSL(pass, &conf)
+			issues := runWSL(pass, conf)
 
 			if len(issues) == 0 {
 				return nil, nil
