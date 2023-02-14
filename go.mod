@@ -2,17 +2,12 @@ module github.com/openshift/cluster-control-plane-machine-set-operator
 
 go 1.18
 
-// github.com/onsi/ginkgo/v2 v2.5.0+ has a race condition bug
-// see: https://github.com/onsi/ginkgo/issues/1134
-// Pinning this to a prior version until that's resolved
-replace github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0
-
 require (
 	github.com/go-logr/logr v1.2.3
 	github.com/go-test/deep v1.1.0
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.50.1
-	github.com/onsi/ginkgo/v2 v2.7.0
+	github.com/onsi/ginkgo/v2 v2.8.1
 	github.com/onsi/gomega v1.26.0
 	github.com/openshift/api v0.0.0-20230208093943-11903e0431cd
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
@@ -206,15 +201,15 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20220827204233-334a2380cb91 // indirect
-	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/term v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.4.0 // indirect
+	golang.org/x/tools v0.6.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
