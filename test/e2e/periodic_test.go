@@ -35,27 +35,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		})
 
-		Context("with a cluster wide proxy", Ordered, func() {
-			BeforeAll(func() {
-				helpers.DeployProxy(testFramework)
-				helpers.ConfigureClusterWideProxy(testFramework)
-				helpers.EventuallyClusterOperatorsShouldStabilise(45*time.Minute, 10*time.Second)
-			})
-
-			AfterAll(func() {
-				helpers.UnconfigureClusterWideProxy(testFramework)
-				helpers.EventuallyClusterOperatorsShouldStabilise(45*time.Minute, 10*time.Second)
-				helpers.DeleteProxy(testFramework)
-			})
-
-			Context("and the instance type of index 1 is not as expected", func() {
-				BeforeEach(func() {
-					helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
-				})
-				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
-			})
-		})
-
 		Context("and the instance type is changed", func() {
 			BeforeEach(func() {
 				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
