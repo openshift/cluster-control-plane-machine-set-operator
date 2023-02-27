@@ -150,6 +150,8 @@ var _ = Describe("With a running controller", func() {
 		)).
 		WithProviderSpecBuilder(machinev1beta1resourcebuilder.AWSProviderSpec())
 
+	masterNodeBuilder := corev1resourcebuilder.Node().AsMaster()
+
 	// Running phase for setting machines to running.
 	running := "Running"
 
@@ -230,19 +232,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -266,20 +273,24 @@ var _ = Describe("With a running controller", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+					machine := machines[i].WithName(machineName).Build()
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -304,19 +315,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					4: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					0: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -341,19 +357,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-5").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					3: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					4: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					5: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -378,19 +399,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -499,19 +525,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -536,19 +567,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -573,19 +609,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					4: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					0: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -606,27 +647,32 @@ var _ = Describe("With a running controller", func() {
 		})
 
 		Context("with machines indexed 3, 4, 5", func() {
-			var toDeleteMachine *machinev1beta1.Machine
+			var toDeleteMachineBuilder machinev1beta1resourcebuilder.MachineBuilder
 
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-3").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+				toDeleteMachineBuilder = machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder)
 
-				toDeleteMachine = machineBuilder.WithName("master-4").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build()
-				Expect(k8sClient.Create(ctx, toDeleteMachine)).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-5").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					3: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					4: toDeleteMachineBuilder,
+					5: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -647,6 +693,7 @@ var _ = Describe("With a running controller", func() {
 
 			Context("and a machine is deleted", func() {
 				BeforeEach(func() {
+					toDeleteMachine := toDeleteMachineBuilder.Build()
 					Eventually(komega.Update(toDeleteMachine, func() {
 						toDeleteMachine.SetFinalizers([]string{"machine.openshift.io/machine"})
 					})).Should(Succeed())
@@ -670,27 +717,30 @@ var _ = Describe("With a running controller", func() {
 		})
 
 		Context("with a machine needing an update", func() {
-			var differentMachine *machinev1beta1.Machine
+			var differentMachineBuilder machinev1beta1resourcebuilder.MachineBuilder
 
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
-				differentMachine = machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build()
-				Expect(k8sClient.Create(ctx, differentMachine)).To(Succeed())
+				differentMachineBuilder = machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).WithName("master-0")
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: differentMachineBuilder,
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+					machine := machines[i].Build()
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -714,6 +764,8 @@ var _ = Describe("With a running controller", func() {
 
 			Context("and the machine is deleted", func() {
 				BeforeEach(func() {
+					differentMachine := differentMachineBuilder.Build()
+
 					Eventually(komega.Update(differentMachine, func() {
 						differentMachine.SetFinalizers([]string{"machine.openshift.io/machine"})
 					})).Should(Succeed())
@@ -822,19 +874,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -858,19 +915,24 @@ var _ = Describe("With a running controller", func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
 				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
 
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-				Expect(k8sClient.Create(ctx, machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder.WithInstanceType("different")),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+				}
 
-				By("Ensuring Machines are Running")
-				machines := &machinev1beta1.MachineList{}
-				Expect(k8sClient.List(ctx, machines)).To(Succeed())
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
 
-				for _, machine := range machines.Items {
-					m := machine.DeepCopy()
+					machine := machines[i].WithName(machineName).Build()
 
-					Eventually(komega.UpdateStatus(m, func() {
-						m.Status.Phase = &running
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
 					})).Should(Succeed())
 				}
 			})
@@ -996,9 +1058,25 @@ var _ = Describe("With a running controller", func() {
 			By("Creating Machines owned by the ControlPlaneMachineSet")
 			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1bProviderSpecBuilder).Build())).To(Succeed())
-			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1cProviderSpecBuilder).Build())).To(Succeed())
+			machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+				0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+				1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+				2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
+			}
+
+			for i := range machines {
+				nodeName := fmt.Sprintf("node-%d", i)
+				machineName := fmt.Sprintf("master-%d", i)
+
+				machine := machines[i].WithName(machineName).Build()
+
+				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+				Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+				Eventually(komega.UpdateStatus(machine, func() {
+					machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
+				})).Should(Succeed())
+			}
 
 			By("Registering the integration machine manager")
 
@@ -1077,9 +1155,25 @@ var _ = Describe("With a running controller", func() {
 			By("Creating Machines in a single failure domain")
 			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-0").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-1").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
-			Expect(k8sClient.Create(ctx, machineBuilder.WithName("master-2").WithProviderSpecBuilder(usEast1aProviderSpecBuilder).Build())).To(Succeed())
+			machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+				0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+				1: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+				2: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+			}
+
+			for i := range machines {
+				nodeName := fmt.Sprintf("node-%d", i)
+				machineName := fmt.Sprintf("master-%d", i)
+
+				machine := machines[i].WithName(machineName).Build()
+
+				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+				Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+				Eventually(komega.UpdateStatus(machine, func() {
+					machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
+				})).Should(Succeed())
+			}
 
 			By("Registering the integration machine manager")
 
