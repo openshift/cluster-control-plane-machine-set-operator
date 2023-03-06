@@ -42,7 +42,7 @@ The control plane machine set can balance machines across multiple failure domai
 fault tolerance within the control plane when issues arise within the infrastructure provider.
 
 Failure domains are configured within the machine template of the control plane machine set and are currently supported
-on Amazon Web Services (AWS) and Microsoft Azure only. Other platforms will be added over time.
+by all the [supported platforms](./README.md#supported-platforms) unless otherwise specified in the support matrix. Other platforms will be added over time.
 
 The control plane machine set will balance the machines across the failure domains provided, weighting towards the
 alphabetically first failure domains when a failure domain must be re-used.
@@ -91,8 +91,9 @@ The matrix shows in detail the support for each specific combination.
 | Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |
 |------------------------------|:---------------|:--------------------|:--------------------|
 | AWS                          |  Not Supported | Full                | Full                |
-| Azure                        |  Not Supported | Manual              | Manual              |
-| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Signle Zone)|
+| Azure                        |  Not Supported | Manual              | Full                |
+| GCP                          |  Not Supported | Not Supported       | Full                |
+| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)|
 | Other Platforms              |  Not Supported | Not Supported       | Not Supported       |
 
 > Note: Google Cloud Platform and OpenStack are planned for inclusion from OpenShift version 4.13 onwards.

@@ -211,3 +211,30 @@ failureDomains:
 
 > Note: The `internalLoadBalancer` field may not be set on the Azure providerSpec. This field is required for control
 plane machines and you should populate this on both the Machine and the ControlPlaneMachineSet resource specs.
+
+#### Configuring a control plane machine set on Google Cloud Platform (GCP)
+
+Currently the only field supported by the GCP failure domain is the `zone`.
+Gather the existing control plane machines and note the value of the `zone` of each.
+Aside from the `zone` field, the remaining in spec the machines should be identical.
+
+Copy the value from one of the machines into the `providerSpec.value` (6) on the example above.
+Remove the `zone` field from the `providerSpec.value` once you have done that.
+
+For each `zone` you have in the cluster (normally 3), configure a failure domain like below:
+```yaml
+- zone: "<zone>"
+```
+
+With these zones, the complete `failureDomains` (3 and 4) on the example above should look something like below:
+```yaml
+failureDomains:
+  platform: GCP
+  gcp:
+  - zone: us-central1-a
+  - zone: us-central1-b
+  - zone: us-central1-c
+```
+
+> Note: The `targetPools` field may not be set on the GCP providerSpec. This field is required for control
+plane machines and you should populate this on both the Machine and the ControlPlaneMachineSet resource specs.
