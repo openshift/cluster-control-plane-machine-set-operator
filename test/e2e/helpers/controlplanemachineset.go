@@ -328,3 +328,27 @@ func GetControlPlaneMachineSetUID(testFramework framework.Framework) types.UID {
 
 	return cpms.ObjectMeta.UID
 }
+
+// MakeControlPlaneMachineSetProviderConfigInvalid makes the current ControlPlaneMachineSet's providerSpec invalid
+// by removing a defaulted value.
+func MakeControlPlaneMachineSetProviderConfigInvalid(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
+
+	updatedProviderSpec := originalProviderSpec.DeepCopy()
+	rawExtension, err := testFramework.RemoveDefaultedValueFromCPMS(updatedProviderSpec.Value)
+	Expect(err).NotTo(HaveOccurred())
+
+	updatedProviderSpec.Value = rawExtension
+
+	By("Removing the defaulted field from the control plane machine set")
+
+	Eventually(komega.Update(cpms, func() {
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
+	}), gomegaArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+
+	return originalProviderSpec
+}

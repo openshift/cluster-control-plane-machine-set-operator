@@ -38,6 +38,19 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		}, OncePerOrdered)
 
+		Context("and the defaulted value delete from the ControlPlaneMachineSet", func() {
+			BeforeEach(func() {
+				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
+				helpers.MakeControlPlaneMachineSetProviderConfigInvalid(testFramework)
+			})
+
+			AfterEach(func() {
+				helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+			})
+
+			helpers.ItShouldNotCauseARollout(testFramework)
+		})
+
 		Context("and the instance type of index 1 is not as expected", func() {
 			BeforeEach(func() {
 				helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
