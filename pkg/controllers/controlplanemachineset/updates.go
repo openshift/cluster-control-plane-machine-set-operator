@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -151,6 +152,8 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineUpdates(ctx context.C
 //
 // In certain scenarios, there may be indexes with missing Machines. In these circumstances, the update should attempt
 // to create a new Machine to fulfil the requirement of that index.
+//
+//nolint:cyclop
 func (r *ControlPlaneMachineSetReconciler) reconcileMachineRollingUpdate(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, indexedMachineInfos map[int32][]machineproviders.MachineInfo) (ctrl.Result, error) {
 	logger = logger.WithValues("updateStrategy", cpms.Spec.Strategy.Type)
 
@@ -171,7 +174,7 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineRollingUpdate(ctx con
 	// as deletions can continue even if the maxSurge has been already reached.
 	surgeCount := deviseExistingSurge(cpms, sortedIndexedMs)
 
-	var updated bool
+	var updated, shouldRequeue bool
 
 	for _, indexToMachines := range sortedIndexedMs {
 		idx := indexToMachines.index
@@ -183,7 +186,14 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineRollingUpdate(ctx con
 			updated = true
 		}
 
-		if done := r.waitForPendingMachines(logger, machines); done {
+		if r.waitForReadyMachine(logger, machines) || r.waitForReplacementMachine(logger, machines) {
+			// Relying on machine events is not sufficient in this case, as the machine could already be in Running phase
+			// while the backing node might still be in NotReady condition. Therefore in order to catch
+			// node's NotReady -> Ready changes (a necessary for CPMS replicas to be Ready), we add a manual requeue.
+			updated, shouldRequeue = true, true
+		}
+
+		if done := r.waitForRemoveMachine(logger, machines); done {
 			updated = true
 		}
 
@@ -198,6 +208,10 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineRollingUpdate(ctx con
 		logger.V(4).Info(noUpdatesRequired)
 	}
 
+	if shouldRequeue {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -210,6 +224,8 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineRollingUpdate(ctx con
 //
 // In certain scenarios, there may be indexes with missing Machines. In these circumstances, the update should attempt
 // to create a new Machine to fulfil the requirement of that index.
+//
+//nolint:cyclop
 func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, machineProvider machineproviders.MachineProvider, indexedMachineInfos map[int32][]machineproviders.MachineInfo) (ctrl.Result, error) {
 	logger = logger.WithValues("updateStrategy", cpms.Spec.Strategy.Type)
 
@@ -219,7 +235,7 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx co
 	// are executed prioritizing the lower indexes first.
 	sortedIndexedMs := sortMachineInfosByIndex(indexedMachineInfos)
 
-	updated := false
+	var updated, shouldRequeue bool
 
 	for _, indexToMachines := range sortedIndexedMs {
 		idx := indexToMachines.index
@@ -233,7 +249,14 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx co
 			continue
 		}
 
-		if done := r.waitForPendingMachines(logger, machines); done {
+		if r.waitForReadyMachine(logger, machines) || r.waitForReplacementMachine(logger, machines) {
+			// Relying on machine events is not sufficient in this case, as the machine could already be in Running phase
+			// while the backing node might still be in NotReady condition. Therefore in order to catch
+			// node's NotReady -> Ready changes (a necessary for CPMS replicas to be Ready), we add a manual requeue.
+			updated, shouldRequeue = true, true
+		}
+
+		if done := r.waitForRemoveMachine(logger, machines); done {
 			updated = true
 		}
 
@@ -248,20 +271,18 @@ func (r *ControlPlaneMachineSetReconciler) reconcileMachineOnDeleteUpdate(ctx co
 		logger.V(4).Info(noUpdatesRequired)
 	}
 
+	if shouldRequeue {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
 	return ctrl.Result{}, nil
 }
 
-// check if there are machines in a pending or deleting state and return true or false.
-// this function will take an array of MachineInfos and determine if any of those machines
-// are in a pending or deleting state based on the presence, and state, of other machines
-// in the same array. this function does not block, but gives a signal to the caller about
-// whether there are machines that are still transitioning towards a final state.
-func (r *ControlPlaneMachineSetReconciler) waitForPendingMachines(logger logr.Logger, machines []machineproviders.MachineInfo) bool {
+// waitForReadyMachine checks machines and finds out whether to wait or not for any of them to become ready.
+func (r *ControlPlaneMachineSetReconciler) waitForReadyMachine(logger logr.Logger, machines []machineproviders.MachineInfo) bool {
 	machinesPending := pendingMachines(machines)
-	machinesNeedingReplacement := needReplacementMachines(machines)
 	machinesReady := readyMachines(machines)
 	machinesDeleting := deletingMachines(machines)
-	machinesUpdatedNonDeleted := updatedNonDeletedMachines(machines)
 
 	// Find out if and what Machines in this index need an update.
 	if isEmpty(machinesReady) && hasAny(machinesPending) && isEmpty(machinesDeleting) {
@@ -274,6 +295,14 @@ func (r *ControlPlaneMachineSetReconciler) waitForPendingMachines(logger logr.Lo
 
 		return true
 	}
+
+	return false
+}
+
+// waitForReplacementMachine checks machines and finds out whether to wait or not for any replacement to become ready.
+func (r *ControlPlaneMachineSetReconciler) waitForReplacementMachine(logger logr.Logger, machines []machineproviders.MachineInfo) bool {
+	machinesPending := pendingMachines(machines)
+	machinesNeedingReplacement := needReplacementMachines(machines)
 
 	if hasAny(machinesNeedingReplacement) && hasAny(machinesPending) {
 		// A Pending Machine Replacement already exists.
@@ -288,6 +317,14 @@ func (r *ControlPlaneMachineSetReconciler) waitForPendingMachines(logger logr.Lo
 
 		return true
 	}
+
+	return false
+}
+
+// waitForRemoveMachine checks machines and finds out whether to wait or not for any of them to be removed.
+func (r *ControlPlaneMachineSetReconciler) waitForRemoveMachine(logger logr.Logger, machines []machineproviders.MachineInfo) bool {
+	machinesDeleting := deletingMachines(machines)
+	machinesUpdatedNonDeleted := updatedNonDeletedMachines(machines)
 
 	if hasAny(machinesDeleting) && hasAny(machinesUpdatedNonDeleted) {
 		// A replacement Machine exists, but the original has not been completely deleted yet.
