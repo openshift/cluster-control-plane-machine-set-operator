@@ -236,6 +236,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with updates required in a single index, and the replacement machine is ready", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -411,6 +412,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with updates are required in multiple indexes, and the replacement machine is ready", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -546,6 +548,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with a missing index, and other indexes needing updates", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -624,6 +627,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with a missing index, and other indexes needing updates, and their replacement machines are ready", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1014,6 +1018,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with no updates required, but a machine has been deleted, and its replacement is ready", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1237,6 +1242,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with updates required in a single index, and replacement machine is ready", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1452,6 +1458,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with updates required in multiple indexes, and multiple machines have been deleted, and the replacement machines are pending", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1495,6 +1502,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with updates required in multiple indexes, and a single machine has been deleted, and the replacement machine is ready", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1575,6 +1583,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with updates required in multiple indexes, and multiple machines have been deleted, and all replacement machines are ready", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1668,6 +1677,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with a missing index, and other indexes need updating", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
@@ -1740,6 +1750,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 					}
 				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
 			}),
 			Entry("with no updates required, but a Machine has been deleted", onDeleteUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
