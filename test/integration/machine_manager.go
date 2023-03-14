@@ -25,9 +25,7 @@ import (
 
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -102,8 +100,6 @@ func (r *integrationMachineManager) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile handles the reconciliation loop for the machine manager.
 // It sets the finalizer and then progresses the Machine through the phases until it is running.
-//
-//nolint:cyclop
 func (r *integrationMachineManager) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := log.FromContext(ctx, "namespace", req.Namespace, "name", req.Name)
 
@@ -120,33 +116,26 @@ func (r *integrationMachineManager) Reconcile(ctx context.Context, req reconcile
 		return ctrl.Result{}, fmt.Errorf("unable to fetch machine: %w", err)
 	}
 
-	machinePhase := pointer.StringDeref(machine.Status.Phase, "")
-
 	if machine.DeletionTimestamp != nil {
-		if machinePhase != phaseDeleting {
+		if machine.Status.Phase != nil && *machine.Status.Phase != phaseDeleting {
 			return r.setPhase(ctx, logger, req, machine, phaseDeleting)
 		}
-	} else if len(machine.GetFinalizers()) == 0 {
+
+		return r.removeFinalizer(ctx, logger, req, machine)
+	}
+
+	// All machines should have a finalizer set first.
+	if len(machine.GetFinalizers()) == 0 {
 		return r.addFinalizer(ctx, logger, req, machine)
 	}
 
-	switch machinePhase {
+	switch pointer.StringDeref(machine.Status.Phase, "") {
 	case "":
 		return r.setPhase(ctx, logger, req, machine, phaseProvisioning)
 	case phaseProvisioning:
 		return r.setPhase(ctx, logger, req, machine, phaseProvisioned)
 	case phaseProvisioned:
 		return r.setPhase(ctx, logger, req, machine, phaseRunning)
-	case phaseRunning:
-		return r.ensureNodeforMachine(ctx, logger, machine)
-	case phaseDeleting:
-		linkedNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: machine.Status.NodeRef.Name}}
-		if err := r.Delete(ctx, &linkedNode); err != nil &&
-			!apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("unable to delete machine's node: %w", err)
-		}
-
-		return r.removeFinalizer(ctx, logger, req, machine)
 	}
 
 	return reconcile.Result{}, nil
@@ -207,47 +196,6 @@ func (r *integrationMachineManager) setPhase(ctx context.Context, logger logr.Lo
 
 	r.lastAction[req] = action{
 		timeStamp: time.Now(),
-	}
-
-	return reconcile.Result{}, nil
-}
-
-// ensureNodeforMachine creates a node and links it to a machine.
-func (r *integrationMachineManager) ensureNodeforMachine(ctx context.Context, logger logr.Logger, machine *machinev1beta1.Machine) (reconcile.Result, error) {
-	if machine.Status.NodeRef != nil {
-		return reconcile.Result{}, nil
-	}
-
-	logger.Info("Creating node for machine", "machine", machine.Name)
-
-	node := corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "node-",
-		},
-		Status: corev1.NodeStatus{
-			Conditions: []corev1.NodeCondition{
-				{
-					// The node must be Ready for the CPMS replica
-					// to be considered Ready.
-					Type:   corev1.NodeReady,
-					Status: corev1.ConditionTrue,
-				},
-			},
-		},
-	}
-
-	if err := r.Create(ctx, &node); err != nil {
-		return ctrl.Result{}, fmt.Errorf("unable to create node for machine: %w", err)
-	}
-
-	logger.Info("Linking node to machine", "node", node.Name, "machine", machine.Name)
-
-	machine.Status.NodeRef = &corev1.ObjectReference{
-		Name: node.Name,
-	}
-
-	if err := r.Status().Update(ctx, machine); err != nil {
-		return reconcile.Result{}, fmt.Errorf("could not update machine: %w", err)
 	}
 
 	return reconcile.Result{}, nil

@@ -462,8 +462,8 @@ github.com/openshift/api v0.0.0-20230208093943-11903e0431cd h1:h6PWIIAWe+RnQ7rVx
 github.com/openshift/api v0.0.0-20230208093943-11903e0431cd/go.mod h1:ctXNyWanKEjGj8sss1KjjHQ3ENKFm33FFnS5BKaIPh4=
 github.com/openshift/client-go v0.0.0-20230120202327-72f107311084 h1:66uaqNwA+qYyQDwsMWUfjjau8ezmg1dzCqub13KZOcE=
 github.com/openshift/client-go v0.0.0-20230120202327-72f107311084/go.mod h1:M3h9m001PWac3eAudGG3isUud6yBjr5XpzLYLLTlHKo=
-github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230228003353-120496b4efb1 h1:/DdtIDtOGzm7Xs4s6dz4Jox+9ahU58Gw469P32LPvpE=
-github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230228003353-120496b4efb1/go.mod h1:p8CKj6ENJj5euJ3Grs71A9wwzBs9EzC1BcVlHCIPJg8=
+github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230209105200-2ec5c87daab3 h1:YKm3Lur2R/ZXGUjUe3ySwVqeu1aqXpmj7Yh76heKBdk=
+github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230209105200-2ec5c87daab3/go.mod h1:p8CKj6ENJj5euJ3Grs71A9wwzBs9EzC1BcVlHCIPJg8=
 github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a h1:OzF7I7mAzO4SBo5eO5CWoCTgMDydN/Tf2/Rq8YbMpT0=
 github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a/go.mod h1:xO4nAf0qa56dgvEJWVD1WuwSJ8JWPU1TYLBQrlutWnE=
 github.com/otiai10/copy v1.2.0 h1:HvG945u96iNadPoG2/Ja2+AUJeW5YuFQMixq9yirC+k=
