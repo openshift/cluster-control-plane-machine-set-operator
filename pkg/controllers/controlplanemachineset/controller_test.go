@@ -1131,7 +1131,12 @@ var _ = Describe("With a running controller", func() {
 
 		Context("and a machine is deleted", func() {
 			index := 1
+			var testFramework framework.Framework
+
 			BeforeEach(func() {
+				// The CPMS is configured for AWS so use the AWS Platform Type.
+				testFramework = framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
+
 				machine := &machinev1beta1.Machine{}
 				machineName := fmt.Sprintf("master-%d", index)
 				machineKey := client.ObjectKey{Namespace: namespaceName, Name: machineName}
@@ -1143,7 +1148,7 @@ var _ = Describe("With a running controller", func() {
 			})
 
 			It("should create a replacement machine for the correct index", func() {
-				helpers.EventuallyIndexIsBeingReplaced(ctx, index)
+				helpers.EventuallyIndexIsBeingReplaced(ctx, testFramework, index)
 			})
 		})
 	})
