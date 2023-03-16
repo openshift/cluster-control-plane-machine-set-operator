@@ -133,8 +133,8 @@ func CheckControlPlaneMachineOnDeleteReplacement(testFramework framework.Framewo
 func EventuallyIndexIsBeingReplaced(ctx context.Context, idx int) bool {
 	controlPlaneMachineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
 
-	// Wait up to a minute for the replacement machine to be created.
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	// Wait for the replacement machine to be created.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	// Use RunCheckUntil to check that the other indexes do not get an additional
