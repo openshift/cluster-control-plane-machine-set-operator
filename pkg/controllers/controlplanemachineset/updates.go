@@ -412,7 +412,7 @@ func (r *ControlPlaneMachineSetReconciler) createOnDeleteReplacementMachines(ctx
 	machinesNeedingReplacement := needReplacementMachines(machines)
 	if len(machines) == 1 && len(machinesNeedingReplacement) == 1 {
 		// if there is only 1 machine and it needs an update
-		logger := logger.WithValues("index", machines[0].Index, "namespace", r.Namespace, "name", machines[0].MachineRef.ObjectMeta.Name)
+		logger := logger.WithValues("index", machines[0].Index, "namespace", r.Namespace, "name", machines[0].MachineRef.ObjectMeta.Name, "diff", machines[0].Diff)
 
 		if isDeletedMachine(machines[0]) {
 			// if deleted create the replacement
@@ -461,7 +461,7 @@ func (r *ControlPlaneMachineSetReconciler) createRollingUpdateReplacementMachine
 		// Trigger a Machine creation.
 		// Consider the first found outdated machine for this index to be the one in need of update.
 		outdatedMachine := machinesNeedingReplacement[0]
-		logger := logger.WithValues("index", outdatedMachine.Index, "namespace", r.Namespace, "name", outdatedMachine.MachineRef.ObjectMeta.Name)
+		logger := logger.WithValues("index", outdatedMachine.Index, "namespace", r.Namespace, "name", outdatedMachine.MachineRef.ObjectMeta.Name, "diff", outdatedMachine.Diff)
 
 		result, err := r.createMachineWithSurge(ctx, logger, machineProvider, outdatedMachine.Index, maxSurge, surgeCount)
 		if err != nil {
