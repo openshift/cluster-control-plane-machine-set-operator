@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
@@ -79,6 +80,9 @@ func main() { //nolint:funlen,cyclop
 			LeaderElect:  true,
 			ResourceName: defaultLeaderElectionID,
 		}
+
+		// defaultSyncPeriod is the default period after which to trigger controller's cache resync.
+		defaultSyncPeriod = 30 * time.Minute
 	)
 
 	pflag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -114,6 +118,8 @@ func main() { //nolint:funlen,cyclop
 		RetryPeriod:             &le.RetryPeriod.Duration,
 		RenewDeadline:           &le.RenewDeadline.Duration,
 		Namespace:               managedNamespace,
+		// Do a full resync to catch up in case of missing events.
+		SyncPeriod: &defaultSyncPeriod,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
