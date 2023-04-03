@@ -38,19 +38,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		}, OncePerOrdered)
 
-		Context("and the defaulted value delete from the ControlPlaneMachineSet", func() {
-			BeforeEach(func() {
-				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
-				helpers.MakeControlPlaneMachineSetProviderConfigInvalid(testFramework)
-			})
-
-			AfterEach(func() {
-				helpers.EnsureActiveControlPlaneMachineSet(testFramework)
-			})
-
-			helpers.ItShouldNotCauseARollout(testFramework)
-		})
-
 		Context("and the instance type of index 1 is not as expected", func() {
 			BeforeEach(func() {
 				helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
@@ -114,6 +101,22 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramework)
 				})
 			})
+		})
+
+		Context("and a defaulted value is deleted from the ControlPlaneMachineSet", func() {
+			BeforeEach(func() {
+				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
+				// Unset the defaulted field
+				helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework, false)
+			})
+
+			AfterEach(func() {
+				helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+				// Set the defaulted field back
+				helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework, true)
+			})
+
+			helpers.ItShouldNotCauseARollout(testFramework)
 		})
 	})
 

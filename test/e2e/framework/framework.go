@@ -89,8 +89,8 @@ type Framework interface {
 	// to a control plane machine set suitable provider spec.
 	ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error)
 
-	// RemoveDefaultedValueFromCPMS removes a value that is defaulted by the defaulting webhook in the MAO
-	RemoveDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension) (*runtime.RawExtension, error)
+	// UpdateDefaultedValueFromCPMS updates a field that is defaulted by the defaulting webhook in the MAO with a desired value.
+	UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension, set bool) (*runtime.RawExtension, error)
 }
 
 // PlatformSupportLevel is used to identify which tests should run
@@ -227,9 +227,9 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 	}
 }
 
-// RemoveDefaultedValueFromCPMS removes a defaulted value from the ControlPlaneMachineSet
+// UpdateDefaultedValueFromCPMS updates a defaulted value from the ControlPlaneMachineSet
 // for either AWS, Azure or GCP.
-func (f *framework) RemoveDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension) (*runtime.RawExtension, error) {
+func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension, set bool) (*runtime.RawExtension, error) {
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machinev1beta1.MachineSpec{
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: rawProviderSpec,
@@ -241,20 +241,25 @@ func (f *framework) RemoveDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExt
 
 	switch f.platform {
 	case configv1.AzurePlatformType:
-		return removeCredentialsSecretNameAzure(providerConfig)
+		return updateCredentialsSecretNameAzure(providerConfig, set)
 	case configv1.AWSPlatformType:
-		return removeCredentialsSecretNameAWS(providerConfig)
+		return updateCredentialsSecretNameAWS(providerConfig, set)
 	case configv1.GCPPlatformType:
-		return removeCredentialsSecretNameGCP(providerConfig)
+		return updateCredentialsSecretNameGCP(providerConfig, set)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
 }
 
-// removeVMSize remove the credentialSecret.Name field from the ControlPlaneMachineSet.
-func removeCredentialsSecretNameAzure(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+// updateCredentialsSecretNameAzure updates the credentialSecret.Name field from the ControlPlaneMachineSet.
+func updateCredentialsSecretNameAzure(providerConfig providerconfig.ProviderConfig, set bool) (*runtime.RawExtension, error) {
 	cfg := providerConfig.Azure().Config()
-	cfg.CredentialsSecret.Name = ""
+
+	if set {
+		cfg.CredentialsSecret.Name = "azure-cloud-credentials"
+	} else {
+		cfg.CredentialsSecret.Name = ""
+	}
 
 	rawBytes, err := json.Marshal(cfg)
 	if err != nil {
@@ -266,10 +271,15 @@ func removeCredentialsSecretNameAzure(providerConfig providerconfig.ProviderConf
 	}, nil
 }
 
-// removeInstanceType remove the credentialSecret.Name field from the ControlPlaneMachineSet.
-func removeCredentialsSecretNameAWS(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+// updateCredentialsSecretNameAWS updates the credentialSecret.Name field from the ControlPlaneMachineSet.
+func updateCredentialsSecretNameAWS(providerConfig providerconfig.ProviderConfig, set bool) (*runtime.RawExtension, error) {
 	cfg := providerConfig.AWS().Config()
-	cfg.CredentialsSecret.Name = ""
+
+	if set {
+		cfg.CredentialsSecret.Name = "aws-cloud-credentials"
+	} else {
+		cfg.CredentialsSecret.Name = ""
+	}
 
 	rawBytes, err := json.Marshal(cfg)
 	if err != nil {
@@ -281,10 +291,15 @@ func removeCredentialsSecretNameAWS(providerConfig providerconfig.ProviderConfig
 	}, nil
 }
 
-// removeMachineType remove the credentialSecret.Name field from the ControlPlaneMachineSet.
-func removeCredentialsSecretNameGCP(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+// updateCredentialsSecretNameGCP updates the credentialSecret.Name field from the ControlPlaneMachineSet.
+func updateCredentialsSecretNameGCP(providerConfig providerconfig.ProviderConfig, set bool) (*runtime.RawExtension, error) {
 	cfg := providerConfig.GCP().Config()
-	cfg.CredentialsSecret.Name = ""
+
+	if set {
+		cfg.CredentialsSecret.Name = "gcp-cloud-credentials"
+	} else {
+		cfg.CredentialsSecret.Name = ""
+	}
 
 	rawBytes, err := json.Marshal(cfg)
 	if err != nil {
