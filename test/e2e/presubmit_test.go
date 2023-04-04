@@ -104,16 +104,15 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 		})
 
 		Context("and a defaulted value is deleted from the ControlPlaneMachineSet", func() {
+			var originalProviderSpec machinev1beta1.ProviderSpec
 			BeforeEach(func() {
 				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
-				// Unset the defaulted field
-				helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework, false)
+				originalProviderSpec = helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework)
 			})
 
 			AfterEach(func() {
 				helpers.EnsureActiveControlPlaneMachineSet(testFramework)
-				// Set the defaulted field back
-				helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework, true)
+				helpers.UpdateControlPlaneMachineSetProviderSpec(testFramework, originalProviderSpec)
 			})
 
 			helpers.ItShouldNotCauseARollout(testFramework)
