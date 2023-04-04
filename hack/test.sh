@@ -24,7 +24,7 @@ fi
 
 # Exclude the specific E2E package as this is not a unit test.
 # This regex should allow packages under the e2e dir to still be tested.
-TEST_PACKAGES=$(go list -f "{{ .Dir }}" ./... | grep -v cluster-control-plane-machine-set-operator/test/e2e$)
+TEST_PACKAGES=${TEST_PACKAGES:-$(go list -f "{{ .Dir }}" ./... | grep -v cluster-control-plane-machine-set-operator/test/e2e$)}
 
 # Print the command we are going to run as Make would.
 echo ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} "<omitted>"
