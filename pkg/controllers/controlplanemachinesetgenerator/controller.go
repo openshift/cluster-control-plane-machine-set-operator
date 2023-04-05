@@ -177,7 +177,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 	}
 
 	// generate an up to date ControlPlaneMachineSet based on the current cluster state.
-	generatedCPMS, err := r.generateControlPlaneMachineSet(logger, infrastructure.Spec.PlatformSpec.Type, machines, machineSets)
+	generatedCPMS, err := r.generateControlPlaneMachineSet(logger, infrastructure.Status.PlatformStatus.Type, machines, machineSets)
 	if errors.Is(err, errUnsupportedPlatform) {
 		// Do not requeue if the platform is not supported.
 		// Nothing to do in this case.
