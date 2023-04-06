@@ -79,7 +79,7 @@ func buildControlPlaneMachineSetGCPMachineSpec(logger logr.Logger, machines []ma
 }
 
 // buildGCPFailureDomains builds a GCP flavored FailureDomains for the ControlPlaneMachineSet.
-func buildGCPFailureDomains(failureDomains *failuredomain.Set) machinev1.FailureDomains {
+func buildGCPFailureDomains(failureDomains *failuredomain.Set) (machinev1.FailureDomains, error) { //nolint:unparam
 	gcpFailureDomains := []machinev1.GCPFailureDomain{}
 
 	for _, fd := range failureDomains.List() {
@@ -91,5 +91,5 @@ func buildGCPFailureDomains(failureDomains *failuredomain.Set) machinev1.Failure
 		Platform: configv1.GCPPlatformType,
 	}
 
-	return cpmsFailureDomains
+	return cpmsFailureDomains, nil
 }

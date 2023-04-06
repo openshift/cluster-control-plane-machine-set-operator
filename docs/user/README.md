@@ -88,15 +88,14 @@ Please ensure that you have 3 (or 5) control plane machines before creating the 
 The control plane machine set is currently supported for a number of platforms and OpenShift versions.
 The matrix shows in detail the support for each specific combination.
 
-| Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |
-|------------------------------|:---------------|:--------------------|:--------------------|
-| AWS                          |  Not Supported | Full                | Full                |
-| Azure                        |  Not Supported | Manual              | Full                |
-| GCP                          |  Not Supported | Not Supported       | Full                |
-| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)|
-| Other Platforms              |  Not Supported | Not Supported       | Not Supported       |
-
-> Note: Google Cloud Platform and OpenStack are planned for inclusion from OpenShift version 4.13 onwards.
+| Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |      4.14           |
+|------------------------------|:---------------|:--------------------|:--------------------|:--------------------|
+| AWS                          |  Not Supported | Full                | Full                | Full                |
+| Azure                        |  Not Supported | Manual              | Full                | Full                |
+| GCP                          |  Not Supported | Not Supported       | Full                | Full                |
+| OpenStack                    |  Not Supported | Not Supported       | Not Supported       | Full                |
+| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)| Manual (Single Zone)|
+| Other Platforms              |  Not Supported | Not Supported       | Not Supported       | Not Supported       |
 
 #### Keys
 

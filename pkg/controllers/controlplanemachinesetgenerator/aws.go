@@ -93,7 +93,7 @@ func buildControlPlaneMachineSetAWSMachineSpec(logger logr.Logger, machines []ma
 }
 
 // buildAWSFailureDomains builds an AWS flavored FailureDomains for the ControlPlaneMachineSet.
-func buildAWSFailureDomains(failureDomains *failuredomain.Set) machinev1.FailureDomains {
+func buildAWSFailureDomains(failureDomains *failuredomain.Set) (machinev1.FailureDomains, error) { //nolint:unparam
 	awsFailureDomains := []machinev1.AWSFailureDomain{}
 
 	for _, fd := range failureDomains.List() {
@@ -105,5 +105,5 @@ func buildAWSFailureDomains(failureDomains *failuredomain.Set) machinev1.Failure
 		Platform: configv1.AWSPlatformType,
 	}
 
-	return cpmsFailureDomain
+	return cpmsFailureDomain, nil
 }

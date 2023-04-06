@@ -74,6 +74,10 @@ var (
 	errUnsupportedPlatform = errors.New("unsupported platform")
 	// errNilProviderSpec is an error used when provider spec is nil.
 	errNilProviderSpec = errors.New("provider spec is nil")
+	// errMixedEmptyFailureDomains is an error used when there are machines with different failure domains and one of them is empty.
+	errMixedEmptyFailureDomains = errors.New("an empty failure domain was found and other failure domains are not empty")
+	// errInconsistentProviderSpec is an error used when the provider specs are inconsistent.
+	errInconsistentProviderSpec = errors.New("provider specs are inconsistent")
 )
 
 // ControlPlaneMachineSetGeneratorReconciler reconciles a ControlPlaneMachineSet object.
@@ -236,6 +240,11 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 		}
 	case configv1.NutanixPlatformType:
 		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(logger, machines)
+		if err != nil {
+			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
+		}
+	case configv1.OpenStackPlatformType:
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetOpenStackSpec(logger, machines, machineSets)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}

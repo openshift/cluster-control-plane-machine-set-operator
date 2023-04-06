@@ -25,6 +25,7 @@ import (
 	"strconv"
 
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -87,6 +88,9 @@ type Framework interface {
 	// providerSpec passed. This is used to trigger updates to the Machines
 	// managed by the control plane machine set.
 	IncreaseProviderSpecInstanceSize(providerSpec *runtime.RawExtension) error
+
+	// TagInstanceInProviderSpec tags the instance in the provider spec.
+	TagInstanceInProviderSpec(providerSpec *runtime.RawExtension) error
 
 	// ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
 	// to a control plane machine set suitable provider spec.
@@ -237,6 +241,25 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 	}
 }
 
+// TagInstanceInProviderSpec tags the instance in the providerSpec.
+func (f *framework) TagInstanceInProviderSpec(rawProviderSpec *runtime.RawExtension) error {
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(f.logger, machinev1beta1.MachineSpec{
+		ProviderSpec: machinev1beta1.ProviderSpec{
+			Value: rawProviderSpec,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get provider config: %w", err)
+	}
+
+	switch f.platform {
+	case configv1.OpenStackPlatformType:
+		return tagOpenStackProviderSpec(rawProviderSpec, providerConfig)
+	default:
+		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
+	}
+}
+
 // UpdateDefaultedValueFromCPMS updates a defaulted value from the ControlPlaneMachineSet
 // for either AWS, Azure or GCP.
 func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension) (*runtime.RawExtension, error) {
@@ -342,6 +365,8 @@ func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec mac
 		return convertGCPProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	case configv1.NutanixPlatformType:
 		return convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	case configv1.OpenStackPlatformType:
+		return convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -404,6 +429,27 @@ func convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerCo
 	rawBytes, err := json.Marshal(nutanixProviderConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling nutanix providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
+// convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec converts an OpenStack providerConfig into a
+// raw control plane machine set provider spec.
+func convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	openStackPs := providerConfig.OpenStack().Config()
+
+	openStackPs.AvailabilityZone = ""
+
+	if openStackPs.RootVolume != nil {
+		openStackPs.RootVolume.Zone = ""
+	}
+
+	rawBytes, err := json.Marshal(openStackPs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling openstack providerSpec: %w", err)
 	}
 
 	return &runtime.RawExtension{
@@ -474,6 +520,8 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	case configv1.GCPPlatformType:
 		return Manual, platformType, nil
 	case configv1.NutanixPlatformType:
+		return Manual, platformType, nil
+	case configv1.OpenStackPlatformType:
 		return Manual, platformType, nil
 	default:
 		return Unsupported, platformType, nil
@@ -547,6 +595,20 @@ func increaseAzureInstanceSize(rawProviderSpec *runtime.RawExtension, providerCo
 	if err != nil {
 		return fmt.Errorf("failed to get next instance size: %w", err)
 	}
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// tagOpenStackProviderSpec adds a tag to the providerSpec for an OpenStack providerSpec.
+func tagOpenStackProviderSpec(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.OpenStack().Config()
+
+	randomTag := uuid.New().String()
+	cfg.Tags = append(cfg.Tags, fmt.Sprintf("cpms-test-tag-%s", randomTag))
 
 	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
 		return fmt.Errorf("failed to set provider spec value: %w", err)

@@ -238,3 +238,41 @@ failureDomains:
 
 > Note: The `targetPools` field may not be set on the GCP providerSpec. This field is required for control
 plane machines and you should populate this on both the Machine and the ControlPlaneMachineSet resource specs.
+
+#### Configuring a control plane machine set on OpenStack
+
+Two fields are supported for now: `availabilityZone` (instance AZ) and `rootVolume.availabilityZone` (root volume AZ).
+Gather the existing control plane machines and note the value of the zones of each if they exist.
+Aside from these fields, the remaining in spec the machines should be identical.
+
+Copy the value from one of the machines into the `providerSpec.value` (6) on the example above.
+Remove the AZ fields from the `providerSpec.value` once you have done that.
+
+For each AZ you have in the cluster, configure a failure domain like below:
+```yaml
+- availabilityZone: "<nova availability zone>"
+  rootVolume:
+    availabilityZone: "<cinder availability zone>"
+```
+
+With these zones, the complete `failureDomains` (4 and 5) on the example above should look something like below:
+```yaml
+failureDomains:
+  platform: OpenStack
+  openstack:
+  - availabilityZone: nova-az0
+    rootVolume:
+      availabilityZone: cinder-az0
+  - availabilityZone: nova-az1
+    rootVolume:
+      availabilityZone: cinder-az1
+  - availabilityZone: nova-az2
+    rootVolume:
+      availabilityZone: cinder-az2
+```
+
+Prior to 4.14, if the masters were configured with Availability Zones (AZ), the installer (via Terraform) would create
+one ServerGroup in OpenStack (the one initially created for master-0, ending with the name of the AZ) but configure
+the Machine ProviderSpec with different ServerGroups, one per AZ.
+So if you upgrade a cluster from a previous release to 4.14, you'll need to follow this [solution](https://access.redhat.com/solutions/7013893).
+

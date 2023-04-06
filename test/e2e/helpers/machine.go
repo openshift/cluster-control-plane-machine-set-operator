@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
@@ -404,7 +405,15 @@ func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, 
 	originalProviderSpec := machine.Spec.ProviderSpec
 
 	updatedProviderSpec := originalProviderSpec.DeepCopy()
-	Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+	platformType := testFramework.GetPlatformType()
+
+	switch platformType {
+	case configv1.OpenStackPlatformType:
+		// OpenStack flavors are not predictable, so we just tag the instance with a new tag, which will trigger the redeployment.
+		Expect(testFramework.TagInstanceInProviderSpec(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with a new tag")
+	default:
+		Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+	}
 
 	By(fmt.Sprintf("Updating the provider spec of the control plane machine at index %d", index))
 

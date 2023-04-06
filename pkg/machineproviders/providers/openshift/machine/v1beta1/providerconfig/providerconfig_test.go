@@ -23,6 +23,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	"github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder"
@@ -116,6 +117,18 @@ var _ = Describe("Provider Config", func() {
 				failureDomainsBuilder: nil,
 				providerSpecBuilder:   machinev1beta1resourcebuilder.GCPProviderSpec(),
 				providerConfigMatcher: HaveField("GCP().Config()", *machinev1beta1resourcebuilder.GCPProviderSpec().Build()),
+			}),
+			Entry("with an OpenStack config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.OpenStackPlatformType,
+				failureDomainsBuilder: machinev1resourcebuilder.OpenStackFailureDomains(),
+				providerSpecBuilder:   machinev1beta1resourcebuilder.OpenStackProviderSpec(),
+				providerConfigMatcher: HaveField("OpenStack().Config()", *machinev1beta1resourcebuilder.OpenStackProviderSpec().Build()),
+			}),
+			Entry("with an OpenStack config without failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.OpenStackPlatformType,
+				failureDomainsBuilder: nil,
+				providerSpecBuilder:   machinev1beta1resourcebuilder.OpenStackProviderSpec(),
+				providerConfigMatcher: HaveField("OpenStack().Config()", *machinev1beta1resourcebuilder.OpenStackProviderSpec().Build()),
 			}),
 		)
 	})
@@ -243,6 +256,66 @@ var _ = Describe("Provider Config", func() {
 				matchPath:        "GCP().Config().Zone",
 				matchExpectation: "us-central1-b",
 			}),
+			Entry("when keeping an OpenStack compute availability zone the same", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az0").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewOpenStackFailureDomain(
+					machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").Build(),
+				),
+				matchPath:        "OpenStack().Config().AvailabilityZone",
+				matchExpectation: "nova-az0",
+			}),
+			Entry("when keeping an OpenStack volume availability zone the same", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithRootVolume(&machinev1alpha1.RootVolume{
+							Zone: "cinder-az1",
+						}).Build(),
+					},
+				},
+				failureDomain: failuredomain.NewOpenStackFailureDomain(
+					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(machinev1.RootVolume{
+						AvailabilityZone: "cinder-az1",
+					}).Build(),
+				),
+				matchPath:        "OpenStack().Config().RootVolume.Zone",
+				matchExpectation: "cinder-az1",
+			}),
+			Entry("when changing an OpenStack compute availability zone", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az0").Build(),
+					},
+				},
+				failureDomain: failuredomain.NewOpenStackFailureDomain(
+					machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").Build(),
+				),
+				matchPath:        "OpenStack().Config().AvailabilityZone",
+				matchExpectation: "nova-az1",
+			}),
+			Entry("when changing an OpenStack volume availability zone", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithRootVolume(&machinev1alpha1.RootVolume{
+							Zone: "cinder-az0",
+						}).Build(),
+					},
+				},
+				failureDomain: failuredomain.NewOpenStackFailureDomain(
+					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(machinev1.RootVolume{
+						AvailabilityZone: "cinder-az1",
+					}).Build(),
+				),
+				matchPath:        "OpenStack().Config().RootVolume.Zone",
+				matchExpectation: "cinder-az1",
+			}),
 		)
 	})
 
@@ -299,6 +372,11 @@ var _ = Describe("Provider Config", func() {
 				expectedPlatformType:  configv1.GCPPlatformType,
 				providerSpecBuilder:   machinev1beta1resourcebuilder.GCPProviderSpec(),
 				providerConfigMatcher: HaveField("GCP().Config()", *machinev1beta1resourcebuilder.GCPProviderSpec().Build()),
+			}),
+			Entry("with an OpenStack config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.OpenStackPlatformType,
+				providerSpecBuilder:   machinev1beta1resourcebuilder.OpenStackProviderSpec(),
+				providerConfigMatcher: HaveField("OpenStack().Config()", *machinev1beta1resourcebuilder.OpenStackProviderSpec().Build()),
 			}),
 		)
 	})
@@ -388,6 +466,10 @@ var _ = Describe("Provider Config", func() {
 			}},
 		}
 
+		rootVolume := &machinev1alpha1.RootVolume{
+			Zone: "cinder-az2",
+		}
+
 		DescribeTable("should correctly extract the failure domain", func(in extractFailureDomainTableInput) {
 			fd := in.providerConfig.ExtractFailureDomain()
 
@@ -437,6 +519,19 @@ var _ = Describe("Provider Config", func() {
 					machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-a").Build(),
 				),
 			}),
+			Entry("with an OpenStack az2 failure domain", extractFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithRootVolume(rootVolume).WithZone("nova-az2").Build(),
+					},
+				},
+				expectedFailureDomain: failuredomain.NewOpenStackFailureDomain(
+					machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(machinev1.RootVolume{
+						AvailabilityZone: "cinder-az2",
+					}).Build(),
+				),
+			}),
 			Entry("with a VSphere dummy failure domain", extractFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
@@ -455,6 +550,10 @@ var _ = Describe("Provider Config", func() {
 			comparePC     ProviderConfig
 			expectedEqual bool
 			expectedError error
+		}
+
+		rootVolume := &machinev1alpha1.RootVolume{
+			Zone: "cinder-az0",
 		}
 
 		DescribeTable("should compare provider configs", func(in equalTableInput) {
@@ -575,6 +674,36 @@ var _ = Describe("Provider Config", func() {
 				},
 				expectedEqual: false,
 			}),
+			Entry("with matching OpenStack configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az0").WithRootVolume(rootVolume).Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az0").WithRootVolume(rootVolume).Build(),
+					},
+				},
+				expectedEqual: true,
+			}),
+			Entry("with mis-matched OpenStack configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az0").WithRootVolume(rootVolume).Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az1").WithRootVolume(rootVolume).Build(),
+					},
+				},
+				expectedEqual: false,
+			}),
 			Entry("with matching Generic configs", equalTableInput{
 				basePC: &providerConfig{
 					platformType: configv1.VSpherePlatformType,
@@ -668,6 +797,15 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedOut: machinev1beta1resourcebuilder.GCPProviderSpec().BuildRawExtension().Raw,
+			}),
+			Entry("with an OpenStack config", rawConfigTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.OpenStackPlatformType,
+					openstack: OpenStackProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().Build(),
+					},
+				},
+				expectedOut: machinev1beta1resourcebuilder.OpenStackProviderSpec().BuildRawExtension().Raw,
 			}),
 			Entry("with a VSphere config", rawConfigTableInput{
 				providerConfig: providerConfig{

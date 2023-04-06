@@ -79,7 +79,7 @@ func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []
 }
 
 // buildAzureFailureDomains builds an Azure flavored FailureDomains for the ControlPlaneMachineSet.
-func buildAzureFailureDomains(failureDomains *failuredomain.Set) machinev1.FailureDomains {
+func buildAzureFailureDomains(failureDomains *failuredomain.Set) (machinev1.FailureDomains, error) { //nolint:unparam
 	azureFailureDomains := []machinev1.AzureFailureDomain{}
 
 	for _, fd := range failureDomains.List() {
@@ -91,5 +91,5 @@ func buildAzureFailureDomains(failureDomains *failuredomain.Set) machinev1.Failu
 		Platform: configv1.AzurePlatformType,
 	}
 
-	return cpmsFailureDomain
+	return cpmsFailureDomain, nil
 }
