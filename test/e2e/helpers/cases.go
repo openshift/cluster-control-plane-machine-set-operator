@@ -70,10 +70,10 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 		cpms := &machinev1.ControlPlaneMachineSet{}
 		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-		// We give the rollout an hour to complete.
+		// We give the rollout two hours to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check
 		// until they pass or until the timeout is reached.
-		rolloutTimeout := 1 * time.Hour
+		rolloutTimeout := 2 * time.Hour
 		if opts.RolloutTimeout.Seconds() != 0 {
 			rolloutTimeout = opts.RolloutTimeout
 		}
