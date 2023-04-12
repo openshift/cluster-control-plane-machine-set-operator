@@ -32,6 +32,8 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -69,7 +71,7 @@ func CheckControlPlaneMachineRollingReplacement(testFramework framework.Framewor
 	By("Replacement machine name is correct")
 
 	// Check the the old machine doesn't have a deletion timestamp until the new machine is running.
-	if ok := waitForNewMachineRunning(ctx, oldMachine, newMachine); !ok {
+	if ok := waitForNewMachineRunning(ctx, testFramework, oldMachine, newMachine); !ok {
 		return false
 	}
 
@@ -130,11 +132,12 @@ func CheckControlPlaneMachineOnDeleteReplacement(testFramework framework.Framewo
 // a replacement Machine.
 // It simultaneously checks that no other index is being replaced, this short circuits
 // what otherwise could be a long wait.
-func EventuallyIndexIsBeingReplaced(ctx context.Context, idx int) bool {
+func EventuallyIndexIsBeingReplaced(ctx context.Context, testFramework framework.Framework, idx int) bool {
 	controlPlaneMachineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+	k8sClient := testFramework.GetClient()
 
-	// Wait up to a minute for the replacement machine to be created.
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	// Wait for the replacement machine to be created.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	// Use RunCheckUntil to check that the other indexes do not get an additional
@@ -142,17 +145,29 @@ func EventuallyIndexIsBeingReplaced(ctx context.Context, idx int) bool {
 	passed := framework.RunCheckUntil(ctx,
 		func(_ context.Context, g framework.GomegaAssertions) bool { // Check function
 			By(fmt.Sprintf("Checking that other indexes (not %d) do not have 2 replicas", idx))
-			list := komega.ObjectList(&machinev1beta1.MachineList{}, controlPlaneMachineSelector)
 
-			return g.Expect(list()).Should(
+			list := &machinev1beta1.MachineList{}
+			if err := k8sClient.List(ctx, list, controlPlaneMachineSelector); err != nil {
+				// For temporary errors in listing objects we don't want to break this check,
+				// so we return happy and retry at the next check.
+				return g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+			}
+
+			return g.Expect(list).Should(
 				HaveField("Items", WithTransform(extractMachineIndexCounts, Not(HaveKeyWithValue(Not(Equal(idx)), 2)))), fmt.Sprintf("expected not to have 2 replicas for index other than index %d", idx),
 			)
 		},
 		func(_ context.Context, g framework.GomegaAssertions) bool { // Until function
 			By(fmt.Sprintf("Checking that index %d has 2 replicas", idx))
-			list := komega.ObjectList(&machinev1beta1.MachineList{}, controlPlaneMachineSelector)
 
-			return g.Expect(list()).Should(
+			list := &machinev1beta1.MachineList{}
+			if err := k8sClient.List(ctx, list, controlPlaneMachineSelector); err != nil {
+				// For temporary errors in listing the objects we don't want to break the until condition,
+				// so we return false, which is the standard behaviour for this condition when things haven't settled yet.
+				return !g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+			}
+
+			return g.Expect(list).Should(
 				HaveField("Items", WithTransform(extractMachineIndexCounts, HaveKeyWithValue(idx, 2))), fmt.Sprintf("expected 2 replicas for index %d", idx),
 			)
 		},
@@ -263,8 +278,9 @@ func checkReplacementMachineName(machine *machinev1beta1.Machine, idx int) bool 
 // While it checks this, it also checks that the old Machine does not get a deletion timestamp.
 // During a rolling update we expect the old machine to only be deleted after the new Machine
 // becomes running.
-func waitForNewMachineRunning(ctx context.Context, oldMachine, newMachine *machinev1beta1.Machine) bool {
+func waitForNewMachineRunning(ctx context.Context, testFramework framework.Framework, oldMachine, newMachine *machinev1beta1.Machine) bool {
 	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+	k8sClient := testFramework.GetClient()
 
 	By("Waiting for the new machine become Running")
 	By("Checking that the old machine is not deleted until the new machine is Running")
@@ -272,9 +288,14 @@ func waitForNewMachineRunning(ctx context.Context, oldMachine, newMachine *machi
 	// Check the the old machine doesn't have a deletion timestamp until the new machine is running.
 	return framework.RunCheckUntil(ctx,
 		func(_ context.Context, g framework.GomegaAssertions) bool { // Check function
-			list := komega.ObjectList(&machinev1beta1.MachineList{}, machineSelector)
+			machineList := &machinev1beta1.MachineList{}
+			if err := k8sClient.List(ctx, machineList, machineSelector); err != nil {
+				// For temporary errors in listing objects we don't want to break this check,
+				// so we return happy and retry at the next check.
+				return g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+			}
 
-			return g.Expect(list()).Should(HaveField("Items", SatisfyAll(
+			return g.Expect(machineList).Should(HaveField("Items", SatisfyAll(
 				ContainElement(SatisfyAll(
 					HaveField("ObjectMeta.Name", Equal(oldMachine.ObjectMeta.Name)),
 					HaveField("ObjectMeta.DeletionTimestamp", BeNil()),
@@ -289,9 +310,16 @@ func waitForNewMachineRunning(ctx context.Context, oldMachine, newMachine *machi
 			)), "expected old machine to not be deleted until new machine is Running")
 		},
 		func(_ context.Context, g framework.GomegaAssertions) bool { // Condition function
-			machine := komega.Object(newMachine)
+			machineKey := runtimeclient.ObjectKey{Namespace: newMachine.Namespace, Name: newMachine.Name}
 
-			return g.Expect(machine()).Should(HaveField("Status.Phase", HaveValue(Equal("Running"))), "expected new machine to be running")
+			machine := &machinev1beta1.Machine{}
+			if err := k8sClient.Get(ctx, machineKey, machine); err != nil {
+				// For temporary errors in getting the object we don't want to break the until condition,
+				// so we return false, which is the standard behaviour for this condition when things haven't settled yet.
+				return !g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+			}
+
+			return g.Expect(machine).Should(HaveField("Status.Phase", HaveValue(Equal("Running"))), "expected new machine to be running")
 		},
 	)
 }
@@ -479,4 +507,21 @@ func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []m
 	})
 
 	return machines
+}
+
+// isRetryableAPIError returns whether an API error is retryable or not.
+// inspired by: k8s.io/kubernetes/test/utils.
+func isRetryableAPIError(err error) bool {
+	// These errors may indicate a transient error that we can retry in tests.
+	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
+		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+		return true
+	}
+
+	// If the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
+	if _, shouldRetry := apierrs.SuggestsClientDelay(err); shouldRetry {
+		return true
+	}
+
+	return false
 }
