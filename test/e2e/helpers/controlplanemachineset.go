@@ -341,3 +341,44 @@ func GetControlPlaneMachineSetUID(testFramework framework.Framework) types.UID {
 
 	return cpms.ObjectMeta.UID
 }
+
+// UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig updates a defaulted field value from the Control Plane Machine Set's
+// provider config to test defaulting on such value.
+func UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework framework.Framework, gomegaArgs ...interface{}) machinev1beta1.ProviderSpec {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	originalProviderSpec := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec
+
+	updatedProviderSpec := originalProviderSpec.DeepCopy()
+	rawExtension, err := testFramework.UpdateDefaultedValueFromCPMS(updatedProviderSpec.Value)
+	Expect(err).NotTo(HaveOccurred())
+
+	updatedProviderSpec.Value = rawExtension
+
+	By("Removing the defaulted field from the control plane machine set")
+
+	Eventually(komega.Update(cpms, func() {
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = *updatedProviderSpec
+	}), gomegaArgs...).Should(Succeed(), "control plane machine set should be able to be updated")
+
+	return originalProviderSpec
+}
+
+// UpdateControlPlaneMachineSetProviderSpec updates the provider spec of the control plane machine set to match the provider spec given.
+func UpdateControlPlaneMachineSetProviderSpec(testFramework framework.Framework, updatedProviderSpec machinev1beta1.ProviderSpec, gomegaArgs ...interface{}) {
+	By("Updating the provider spec of the control plane machine set")
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	Eventually(komega.Update(cpms, func() {
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = updatedProviderSpec
+	}), gomegaArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+}

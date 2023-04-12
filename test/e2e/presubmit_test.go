@@ -102,6 +102,21 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				})
 			})
 		})
+
+		Context("and a defaulted value is deleted from the ControlPlaneMachineSet", func() {
+			var originalProviderSpec machinev1beta1.ProviderSpec
+			BeforeEach(func() {
+				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
+				originalProviderSpec = helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework)
+			})
+
+			AfterEach(func() {
+				helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+				helpers.UpdateControlPlaneMachineSetProviderSpec(testFramework, originalProviderSpec)
+			})
+
+			helpers.ItShouldNotCauseARollout(testFramework)
+		})
 	})
 
 	Context("With an inactive ControlPlaneMachineSet", func() {
