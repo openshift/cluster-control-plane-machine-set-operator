@@ -122,16 +122,19 @@ func (c *compiler) compileNode(n ast.Node) {
 		c.compileStmt(n)
 	case *ast.ValueSpec:
 		c.compileValueSpec(n)
-	case stmtSlice:
-		c.compileStmtSlice(n)
-	case declSlice:
-		c.compileDeclSlice(n)
-	case ExprSlice:
-		c.compileExprSlice(n)
 	case *rangeClause:
 		c.compileRangeClause(n)
 	case *rangeHeader:
 		c.compileRangeHeader(n)
+	case *NodeSlice:
+		switch n.Kind {
+		case StmtNodeSlice:
+			c.compileStmtSlice(n.stmtSlice)
+		case DeclNodeSlice:
+			c.compileDeclSlice(n.declSlice)
+		case ExprNodeSlice:
+			c.compileExprSlice(n.exprSlice)
+		}
 	default:
 		panic(c.errorf(n, "compileNode: unexpected %T", n))
 	}
@@ -365,6 +368,8 @@ func (c *compiler) compileExpr(n ast.Expr) {
 		c.compileBinaryExpr(n)
 	case *ast.IndexExpr:
 		c.compileIndexExpr(n)
+	case *typeparams.IndexListExpr:
+		c.compileIndexListExpr(n)
 	case *ast.Ident:
 		c.compileIdent(n)
 	case *ast.CallExpr:
@@ -450,6 +455,15 @@ func (c *compiler) compileIndexExpr(n *ast.IndexExpr) {
 	c.emitInstOp(opIndexExpr)
 	c.compileExpr(n.X)
 	c.compileExpr(n.Index)
+}
+
+func (c *compiler) compileIndexListExpr(n *typeparams.IndexListExpr) {
+	c.emitInstOp(opIndexListExpr)
+	c.compileExpr(n.X)
+	for _, x := range n.Indices {
+		c.compileExpr(x)
+	}
+	c.emitInstOp(opEnd)
 }
 
 func (c *compiler) compileWildIdent(n *ast.Ident, optional bool) {
@@ -1180,7 +1194,7 @@ func (c *compiler) compileSendStmt(n *ast.SendStmt) {
 	c.compileExpr(n.Value)
 }
 
-func (c *compiler) compileDeclSlice(decls declSlice) {
+func (c *compiler) compileDeclSlice(decls []ast.Decl) {
 	c.emitInstOp(opMultiDecl)
 	for _, n := range decls {
 		c.compileDecl(n)
@@ -1188,7 +1202,7 @@ func (c *compiler) compileDeclSlice(decls declSlice) {
 	c.emitInstOp(opEnd)
 }
 
-func (c *compiler) compileStmtSlice(stmts stmtSlice) {
+func (c *compiler) compileStmtSlice(stmts []ast.Stmt) {
 	c.emitInstOp(opMultiStmt)
 	insideStmtList := c.insideStmtList
 	c.insideStmtList = true
@@ -1199,7 +1213,7 @@ func (c *compiler) compileStmtSlice(stmts stmtSlice) {
 	c.emitInstOp(opEnd)
 }
 
-func (c *compiler) compileExprSlice(exprs ExprSlice) {
+func (c *compiler) compileExprSlice(exprs []ast.Expr) {
 	c.emitInstOp(opMultiExpr)
 	for _, n := range exprs {
 		c.compileExpr(n)
