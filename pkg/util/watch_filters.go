@@ -22,12 +22,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-
-	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -38,12 +34,6 @@ const (
 
 	// machineTypeLabelName is the label used to identify the type of a machine.
 	machineTypeLabelName = "machine.openshift.io/cluster-api-machine-type"
-
-	// nodeRoleMasterLabelName is the label used to identify the role of the node.
-	nodeRoleMasterLabelName = "node-role.kubernetes.io/master"
-
-	// nodeRoleControlPlaneLabelName is the label used to identify the role of the node.
-	nodeRoleControlPlaneLabelName = "node-role.kubernetes.io/control-plane"
 
 	// machineMasterRoleLabelName is the label value to identify the role of a control plane machine.
 	machineMasterRoleLabelName = "master"
@@ -129,85 +119,4 @@ func FilterControlPlaneMachines(namespace string) predicate.Predicate {
 			(labels[machineTypeLabelName] == machineMasterTypeLabelName ||
 				labels[machineTypeLabelName] == machineControlPlaneTypeLabelName)
 	})
-}
-
-// FilterControlPlaneNodes filters nodes requests to just the nodes that present as control plane nodes
-// and that have had a transition in the NodeReady condition.
-func FilterControlPlaneNodes() predicate.Predicate {
-	return predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			node, ok := e.Object.(*corev1.Node)
-			if !ok {
-				panic(fmt.Sprintf("expected to get an of object of type corev1.Node: got type %T", e.Object))
-			}
-
-			return isControlPlaneNode(node)
-		},
-		UpdateFunc: updateFuncFilterControlPlaneNodes,
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			node, ok := e.Object.(*corev1.Node)
-			if !ok {
-				panic(fmt.Sprintf("expected to get an of object of type corev1.Node: got type %T", e.Object))
-			}
-
-			return isControlPlaneNode(node)
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			if _, ok := e.Object.(*corev1.Node); !ok {
-				panic(fmt.Sprintf("expected to get an of object of type corev1.Node: got type %T", e.Object))
-			}
-
-			// We are only interested in events that can change a Node status,
-			// so we ignore generic events.
-			return false
-		},
-	}
-}
-
-// isControlPlaneNode checks whether the provided node is a control plane one.
-func isControlPlaneNode(node *corev1.Node) bool {
-	// Ensuring that this is a master machine by checking required labels.
-	labels := node.GetLabels()
-	_, hasMasterLabel := labels[nodeRoleMasterLabelName]
-	_, hasControlPlaneLabel := labels[nodeRoleControlPlaneLabelName]
-
-	// Only consider if Node is a control plane.
-	return hasMasterLabel || hasControlPlaneLabel
-}
-
-// updateFuncFilterControlPlaneNodes filters an event based on whether the node is a control plane
-// or not and if it has recently transitioned in its readiness status.
-func updateFuncFilterControlPlaneNodes(e event.UpdateEvent) bool {
-	node, ok := e.ObjectNew.(*corev1.Node)
-	if !ok {
-		panic(fmt.Sprintf("expected to get an of object of type corev1.Node: got type %T", e.ObjectNew))
-	}
-
-	oldNode, ok := e.ObjectOld.(*corev1.Node)
-	if !ok && oldNode != nil {
-		panic(fmt.Sprintf("expected to get an of object of type corev1.Node: got type %T", e.ObjectOld))
-	}
-
-	if !isControlPlaneNode(node) {
-		return false
-	}
-
-	var wasNodeReady, isNodeReady corev1.ConditionStatus
-
-	for _, c := range oldNode.Status.Conditions {
-		if c.Type == corev1.NodeReady {
-			wasNodeReady = c.Status
-			break
-		}
-	}
-
-	for _, c := range node.Status.Conditions {
-		if c.Type == corev1.NodeReady {
-			isNodeReady = c.Status
-			break
-		}
-	}
-
-	// Only consider if the node has changed in its readiness.
-	return wasNodeReady != isNodeReady
 }

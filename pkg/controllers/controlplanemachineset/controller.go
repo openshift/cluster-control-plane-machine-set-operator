@@ -124,11 +124,6 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 			builder.WithPredicates(util.FilterControlPlaneMachines(r.Namespace)),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Node{}},
-			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
-			builder.WithPredicates(util.FilterControlPlaneNodes()),
-		).
-		Watches(
 			&source.Kind{Type: &configv1.ClusterOperator{}},
 			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
 			builder.WithPredicates(util.FilterClusterOperator(r.OperatorName)),

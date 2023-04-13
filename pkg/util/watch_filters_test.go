@@ -20,11 +20,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
-	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,14 +72,6 @@ var _ = Describe("Watch Filters", func() {
 	updateEvent := func(obj client.Object) event.UpdateEvent {
 		return event.UpdateEvent{
 			ObjectNew: obj,
-		}
-	}
-
-	// updateEventFull is used to pass objects to the predicate Update function.
-	updateEventFull := func(objOld client.Object, objNew client.Object) event.UpdateEvent {
-		return event.UpdateEvent{
-			ObjectNew: objNew,
-			ObjectOld: objOld,
 		}
 	}
 
@@ -306,140 +296,6 @@ var _ = Describe("Watch Filters", func() {
 			Expect(machinePredicate.Update(updateEvent(machine))).To(BeTrue())
 			Expect(machinePredicate.Delete(deleteEvent(machine))).To(BeTrue())
 			Expect(machinePredicate.Generic(genericEvent(machine))).To(BeTrue())
-		})
-	})
-
-	Context("filterControlPlaneNodes", func() {
-		var nodesPredicate predicate.Predicate
-
-		BeforeEach(func() {
-			nodesPredicate = FilterControlPlaneNodes()
-		})
-
-		It("Panics with the wrong object kind", func() {
-			expectedMessage := "expected to get an of object of type corev1.Node: got type *v1.ControlPlaneMachineSet"
-			cpms := machinev1resourcebuilder.ControlPlaneMachineSet().Build()
-
-			Expect(func() {
-				nodesPredicate.Create(createEvent(cpms))
-			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
-
-			Expect(func() {
-				nodesPredicate.Update(updateEventFull(cpms, cpms))
-			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
-
-			Expect(func() {
-				nodesPredicate.Delete(deleteEvent(cpms))
-			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
-
-			Expect(func() {
-				nodesPredicate.Generic(genericEvent(cpms))
-			}).To(PanicWith(expectedMessage), "A programming error occurs when passing the wrong object, the function should panic")
-		})
-
-		It("Returns false with worker node", func() {
-			node := corev1resourcebuilder.Node().AsWorker().Build()
-
-			Expect(nodesPredicate.Create(createEvent(node))).To(BeFalse())
-			Expect(nodesPredicate.Update(updateEvent(node))).To(BeFalse())
-			Expect(nodesPredicate.Delete(deleteEvent(node))).To(BeFalse())
-			Expect(nodesPredicate.Generic(genericEvent(node))).To(BeFalse())
-		})
-
-		It("Returns true with master node transitioned from NotReady to Ready", func() {
-			oldNode := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			).AsMaster().Build()
-			node := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			).AsMaster().Build()
-
-			Expect(nodesPredicate.Create(createEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Update(updateEventFull(oldNode, node))).To(BeTrue())
-			Expect(nodesPredicate.Delete(deleteEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Generic(genericEvent(node))).To(BeFalse())
-		})
-
-		It("Returns true with master node transitioned from Ready to NotReady", func() {
-			oldNode := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			).AsMaster().Build()
-			node := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			).AsMaster().Build()
-
-			Expect(nodesPredicate.Create(createEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Update(updateEventFull(oldNode, node))).To(BeTrue())
-			Expect(nodesPredicate.Delete(deleteEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Generic(genericEvent(node))).To(BeFalse())
-		})
-
-		It("Returns false with master node stayed in Ready", func() {
-			oldNode := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			).AsMaster().Build()
-			node := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			).AsMaster().Build()
-
-			Expect(nodesPredicate.Create(createEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Update(updateEventFull(oldNode, node))).To(BeFalse())
-			Expect(nodesPredicate.Delete(deleteEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Generic(genericEvent(node))).To(BeFalse())
-		})
-
-		It("Returns false with master node stayed in NotReady", func() {
-			oldNode := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			).AsMaster().Build()
-			node := corev1resourcebuilder.Node().WithConditions(
-				[]corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			).AsMaster().Build()
-
-			Expect(nodesPredicate.Create(createEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Update(updateEventFull(oldNode, node))).To(BeFalse())
-			Expect(nodesPredicate.Delete(deleteEvent(node))).To(BeTrue())
-			Expect(nodesPredicate.Generic(genericEvent(node))).To(BeFalse())
 		})
 	})
 })
