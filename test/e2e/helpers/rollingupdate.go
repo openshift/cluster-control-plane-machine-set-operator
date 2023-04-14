@@ -36,7 +36,7 @@ import (
 func CheckRolloutForIndex(testFramework framework.Framework, ctx context.Context, idx int, strategy machinev1.ControlPlaneMachineSetStrategyType) bool {
 	By(fmt.Sprintf("Waiting for the index %d to be replaced", idx))
 	// Don't provide additional timeouts here, the default should be enough.
-	if ok := EventuallyIndexIsBeingReplaced(ctx, idx); !ok {
+	if ok := EventuallyIndexIsBeingReplaced(ctx, testFramework, idx); !ok {
 		return false
 	}
 
