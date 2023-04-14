@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/pointer"
 
@@ -200,7 +201,7 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 	}
 
 	for _, machine := range machineList.Items {
-		machineInfo, err := m.generateMachineInfo(logger, machine)
+		machineInfo, err := m.generateMachineInfo(ctx, logger, machine)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate machine info for machine %s: %w", machine.Name, err)
 		}
@@ -230,7 +231,7 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 }
 
 // generateMachineInfo creates a MachineInfo object for a given machine.
-func (m *openshiftMachineProvider) generateMachineInfo(logger logr.Logger, machine machinev1beta1.Machine) (machineproviders.MachineInfo, error) {
+func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logger logr.Logger, machine machinev1beta1.Machine) (machineproviders.MachineInfo, error) {
 	machineRef := getMachineRef(machine)
 	nodeRef := getNodeRef(machine)
 
@@ -266,7 +267,10 @@ func (m *openshiftMachineProvider) generateMachineInfo(logger logr.Logger, machi
 		return machineproviders.MachineInfo{}, fmt.Errorf("cannot compare provider configs: %w", err)
 	}
 
-	ready := m.isMachineReady(machine)
+	ready, err := m.isMachineReady(ctx, machine)
+	if err != nil {
+		return machineproviders.MachineInfo{}, fmt.Errorf("error checking machine readiness: %w", err)
+	}
 
 	return machineproviders.MachineInfo{
 		MachineRef:   machineRef,
@@ -323,20 +327,34 @@ func (m *openshiftMachineProvider) failureDomainToIndex(failureDomain failuredom
 	return 0, false
 }
 
-// isMachineReady determines whether a machine is ready or not.
-func (m *openshiftMachineProvider) isMachineReady(machine machinev1beta1.Machine) bool {
-	if pointer.StringDeref(machine.Status.Phase, "") == runningPhase {
-		// The machine is running so everything is working as expected.
-		return true
+// isMachineReady determines whether a CPMS Machine is Ready or not.
+// A CPMS Machine is considered Ready when:
+// - the underlying Machine is Running and its Node is Ready
+// - the underlying Machine is Deleting and is still has a NodeRef.
+func (m *openshiftMachineProvider) isMachineReady(ctx context.Context, machine machinev1beta1.Machine) (bool, error) {
+	if machine.Status.NodeRef == nil {
+		return false, nil
 	}
 
-	if pointer.StringDeref(machine.Status.Phase, "") == deletingPhase && machine.Status.NodeRef != nil {
+	nodeName := machine.Status.NodeRef.Name
+
+	node := &corev1.Node{}
+	if err := m.client.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		return false, fmt.Errorf("failed to get Node %q: %w", nodeName, err)
+	}
+
+	if pointer.StringDeref(machine.Status.Phase, "") == runningPhase && isNodeReady(node) {
+		// The machine is running and its node is ready, so everything is working as expected.
+		return true, nil
+	}
+
+	if pointer.StringDeref(machine.Status.Phase, "") == deletingPhase && isNodeReady(node) {
 		// The machine was previously running but is now being deleted.
 		// The machine is still ready until the node is drained and removed from the cluster.
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // getMachineNameIndex tries to fetch machine index from its name. If it's not possible,
@@ -372,6 +390,21 @@ func getNodeRef(machine machinev1beta1.Machine) *machineproviders.ObjectRef {
 		},
 		GroupVersionResource: corev1.SchemeGroupVersion.WithResource("nodes"),
 	}
+}
+
+// isNodeReady returns true if a node is ready; false otherwise.
+func isNodeReady(node *corev1.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	for _, c := range node.Status.Conditions {
+		if c.Type == corev1.NodeReady {
+			return c.Status == corev1.ConditionTrue
+		}
+	}
+
+	return false
 }
 
 // CreateMachine creates a new Machine from the template provider config based on the
