@@ -60,6 +60,8 @@ func sortMachineSetsByCreationTimeAscending(machineSets []machinev1beta1.Machine
 }
 
 // genericControlPlaneMachineSetSpec returns a generic ControlPlaneMachineSet spec, without provider specific details.
+//
+//nolint:unparam
 func genericControlPlaneMachineSetSpec(replicas int32, clusterID string) machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration {
 	labels := map[string]string{
 		clusterIDLabelKey:          clusterID,

@@ -222,6 +222,8 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 		return increaseAzureInstanceSize(rawProviderSpec, providerConfig)
 	case configv1.GCPPlatformType:
 		return increaseGCPInstanceSize(rawProviderSpec, providerConfig)
+	case configv1.NutanixPlatformType:
+		return increaseNutanixInstanceSize(rawProviderSpec, providerConfig)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -246,6 +248,8 @@ func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExt
 		return updateCredentialsSecretNameAWS(providerConfig)
 	case configv1.GCPPlatformType:
 		return updateCredentialsSecretNameGCP(providerConfig)
+	case configv1.NutanixPlatformType:
+		return updateCredentialsSecretNameNutanix(providerConfig)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -296,6 +300,21 @@ func updateCredentialsSecretNameGCP(providerConfig providerconfig.ProviderConfig
 	}, nil
 }
 
+// updateCredentialsSecretNameNutanix updates the credentialSecret field from the ControlPlaneMachineSet.
+func updateCredentialsSecretNameNutanix(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	cfg := providerConfig.Nutanix().Config()
+	cfg.CredentialsSecret = nil
+
+	rawBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling nutanix providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
 // ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
 // to a raw, control plane machine set suitable provider spec.
 func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error) {
@@ -313,6 +332,8 @@ func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec mac
 		return convertAzureProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	case configv1.GCPPlatformType:
 		return convertGCPProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	case configv1.NutanixPlatformType:
+		return convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -360,6 +381,21 @@ func convertAzureProviderConfigToControlPlaneMachineSetProviderSpec(providerConf
 	rawBytes, err := json.Marshal(azurePs)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling azure providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
+// convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec converts a Nutanix providerConfig into a
+// raw control plane machine set provider spec.
+func convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	nutanixProviderConfig := providerConfig.Nutanix().Config()
+
+	rawBytes, err := json.Marshal(nutanixProviderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling nutanix providerSpec: %w", err)
 	}
 
 	return &runtime.RawExtension{
@@ -428,6 +464,8 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	case configv1.AzurePlatformType:
 		return Manual, platformType, nil
 	case configv1.GCPPlatformType:
+		return Manual, platformType, nil
+	case configv1.NutanixPlatformType:
 		return Manual, platformType, nil
 	default:
 		return Unsupported, platformType, nil
@@ -555,6 +593,18 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 	if err != nil {
 		return fmt.Errorf("failed to get next instance size: %w", err)
 	}
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// increateNutanixInstanceSize increases the instance size of the instance on the providerSpec for an Nutanix providerSpec.
+func increaseNutanixInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.Nutanix().Config()
+	cfg.VCPUSockets++
 
 	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
 		return fmt.Errorf("failed to set provider spec value: %w", err)

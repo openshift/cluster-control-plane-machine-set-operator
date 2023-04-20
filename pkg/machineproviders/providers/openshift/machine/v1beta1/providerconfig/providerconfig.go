@@ -79,6 +79,9 @@ type ProviderConfig interface {
 	// GCP returns the GCPProviderConfig if the platform type is GCP.
 	GCP() GCPProviderConfig
 
+	// Nutanix returns the NutanixProviderConfig if the platform type is Nutanix.
+	Nutanix() NutanixProviderConfig
+
 	// Generic returns the GenericProviderConfig if we are on a platform that is using generic provider abstraction.
 	Generic() GenericProviderConfig
 }
@@ -115,6 +118,8 @@ func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec,
 		return newAzureProviderConfig(providerSpec.Value)
 	case configv1.GCPPlatformType:
 		return newGCPProviderConfig(providerSpec.Value)
+	case configv1.NutanixPlatformType:
+		return newNutanixProviderConfig(providerSpec.Value)
 	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platformType)
 	default:
@@ -128,6 +133,7 @@ type providerConfig struct {
 	aws          AWSProviderConfig
 	azure        AzureProviderConfig
 	gcp          GCPProviderConfig
+	nutanix      NutanixProviderConfig
 	generic      GenericProviderConfig
 }
 
@@ -189,6 +195,8 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 		return deep.Equal(p.azure.providerConfig, other.Azure().providerConfig), nil
 	case configv1.GCPPlatformType:
 		return deep.Equal(p.gcp.providerConfig, other.GCP().providerConfig), nil
+	case configv1.NutanixPlatformType:
+		return deep.Equal(p.nutanix.providerConfig, other.Nutanix().providerConfig), nil
 	case configv1.NonePlatformType:
 		return nil, errUnsupportedPlatformType
 	default:
@@ -213,6 +221,8 @@ func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
 		return reflect.DeepEqual(p.azure.providerConfig, other.Azure().providerConfig), nil
 	case configv1.GCPPlatformType:
 		return reflect.DeepEqual(p.gcp.providerConfig, other.GCP().providerConfig), nil
+	case configv1.NutanixPlatformType:
+		return reflect.DeepEqual(p.nutanix.providerConfig, other.Nutanix().providerConfig), nil
 	case configv1.NonePlatformType:
 		return false, errUnsupportedPlatformType
 	default:
@@ -234,6 +244,8 @@ func (p providerConfig) RawConfig() ([]byte, error) {
 		rawConfig, err = json.Marshal(p.azure.providerConfig)
 	case configv1.GCPPlatformType:
 		rawConfig, err = json.Marshal(p.gcp.providerConfig)
+	case configv1.NutanixPlatformType:
+		rawConfig, err = json.Marshal(p.nutanix.providerConfig)
 	case configv1.NonePlatformType:
 		return nil, errUnsupportedPlatformType
 	default:
@@ -267,6 +279,11 @@ func (p providerConfig) GCP() GCPProviderConfig {
 	return p.gcp
 }
 
+// Nutanix returns the NutanixProviderConfig if the platform type is Nutanix.
+func (p providerConfig) Nutanix() NutanixProviderConfig {
+	return p.nutanix
+}
+
 // Generic returns the GenericProviderConfig if the platform type is generic.
 func (p providerConfig) Generic() GenericProviderConfig {
 	return p.generic
@@ -276,9 +293,10 @@ func (p providerConfig) Generic() GenericProviderConfig {
 // When platform is unknown, it returns "UnknownPlatform".
 func getPlatformTypeFromProviderSpecKind(kind string) configv1.PlatformType {
 	var providerSpecKindToPlatformType = map[string]configv1.PlatformType{
-		"AWSMachineProviderConfig": configv1.AWSPlatformType,
-		"AzureMachineProviderSpec": configv1.AzurePlatformType,
-		"GCPMachineProviderSpec":   configv1.GCPPlatformType,
+		"AWSMachineProviderConfig":     configv1.AWSPlatformType,
+		"AzureMachineProviderSpec":     configv1.AzurePlatformType,
+		"GCPMachineProviderSpec":       configv1.GCPPlatformType,
+		"NutanixMachineProviderConfig": configv1.NutanixPlatformType,
 	}
 
 	platformType, ok := providerSpecKindToPlatformType[kind]
