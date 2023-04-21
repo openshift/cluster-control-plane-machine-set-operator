@@ -96,18 +96,18 @@ spec:
   template:
     machineType: machines_v1beta1_machine_openshift_io
     machines_v1beta1_machine_openshift_io:
-      failureDomains:
-        platform: <platform> [4]
-        <platform failure domains> [5]
+      failureDomains: [4]
+        platform: <platform>
+        <platform failure domains>
       metadata:
         labels:
           machine.openshift.io/cluster-api-machine-role: master
           machine.openshift.io/cluster-api-machine-type: master
-          machine.openshift.io/cluster-api-cluster: <cluster-id> [6]
+          machine.openshift.io/cluster-api-cluster: <cluster-id> [5]
       spec:
         providerSpec:
           value:
-            <platform provider spec> [7]
+            <platform provider spec> [6]
 ```
 
 1. The state defines whether the ControlPlaneMachineSet is Active or Inactive.
@@ -119,12 +119,12 @@ Once `Active`, a control plane machine set cannot be made `Inactive` again.
 Horizontal scaling is not currently supported and so this field is currently immutable.
 This may change in a future release.
 3. The strategy defaults to `RollingUpdate`. `OnDelete` is also supported.
-4. The ControlPlaneMachineSet spreads Machines across multiple failure domains where possible.
-This field must be set to the platform name.
-5. The failure domains vary on their configuration per platform, see [configuring provider specific fields](#configuring-provider-specific-fields) for how to configure a failure domain on each platform.
-6. The cluster ID is required here. You should be able to find this label on existing Machines in the cluster.
+4. ControlPlaneMachineSet spreads Machines across multiple failure domains where possible.
+Because the underlying primitive used to implement failure domains varies across platforms, you must specify the platform name and a platform-specific field.
+See [configuring provider specific fields](#configuring-provider-specific-fields) for how to configure a failure domain on each platform.
+5. The cluster ID is required here. You should be able to find this label on existing Machines in the cluster.
 Alternatively, it can be found on the infrastructure resource: `oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster`
-7. The provider spec must match that of the Control Plane Machines created by the installer, except, you can omit any
+6. The provider spec must match that of the Control Plane Machines created by the installer except you can omit any
 field set in the failure domains.
 
 
@@ -139,7 +139,7 @@ AWS supports both the `availabilityZone` and `subnet` in its failure domains.
 Gather the existing control plane machines and make a note of the values of both the `availabilityZone` and `subnet`.
 Aside from these fields, the remaining spec in the machines should be identical.
 
-Copy the value from one of the machines into the `providerSpec.value` (6) on the example above.
+Copy the value from one of the machines into the `providerSpec.value` (`[6]` in the example above).
 Remove the `avialabilityZone` and `subnet` fields from the `providerSpec.value` once you have done that.
 
 For each failure domain you have in the cluster (normally 3-6 on AWS), configure a failure domain like below:
@@ -154,7 +154,7 @@ For each failure domain you have in the cluster (normally 3-6 on AWS), configure
       - <subnet>
 ```
 
-The complete `failureDomains` (3 and 4) on the example above should look something like below:
+The complete `failureDomains` (`[4]` in the example above) should look something like below:
 ```yaml
 failureDomains:
   platform: AWS
@@ -191,7 +191,7 @@ Currently the only field supported by the Azure failure domain is the `zone`.
 Gather the existing control plane machines and note the value of the `zone` of each.
 Aside from the `zone` field, the remaining in spec the machines should be identical.
 
-Copy the value from one of the machines into the `providerSpec.value` (6) on the example above.
+Copy the value from one of the machines into the `providerSpec.value` (`[6]` in the example above).
 Remove the `zone` field from the `providerSpec.value` once you have done that.
 
 For each `zone` you have in the cluster (normally 3), configure a failure domain like below:
@@ -199,7 +199,7 @@ For each `zone` you have in the cluster (normally 3), configure a failure domain
 - zone: "<zone>"
 ```
 
-With these zones, the complete `failureDomains` (3 and 4) on the example above should look something like below:
+With these zones, the complete `failureDomains` (`[4]` in the example above) should look something like below:
 ```yaml
 failureDomains:
   platform: Azure
@@ -218,7 +218,7 @@ Currently the only field supported by the GCP failure domain is the `zone`.
 Gather the existing control plane machines and note the value of the `zone` of each.
 Aside from the `zone` field, the remaining in spec the machines should be identical.
 
-Copy the value from one of the machines into the `providerSpec.value` (6) on the example above.
+Copy the value from one of the machines into the `providerSpec.value` (`[6]` in the example above).
 Remove the `zone` field from the `providerSpec.value` once you have done that.
 
 For each `zone` you have in the cluster (normally 3), configure a failure domain like below:
@@ -226,7 +226,7 @@ For each `zone` you have in the cluster (normally 3), configure a failure domain
 - zone: "<zone>"
 ```
 
-With these zones, the complete `failureDomains` (3 and 4) on the example above should look something like below:
+With these zones, the complete `failureDomains` (`[4]` in the example above) should look something like below:
 ```yaml
 failureDomains:
   platform: GCP
