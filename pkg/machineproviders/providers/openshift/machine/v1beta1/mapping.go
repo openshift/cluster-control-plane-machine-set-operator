@@ -65,7 +65,7 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 
 	failureDomainsSet := failuredomain.NewSet(failureDomains...)
 
-	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomainsSet.List(), len(machineMapping))
+	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomainsSet.List(), machineMapping)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct base failure domain mapping: %w", err)
 	}
@@ -86,11 +86,18 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 // domains.
 // Create the output based on the longer of the number of Machines or replicas so that when we reconcile the machine
 // mappings we always have enough candidates which are balanced between the available failure domains.
-func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, failureDomains []failuredomain.FailureDomain, machineIndexCount int) (map[int32]failuredomain.FailureDomain, error) {
+func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, failureDomains []failuredomain.FailureDomain, machineMapping map[int32]failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
 	out := make(map[int32]failuredomain.FailureDomain)
 
 	if cpms.Spec.Replicas == nil || *cpms.Spec.Replicas < 1 {
 		return nil, errReplicasRequired
+	}
+
+	machineIndexCount := len(machineMapping)
+	machineFailureDomains := failuredomain.NewSet()
+
+	for _, failureDomain := range machineMapping {
+		machineFailureDomains.Insert(failureDomain)
 	}
 
 	// Create a base mapping which account for the larger of the number of machines or
@@ -105,6 +112,11 @@ func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, fail
 
 	// Sort failure domains alphabetically
 	sort.Slice(failureDomains, func(i, j int) bool { return failureDomains[i].String() < failureDomains[j].String() })
+
+	// Deprioritise any failure domain that is not present in the machine mapping.
+	sort.Slice(failureDomains, func(i, j int) bool {
+		return machineFailureDomains.Has(failureDomains[i]) && !machineFailureDomains.Has(failureDomains[j])
+	})
 
 	for i := int32(0); i < int32(machineIndexCount); i++ {
 		out[i] = failureDomains[i%int32(len(failureDomains))]
