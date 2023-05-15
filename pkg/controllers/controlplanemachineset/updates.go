@@ -560,6 +560,10 @@ func (r *ControlPlaneMachineSetReconciler) checkForExistingReplacement(ctx conte
 		}
 	}
 
+	logger.V(2).Info(fmt.Sprintf(
+		"no existing replacement found for index %d. found these machines instead: %#v",
+		idx, mInfos))
+
 	return false, nil
 }
 
