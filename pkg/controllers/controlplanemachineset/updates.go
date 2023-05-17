@@ -401,7 +401,7 @@ func (r *ControlPlaneMachineSetReconciler) createOnDeleteReplacementMachines(ctx
 		// Trigger a Machine creation.
 		logger := logger.WithValues("index", idx, "namespace", r.Namespace, "name", unknownMachineName)
 
-		result, err := r.createMachine(ctx, logger, machineProvider, idx)
+		_, result, err := r.createMachine(ctx, logger, machineProvider, idx)
 		if err != nil {
 			return false, result, err
 		}
@@ -416,7 +416,7 @@ func (r *ControlPlaneMachineSetReconciler) createOnDeleteReplacementMachines(ctx
 
 		if isDeletedMachine(machines[0]) {
 			// if deleted create the replacement
-			result, err := r.createMachine(ctx, logger, machineProvider, idx)
+			_, result, err := r.createMachine(ctx, logger, machineProvider, idx)
 			if err != nil {
 				return false, result, err
 			}
@@ -488,13 +488,13 @@ func deleteMachine(ctx context.Context, logger logr.Logger, machineProvider mach
 	return ctrl.Result{}, nil
 }
 
-// createMachine creates the Machine provided.
-func (r *ControlPlaneMachineSetReconciler) createMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (ctrl.Result, error) {
+// createMachine checks if a machine already exists and otherwise creates the Machine provided.
+func (r *ControlPlaneMachineSetReconciler) createMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (bool, ctrl.Result, error) {
 	// Check if a replacement machine already exists and
 	// was not previously detected due to potential stale cache.
 	exists, err := r.checkForExistingReplacement(ctx, logger, machineProvider, idx)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("error checking for existing replacement: %w", err)
+		return false, ctrl.Result{}, fmt.Errorf("error checking for existing replacement: %w", err)
 	}
 
 	if exists {
@@ -503,18 +503,21 @@ func (r *ControlPlaneMachineSetReconciler) createMachine(ctx context.Context, lo
 		// This means the machine provider cache was stale when we previously checked.
 		// No need to create a replacement.
 		logger.V(2).Info(alreadyPresentReplacement)
+
+		// Do not error but signal the machine was not created (created=false).
+		return false, ctrl.Result{}, nil
 	}
 
 	if err := machineProvider.CreateMachine(ctx, logger, idx); err != nil {
 		werr := fmt.Errorf("error creating new Machine for index %d: %w", idx, err)
 		logger.Error(werr, errorCreatingMachine)
 
-		return ctrl.Result{}, werr
+		return false, ctrl.Result{}, werr
 	}
 
 	logger.V(2).Info(createdReplacement)
 
-	return ctrl.Result{}, nil
+	return true, ctrl.Result{}, nil
 }
 
 // createMachineWithSurge creates the Machine provided while observing the surge count.
@@ -531,12 +534,14 @@ func (r *ControlPlaneMachineSetReconciler) createMachineWithSurge(ctx context.Co
 
 	// There is still room to surge,
 	// trigger a Replacement Machine creation.
-	result, err := r.createMachine(ctx, logger, machineProvider, idx)
+	created, result, err := r.createMachine(ctx, logger, machineProvider, idx)
 	if err != nil {
 		return result, err
 	}
 
-	*surgeCount++
+	if created {
+		*surgeCount++
+	}
 
 	return result, nil
 }
