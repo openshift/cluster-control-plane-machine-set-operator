@@ -179,6 +179,44 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					}
 				},
 			}),
+			Entry("with updates required in a single index, but actually the machine cache was stale, and so no creation needed", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(
+						func(mI map[int32][]machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
+							mICopy := make(map[int32][]machineproviders.MachineInfo)
+							for k, v := range mI {
+								mICopy[k] = v
+							}
+
+							mICopy[int32(1)] = append(mICopy[int32(1)], updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build())
+
+							return mICopy
+						}(machineInfos)), nil).Times(1)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				},
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", int32(1),
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: alreadyPresentReplacement,
+						},
+					}
+				},
+			}),
 			Entry("with updates required in a single index, and an error occurs", rollingUpdateTableInput{
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
 				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
@@ -1129,6 +1167,44 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						},
 						Message: machineRequiresUpdate,
 					},
+					}
+				},
+			}),
+			Entry("with updates required in a single index, and the machine has been deleted, but actually the machine cache was stale, and so no creation needed", onDeleteUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).WithMachineDeletionTimestamp(metav1.Now()).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(
+						func(mI map[int32][]machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
+							mICopy := make(map[int32][]machineproviders.MachineInfo)
+							for k, v := range mI {
+								mICopy[k] = v
+							}
+
+							mICopy[int32(1)] = append(mICopy[int32(1)], updatedMachineBuilder.WithIndex(1).WithMachineName("machine-replacement-1").Build())
+
+							return mICopy
+						}(machineInfos)), nil).Times(1)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				},
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.OnDelete,
+								"index", int32(1),
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: alreadyPresentReplacement,
+						},
 					}
 				},
 			}),
