@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -57,8 +58,8 @@ const (
 
 // ObjToControlPlaneMachineSet maps any object to the control plane machine set singleton
 // in the namespace provided.
-func ObjToControlPlaneMachineSet(controlPlaneMachineSetName, namespace string) func(client.Object) []reconcile.Request {
-	return func(obj client.Object) []reconcile.Request {
+func ObjToControlPlaneMachineSet(controlPlaneMachineSetName, namespace string) func(context.Context, client.Object) []reconcile.Request {
+	return func(_ context.Context, obj client.Object) []reconcile.Request {
 		klog.V(4).Info(
 			"reconcile triggered by object",
 			"objectType", fmt.Sprintf("%T", obj),

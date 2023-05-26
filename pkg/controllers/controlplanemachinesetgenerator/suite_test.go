@@ -84,7 +84,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	testRESTMapper, err = apiutil.NewDynamicRESTMapper(cfg)
+	httpClient, err := rest.HTTPClientFor(cfg)
+	Expect(err).NotTo(HaveOccurred())
+
+	testRESTMapper, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 	Expect(err).NotTo(HaveOccurred())
 
 	komega.SetClient(k8sClient)
