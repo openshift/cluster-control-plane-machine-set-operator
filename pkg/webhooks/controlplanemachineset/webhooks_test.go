@@ -31,7 +31,6 @@ import (
 	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -124,7 +123,7 @@ var _ = Describe("Webhooks", func() {
 
 			It("with a disallowed name", func() {
 				cpms := builder.WithName("disallowed").Build()
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("metadata.name: Invalid value: \"disallowed\": control plane machine set name must be cluster"))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("metadata.name: Invalid value: \"disallowed\": control plane machine set name must be cluster")))
 			})
 
 			It("with 4 replicas", func() {
@@ -148,7 +147,7 @@ var _ = Describe("Webhooks", func() {
 					}),
 				).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: map[string]string{\"machine.openshift.io/cluster-api-cluster\":\"different-id\", \"machine.openshift.io/cluster-api-machine-role\":\"master\", \"machine.openshift.io/cluster-api-machine-type\":\"master\"}: selector does not match template labels"))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: map[string]string{\"machine.openshift.io/cluster-api-cluster\":\"different-id\", \"machine.openshift.io/cluster-api-machine-role\":\"master\", \"machine.openshift.io/cluster-api-machine-type\":\"master\"}: selector does not match template labels")))
 			})
 
 			It("with no cluster ID label is set", func() {
@@ -254,7 +253,7 @@ var _ = Describe("Webhooks", func() {
 				templateBuilder := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(tempateProviderSpec)
 				cpms := builder.WithMachineTemplateBuilder(templateBuilder).Build()
 
-				Expect(apierrors.ReasonForError(k8sClient.Create(ctx, cpms))).To(BeEquivalentTo("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec: Invalid value: AWSFailureDomain{AvailabilityZone:different-zone-1, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}: Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec: Invalid value: AWSFailureDomain{AvailabilityZone:different-zone-1, Subnet:{Type:Filters, Value:&[{Name:tag:Name Values:[aws-subnet-12345678]}]}}: Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines")))
 			})
 
 			It("with invalid failure domain information", func() {

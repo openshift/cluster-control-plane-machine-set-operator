@@ -475,7 +475,7 @@ func (r *ControlPlaneMachineSetReconciler) createRollingUpdateReplacementMachine
 }
 
 // deleteMachine deletes the Machine provided.
-func deleteMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, outdatedMachine machineproviders.MachineInfo, namespace string) (ctrl.Result, error) {
+func deleteMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, outdatedMachine machineproviders.MachineInfo, namespace string) (ctrl.Result, error) { //nolint:unparam
 	if err := machineProvider.DeleteMachine(ctx, logger, outdatedMachine.MachineRef); err != nil {
 		werr := fmt.Errorf("error deleting Machine %s/%s: %w", namespace, outdatedMachine.MachineRef.ObjectMeta.Name, err)
 		logger.Error(werr, errorDeletingMachine)
@@ -489,7 +489,7 @@ func deleteMachine(ctx context.Context, logger logr.Logger, machineProvider mach
 }
 
 // createMachine checks if a machine already exists and otherwise creates the Machine provided.
-func (r *ControlPlaneMachineSetReconciler) createMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (bool, ctrl.Result, error) {
+func (r *ControlPlaneMachineSetReconciler) createMachine(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (bool, ctrl.Result, error) { //nolint:unparam
 	// Check if a replacement machine already exists and
 	// was not previously detected due to potential stale cache.
 	exists, err := r.checkForExistingReplacement(ctx, logger, machineProvider, idx)

@@ -39,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -93,7 +92,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) SetupWithManager(mgr ctrl.Ma
 	// All predicates are executed before the event handler is called.
 	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(util.FilterControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
-		Watches(&source.Kind{Type: &machinev1beta1.Machine{}}, handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
+		Watches(&machinev1beta1.Machine{}, handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
 		// Override the default log constructor as it makes the logs very chatty.
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {
 			return mgr.GetLogger().WithValues(
@@ -250,7 +249,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 
 // ensureControlPlaneMachineSet ensures that the ControlPlaneMachineSet has been created.
 func (r *ControlPlaneMachineSetGeneratorReconciler) ensureControlPlaneMachineSet(ctx context.Context, logger logr.Logger,
-	cpms *machinev1.ControlPlaneMachineSet, generatedCPMS *machinev1.ControlPlaneMachineSet) (bool, ctrl.Result, error) {
+	cpms *machinev1.ControlPlaneMachineSet, generatedCPMS *machinev1.ControlPlaneMachineSet) (bool, ctrl.Result, error) { //nolint:unparam
 	if cpms.Name == "" {
 		logger.V(1).Info(controlPlaneMachineSetNotFound)
 
