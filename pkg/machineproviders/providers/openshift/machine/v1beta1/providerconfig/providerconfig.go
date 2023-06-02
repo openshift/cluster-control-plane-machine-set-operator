@@ -28,6 +28,9 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -383,4 +386,23 @@ func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSe
 	}
 
 	return machineSetFailureDomains.List(), nil
+}
+
+// checkForUnknownFieldsInProviderSpecAndUnmarshal tries to unmarshal content into a platform specific provider spec
+// and detect invalid fields.
+//
+// If the provider spec contains an unknown field, we want to log a warning to the user
+// instead of just omitting the unknown field. This also catches only the first unknown field
+// in the provider spec. In order to not break any live clusters, we keep the original json
+// style of unmarshaling if the strict version fails.
+func checkForUnknownFieldsInProviderSpecAndUnmarshal(raw *runtime.RawExtension, platformProviderSpec interface{}) error {
+	if err := yaml.UnmarshalStrict(raw.Raw, platformProviderSpec); err != nil {
+		klog.Warning("failed to strictly unmarshal provider config due to unknown field: %w", err)
+
+		if err := json.Unmarshal(raw.Raw, platformProviderSpec); err != nil {
+			return fmt.Errorf("failed to unmarshal provider config: %w", err)
+		}
+	}
+
+	return nil
 }

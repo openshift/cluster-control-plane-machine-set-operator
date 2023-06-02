@@ -17,7 +17,6 @@ limitations under the License.
 package providerconfig
 
 import (
-	"encoding/json"
 	"fmt"
 
 	v1 "github.com/openshift/api/config/v1"
@@ -62,8 +61,9 @@ func (a AzureProviderConfig) Config() machinev1beta1.AzureMachineProviderSpec {
 // an AzureMachineProviderConfig.
 func newAzureProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
 	azureMachineProviderSpec := machinev1beta1.AzureMachineProviderSpec{}
-	if err := json.Unmarshal(raw.Raw, &azureMachineProviderSpec); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+
+	if err := checkForUnknownFieldsInProviderSpecAndUnmarshal(raw, &azureMachineProviderSpec); err != nil {
+		return nil, fmt.Errorf("failed to check for unknown fields in the provider spec: %w", err)
 	}
 
 	azureProviderConfig := AzureProviderConfig{

@@ -17,7 +17,6 @@ limitations under the License.
 package providerconfig
 
 import (
-	"encoding/json"
 	"fmt"
 
 	v1 "github.com/openshift/api/config/v1"
@@ -59,8 +58,9 @@ func (g GCPProviderConfig) Config() machinev1beta1.GCPMachineProviderSpec {
 // It should return an error if the provided RawExtension does not represent a GCPProviderConfig.
 func newGCPProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
 	var gcpMachineProviderSpec machinev1beta1.GCPMachineProviderSpec
-	if err := json.Unmarshal(raw.Raw, &gcpMachineProviderSpec); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal GCP provider config: %w", err)
+
+	if err := checkForUnknownFieldsInProviderSpecAndUnmarshal(raw, &gcpMachineProviderSpec); err != nil {
+		return nil, fmt.Errorf("failed to check for unknown fields in the provider spec: %w", err)
 	}
 
 	gcpProviderConfig := GCPProviderConfig{
