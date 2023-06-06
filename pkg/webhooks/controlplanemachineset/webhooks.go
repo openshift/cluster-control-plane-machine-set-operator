@@ -34,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -86,12 +87,14 @@ func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager
 var _ webhook.CustomValidator = &ControlPlaneMachineSetWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	var errs []error
+	// TODO: actually plug in admission warnings.
+	var warnings []string
 
 	cpms, ok := obj.(*machinev1.ControlPlaneMachineSet)
 	if !ok {
-		return errObjNotCPMS
+		return warnings, errObjNotCPMS
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
@@ -99,38 +102,40 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	errs = append(errs, r.validateSpecOnCreate(ctx, field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
-		return utilerrors.NewAggregate(errs)
+		return warnings, utilerrors.NewAggregate(errs)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
-	errs := []error{}
+func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	var errs []error
+	// TODO: actually plug in admission warnings.
+	var warnings []string
 
 	if oldObj == nil {
-		return errUpdateNilCPMS
+		return warnings, errUpdateNilCPMS
 	}
 
 	cpms, ok := newObj.(*machinev1.ControlPlaneMachineSet)
 	if !ok {
-		return errObjNotCPMS
+		return warnings, errObjNotCPMS
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
 	errs = append(errs, validateSpec(field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
-		return utilerrors.NewAggregate(errs)
+		return warnings, utilerrors.NewAggregate(errs)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (r *ControlPlaneMachineSetWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) error {
-	return nil
+func (r *ControlPlaneMachineSetWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // validateSpecOnCreate runs the create time validations on the ControlPlaneMachineSet spec.

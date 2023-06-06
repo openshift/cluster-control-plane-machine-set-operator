@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -119,17 +118,17 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(util.FilterControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
 		Watches(
-			&source.Kind{Type: &machinev1beta1.Machine{}},
+			&machinev1beta1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
 			builder.WithPredicates(util.FilterControlPlaneMachines(r.Namespace)),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Node{}},
+			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
 			builder.WithPredicates(util.FilterControlPlaneNodes()),
 		).
 		Watches(
-			&source.Kind{Type: &configv1.ClusterOperator{}},
+			&configv1.ClusterOperator{},
 			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
 			builder.WithPredicates(util.FilterClusterOperator(r.OperatorName)),
 		).

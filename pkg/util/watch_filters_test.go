@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
@@ -45,7 +47,7 @@ var _ = Describe("Watch Filters", func() {
 		const testNamespace = "test"
 		const operatorName = "control-plane-machine-set"
 
-		var clusterOperatorFilter func(client.Object) []reconcile.Request
+		var clusterOperatorFilter func(context.Context, client.Object) []reconcile.Request
 
 		BeforeEach(func() {
 			clusterOperatorFilter = ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, testNamespace)
@@ -54,7 +56,7 @@ var _ = Describe("Watch Filters", func() {
 		It("returns a correct request for the cluster ControlPlaneMachineSet", func() {
 			co := configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
 
-			Expect(clusterOperatorFilter(co)).To(ConsistOf(reconcile.Request{
+			Expect(clusterOperatorFilter(ctx, co)).To(ConsistOf(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: testNamespace,
 					Name:      clusterControlPlaneMachineSetName,
