@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -39,13 +40,13 @@ const (
 )
 
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAWSFailureDomains(machineSets, machines)
+func generateControlPlaneMachineSetAWSSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAWSFailureDomains(logger, machineSets, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS failure domains: %w", err)
 	}
 
-	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAWSMachineSpec(machines)
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAWSMachineSpec(logger, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS spec: %w", err)
 	}
@@ -58,13 +59,13 @@ func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, ma
 }
 
 // buildAWSFailureDomains builds an AWSFailureDomain config for the ControlPlaneMachineSet from cluster's Machines and MachineSets.
-func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
+func buildAWSFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
+	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
 	}
 
-	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
+	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
 	}
@@ -94,7 +95,7 @@ func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet, machines []
 }
 
 // buildControlPlaneMachineSetAWSMachineSpec builds an AWS flavored MachineSpec for the ControlPlaneMachineSet.
-func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
+func buildControlPlaneMachineSetAWSMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// Take the Provider Spec of the first in the machines slice
 	// as a the one to be put on the ControlPlaneMachineSet spec.
 	// Since the `machines` slice is sorted by descending creation time
@@ -102,7 +103,7 @@ func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine
 	// This is done so that if there are control plane machines with differing
 	// Provider Specs, we will use the most recent one. This is an attempt to try and inferr
 	// the spec that the user might want to choose among the different ones found in the cluster.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's aws providerSpec: %w", err)
 	}

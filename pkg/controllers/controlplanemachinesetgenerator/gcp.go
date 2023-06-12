@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -31,13 +32,13 @@ import (
 )
 
 // generateControlPlaneMachineSetGCPSpec generates an GCP flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetGCPSpec(machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildGCPFailureDomains(machineSets, machines)
+func generateControlPlaneMachineSetGCPSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildGCPFailureDomains(logger, machineSets, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's GCP failure domains: %w", err)
 	}
 
-	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetGCPMachineSpec(machines)
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetGCPMachineSpec(logger, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's GCP spec: %w", err)
 	}
@@ -51,15 +52,15 @@ func generateControlPlaneMachineSetGCPSpec(machines []machinev1beta1.Machine, ma
 }
 
 // buildGCPFailureDomains builds an GCPFailureDomain config for the ControlPaneMachineSet from the cluster's Machines and MachineSets.
-func buildGCPFailureDomains(machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
+func buildGCPFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
 	// Fetch failure domains from the machines
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
+	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
 	}
 
 	// Fetch failure domains from the machineSets
-	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
+	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
 	}
@@ -89,10 +90,10 @@ func buildGCPFailureDomains(machineSets []machinev1beta1.MachineSet, machines []
 }
 
 // buildControlPlaneMachineSetGCPMachineSpec builds an GCP flavored MachineSpec for the ControlPlaneMachineSet.
-func buildControlPlaneMachineSetGCPMachineSpec(machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
+func buildControlPlaneMachineSetGCPMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's GCP providerSpec: %w", err)
 	}

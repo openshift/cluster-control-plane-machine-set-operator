@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/go-logr/logr"
 	"github.com/go-test/deep"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -90,15 +91,15 @@ func genericControlPlaneMachineSetSpec(replicas int32, clusterID string) machine
 }
 
 // compareControlPlaneMachineSets does a comparison of two ControlPlaneMachineSets also based on their PlatformType and returns any difference found.
-func compareControlPlaneMachineSets(a, b *machinev1.ControlPlaneMachineSet) ([]string, error) {
+func compareControlPlaneMachineSets(logger logr.Logger, a, b *machinev1.ControlPlaneMachineSet) ([]string, error) {
 	// We need to compare the providerSpecs and the rest of the ControlPlaneMachineSets specs separately,
 	// as the formers are marshalled and need to be unmarshaled to be compared.
-	aProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(a.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+	aProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(logger, a.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to extract providerSpec from MachineSpec: %w", err)
 	}
 
-	bProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(b.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+	bProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(logger, b.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to extract providerSpec from MachineSpec: %w", err)
 	}

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +36,7 @@ func (n NutanixProviderConfig) Config() machinev1.NutanixMachineProviderConfig {
 	return n.providerConfig
 }
 
-func newNutanixProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
+func newNutanixProviderConfig(logger logr.Logger, raw *runtime.RawExtension) (ProviderConfig, error) {
 	nutanixMachineProviderconfig := machinev1.NutanixMachineProviderConfig{}
 	if err := json.Unmarshal(raw.Raw, &nutanixMachineProviderconfig); err != nil {
 		return providerConfig{}, fmt.Errorf("unable to unmarshal provider config: %w", err)

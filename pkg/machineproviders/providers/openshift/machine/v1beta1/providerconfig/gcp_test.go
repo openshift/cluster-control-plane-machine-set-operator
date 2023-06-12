@@ -22,11 +22,14 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("GCP Provider Config", func() {
+	var logger testutils.TestLogger
+
 	var providerConfig GCPProviderConfig
 
 	usCentral1a := "us-central1-a"
@@ -50,6 +53,8 @@ var _ = Describe("GCP Provider Config", func() {
 
 			Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
 		})
+
+		logger = testutils.NewTestLogger()
 	})
 
 	Context("when the failuredomain is changed after initialisation", func() {
@@ -92,7 +97,7 @@ var _ = Describe("GCP Provider Config", func() {
 			rawConfig := configBuilder.BuildRawExtension()
 
 			var err error
-			providerConfig, err = newGCPProviderConfig(rawConfig)
+			providerConfig, err = newGCPProviderConfig(logger.Logger(), rawConfig)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

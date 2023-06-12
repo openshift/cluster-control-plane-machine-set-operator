@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
@@ -138,6 +139,7 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 	)
 
 	type compareControlPlaneMachineSetsTableInput struct {
+		logger        logr.Logger
 		platformType  configv1.PlatformType
 		cpmsABuilder  machinev1resourcebuilder.ControlPlaneMachineSetInterface
 		cpmsBBuilder  machinev1resourcebuilder.ControlPlaneMachineSetInterface
@@ -147,7 +149,7 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 
 	DescribeTable("when comparing two ControlPlaneMachineSets",
 		func(in compareControlPlaneMachineSetsTableInput) {
-			diff, err := compareControlPlaneMachineSets(in.cpmsABuilder.Build(), in.cpmsBBuilder.Build())
+			diff, err := compareControlPlaneMachineSets(in.logger, in.cpmsABuilder.Build(), in.cpmsBBuilder.Build())
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 			} else {
@@ -156,6 +158,7 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 			}
 		},
 		Entry("with two identical ControlPlaneMachineSets should find no diff", compareControlPlaneMachineSetsTableInput{
+			logger:        logr.Logger{},
 			platformType:  configv1.AWSPlatformType,
 			cpmsABuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template()),
 			cpmsBBuilder:  machinev1resourcebuilder.ControlPlaneMachineSet().WithMachineTemplateBuilder(machinev1resourcebuilder.OpenShiftMachineV1Beta1Template()),

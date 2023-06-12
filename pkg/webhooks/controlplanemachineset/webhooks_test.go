@@ -69,7 +69,7 @@ var _ = Describe("Webhooks", func() {
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		wh := &ControlPlaneMachineSetWebhook{}
-		Expect(wh.SetupWebhookWithManager(mgr)).To(Succeed(), "Webhook should be able to register with manager")
+		Expect(wh.SetupWebhookWithManager(mgr, mgr.GetLogger())).To(Succeed(), "Webhook should be able to register with manager")
 
 		By("Starting the manager")
 		var mgrCtx context.Context

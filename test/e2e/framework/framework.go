@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2/klogr"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -114,6 +117,7 @@ const (
 // test cases.
 type framework struct {
 	client       runtimeclient.Client
+	logger       logr.Logger
 	platform     configv1.PlatformType
 	supportLevel PlatformSupportLevel
 	scheme       *runtime.Scheme
@@ -137,8 +141,12 @@ func NewFramework() (Framework, error) {
 		return nil, err
 	}
 
+	logger := klogr.New()
+	ctrl.SetLogger(logger)
+
 	return &framework{
 		client:       client,
+		logger:       logger,
 		platform:     platform,
 		supportLevel: supportLevel,
 		scheme:       sch,
@@ -206,7 +214,7 @@ func (f *framework) NewEmptyControlPlaneMachineSet() *machinev1.ControlPlaneMach
 // IncreaseProviderSpecInstanceSize increases the instance size of the instance on the providerSpec
 // that is passed.
 func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.RawExtension) error {
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machinev1beta1.MachineSpec{
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(f.logger, machinev1beta1.MachineSpec{
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: rawProviderSpec,
 		},
@@ -232,7 +240,7 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 // UpdateDefaultedValueFromCPMS updates a defaulted value from the ControlPlaneMachineSet
 // for either AWS, Azure or GCP.
 func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension) (*runtime.RawExtension, error) {
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machinev1beta1.MachineSpec{
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(f.logger, machinev1beta1.MachineSpec{
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: rawProviderSpec,
 		},
@@ -318,7 +326,7 @@ func updateCredentialsSecretNameNutanix(providerConfig providerconfig.ProviderCo
 // ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
 // to a raw, control plane machine set suitable provider spec.
 func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error) {
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machinev1beta1.MachineSpec{
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(f.logger, machinev1beta1.MachineSpec{
 		ProviderSpec: providerSpec,
 	})
 	if err != nil {

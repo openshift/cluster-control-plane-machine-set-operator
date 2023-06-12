@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/go-logr/logr"
 	"github.com/go-test/deep"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -29,7 +30,6 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
 
@@ -90,39 +90,39 @@ type ProviderConfig interface {
 }
 
 // NewProviderConfigFromMachineTemplate creates a new ProviderConfig from the provided machine template.
-func NewProviderConfigFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (ProviderConfig, error) {
+func NewProviderConfigFromMachineTemplate(logger logr.Logger, tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (ProviderConfig, error) {
 	platformType, err := getPlatformTypeFromMachineTemplate(tmpl)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine platform type: %w", err)
 	}
 
-	return newProviderConfigFromProviderSpec(tmpl.Spec.ProviderSpec, platformType)
+	return newProviderConfigFromProviderSpec(logger, tmpl.Spec.ProviderSpec, platformType)
 }
 
 // NewProviderConfigFromMachineSpec creates a new ProviderConfig from the provided machineSpec object.
-func NewProviderConfigFromMachineSpec(machineSpec machinev1beta1.MachineSpec) (ProviderConfig, error) {
+func NewProviderConfigFromMachineSpec(logger logr.Logger, machineSpec machinev1beta1.MachineSpec) (ProviderConfig, error) {
 	platformType, err := getPlatformTypeFromProviderSpec(machineSpec.ProviderSpec)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine platform type: %w", err)
 	}
 
-	return newProviderConfigFromProviderSpec(machineSpec.ProviderSpec, platformType)
+	return newProviderConfigFromProviderSpec(logger, machineSpec.ProviderSpec, platformType)
 }
 
-func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType) (ProviderConfig, error) {
+func newProviderConfigFromProviderSpec(logger logr.Logger, providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType) (ProviderConfig, error) {
 	if providerSpec.Value == nil {
 		return nil, errNilProviderSpec
 	}
 
 	switch platformType {
 	case configv1.AWSPlatformType:
-		return newAWSProviderConfig(providerSpec.Value)
+		return newAWSProviderConfig(logger, providerSpec.Value)
 	case configv1.AzurePlatformType:
-		return newAzureProviderConfig(providerSpec.Value)
+		return newAzureProviderConfig(logger, providerSpec.Value)
 	case configv1.GCPPlatformType:
-		return newGCPProviderConfig(providerSpec.Value)
+		return newGCPProviderConfig(logger, providerSpec.Value)
 	case configv1.NutanixPlatformType:
-		return newNutanixProviderConfig(providerSpec.Value)
+		return newNutanixProviderConfig(logger, providerSpec.Value)
 	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platformType)
 	default:
@@ -347,11 +347,11 @@ func getPlatformTypeFromProviderSpec(providerSpec machinev1beta1.ProviderSpec) (
 }
 
 // ExtractFailureDomainsFromMachines creates list of FailureDomains extracted from the provided list of machines.
-func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]failuredomain.FailureDomain, error) {
+func ExtractFailureDomainsFromMachines(logger logr.Logger, machines []machinev1beta1.Machine) ([]failuredomain.FailureDomain, error) {
 	machineFailureDomains := failuredomain.NewSet()
 
 	for _, machine := range machines {
-		providerconfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
+		providerconfig, err := NewProviderConfigFromMachineSpec(logger, machine.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 		}
@@ -363,8 +363,8 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 }
 
 // ExtractFailureDomainFromMachine FailureDomain extracted from the provided machine.
-func ExtractFailureDomainFromMachine(machine machinev1beta1.Machine) (failuredomain.FailureDomain, error) {
-	providerConfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
+func ExtractFailureDomainFromMachine(logger logr.Logger, machine machinev1beta1.Machine) (failuredomain.FailureDomain, error) {
+	providerConfig, err := NewProviderConfigFromMachineSpec(logger, machine.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 	}
@@ -373,11 +373,11 @@ func ExtractFailureDomainFromMachine(machine machinev1beta1.Machine) (failuredom
 }
 
 // ExtractFailureDomainsFromMachineSets creates list of FailureDomains extracted from the provided list of machineSets.
-func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSet) ([]failuredomain.FailureDomain, error) {
+func ExtractFailureDomainsFromMachineSets(logger logr.Logger, machineSets []machinev1beta1.MachineSet) ([]failuredomain.FailureDomain, error) {
 	machineSetFailureDomains := failuredomain.NewSet()
 
 	for _, machineSet := range machineSets {
-		providerconfig, err := NewProviderConfigFromMachineSpec(machineSet.Spec.Template.Spec)
+		providerconfig, err := NewProviderConfigFromMachineSpec(logger, machineSet.Spec.Template.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("error getting failure domain from machineSet %s: %w", machineSet.Name, err)
 		}
@@ -395,9 +395,9 @@ func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSe
 // instead of just omitting the unknown field. This also catches only the first unknown field
 // in the provider spec. In order to not break any live clusters, we keep the original json
 // style of unmarshaling if the strict version fails.
-func checkForUnknownFieldsInProviderSpecAndUnmarshal(raw *runtime.RawExtension, platformProviderSpec interface{}) error {
+func checkForUnknownFieldsInProviderSpecAndUnmarshal(logger logr.Logger, raw *runtime.RawExtension, platformProviderSpec interface{}) error {
 	if err := yaml.UnmarshalStrict(raw.Raw, platformProviderSpec); err != nil {
-		klog.Warning("failed to strictly unmarshal provider config due to unknown field: %w", err)
+		logger.Error(err, "failed to strictly unmarshal provider config due to unknown field")
 
 		if err := json.Unmarshal(raw.Raw, platformProviderSpec); err != nil {
 			return fmt.Errorf("failed to unmarshal provider config: %w", err)

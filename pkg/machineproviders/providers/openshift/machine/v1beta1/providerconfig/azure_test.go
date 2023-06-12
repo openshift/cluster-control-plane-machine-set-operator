@@ -22,11 +22,14 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("Azure Provider Config", func() {
+	var logger testutils.TestLogger
+
 	var providerConfig AzureProviderConfig
 
 	zone1 := "1"
@@ -40,6 +43,8 @@ var _ = Describe("Azure Provider Config", func() {
 		providerConfig = AzureProviderConfig{
 			providerConfig: *machineProviderConfig,
 		}
+
+		logger = testutils.NewTestLogger()
 	})
 
 	Context("ExtractFailureDomain", func() {
@@ -92,7 +97,7 @@ var _ = Describe("Azure Provider Config", func() {
 			rawConfig := configBuilder.BuildRawExtension()
 
 			var err error
-			providerConfig, err = newAzureProviderConfig(rawConfig)
+			providerConfig, err = newAzureProviderConfig(logger.Logger(), rawConfig)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

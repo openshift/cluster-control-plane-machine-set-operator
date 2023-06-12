@@ -96,7 +96,8 @@ func main() { //nolint:funlen,cyclop
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	ctrl.SetLogger(klogr.New())
+	logger := klogr.New()
+	ctrl.SetLogger(logger)
 
 	cfg := ctrl.GetConfigOrDie()
 	le := util.GetLeaderElectionDefaults(cfg, configv1.LeaderElection{
@@ -159,7 +160,7 @@ func main() { //nolint:funlen,cyclop
 	}
 
 	if webhookPort != 0 {
-		if err := (&cpmswebhook.ControlPlaneMachineSetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+		if err := (&cpmswebhook.ControlPlaneMachineSetWebhook{}).SetupWebhookWithManager(mgr, logger); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ControlPlaneMachineSet")
 			os.Exit(1)
 		}
