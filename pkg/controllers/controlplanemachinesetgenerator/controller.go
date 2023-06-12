@@ -209,6 +209,8 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 }
 
 // generateControlPlaneMachineSet generates a control plane machine set based on the current cluster state.
+//
+//nolint:cyclop
 func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineSet(logger logr.Logger,
 	platformType configv1.PlatformType, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (*machinev1.ControlPlaneMachineSet, error) {
 	var (
@@ -229,6 +231,11 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 		}
 	case configv1.GCPPlatformType:
 		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetGCPSpec(machines, machineSets)
+		if err != nil {
+			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
+		}
+	case configv1.NutanixPlatformType:
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(machines)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
