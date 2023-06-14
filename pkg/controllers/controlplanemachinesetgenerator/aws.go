@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -39,13 +40,13 @@ const (
 )
 
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAWSFailureDomains(machineSets, machines)
+func generateControlPlaneMachineSetAWSSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS failure domains: %w", err)
 	}
 
-	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAWSMachineSpec(machines)
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAWSMachineSpec(logger, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS spec: %w", err)
 	}
@@ -57,44 +58,8 @@ func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, ma
 	return controlPlaneMachineSetApplyConfigSpec, nil
 }
 
-// buildAWSFailureDomains builds an AWSFailureDomain config for the ControlPlaneMachineSet from cluster's Machines and MachineSets.
-func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
-	}
-
-	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
-	}
-
-	// Use a failure domain set to deduplicate the failure domains.
-	// Ensure we cover the superset of both machine and machine set failure domains.
-	failureDomains := failuredomain.NewSet(machineFailureDomains...)
-	failureDomains.Insert(machineSetFailureDomains...)
-
-	awsFailureDomains := []machinev1.AWSFailureDomain{}
-	for _, fd := range failureDomains.List() {
-		awsFailureDomains = append(awsFailureDomains, fd.AWS())
-	}
-
-	cpmsFailureDomains := machinev1.FailureDomains{
-		AWS:      &awsFailureDomains,
-		Platform: configv1.AWSPlatformType,
-	}
-
-	cpmsFailureDomainsApplyConfig := &machinev1builder.FailureDomainsApplyConfiguration{}
-	if err := convertViaJSON(cpmsFailureDomains, cpmsFailureDomainsApplyConfig); err != nil {
-		return nil,
-			fmt.Errorf("failed to convert machinev1.FailureDomains to machinev1builder.FailureDomainsApplyConfiguration: %w", err)
-	}
-
-	return cpmsFailureDomainsApplyConfig, nil
-}
-
 // buildControlPlaneMachineSetAWSMachineSpec builds an AWS flavored MachineSpec for the ControlPlaneMachineSet.
-func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
+func buildControlPlaneMachineSetAWSMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// Take the Provider Spec of the first in the machines slice
 	// as a the one to be put on the ControlPlaneMachineSet spec.
 	// Since the `machines` slice is sorted by descending creation time
@@ -102,7 +67,7 @@ func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine
 	// This is done so that if there are control plane machines with differing
 	// Provider Specs, we will use the most recent one. This is an attempt to try and inferr
 	// the spec that the user might want to choose among the different ones found in the cluster.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's aws providerSpec: %w", err)
 	}
@@ -125,4 +90,20 @@ func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine
 	return &machinev1beta1builder.MachineSpecApplyConfiguration{
 		ProviderSpec: &machinev1beta1builder.ProviderSpecApplyConfiguration{Value: &re},
 	}, nil
+}
+
+// buildAWSFailureDomains builds an AWS flavored FailureDomains for the ControlPlaneMachineSet.
+func buildAWSFailureDomains(failureDomains *failuredomain.Set) machinev1.FailureDomains {
+	awsFailureDomains := []machinev1.AWSFailureDomain{}
+
+	for _, fd := range failureDomains.List() {
+		awsFailureDomains = append(awsFailureDomains, fd.AWS())
+	}
+
+	cpmsFailureDomain := machinev1.FailureDomains{
+		AWS:      &awsFailureDomains,
+		Platform: configv1.AWSPlatformType,
+	}
+
+	return cpmsFailureDomain
 }

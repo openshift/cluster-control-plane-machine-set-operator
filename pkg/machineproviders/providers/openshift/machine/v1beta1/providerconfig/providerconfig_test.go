@@ -24,6 +24,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	"github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
@@ -46,6 +47,12 @@ var _ = Describe("Provider Config", func() {
 			expectedError         error
 		}
 
+		var logger testutils.TestLogger
+
+		BeforeEach(func() {
+			logger = testutils.NewTestLogger()
+		})
+
 		DescribeTable("should extract the config", func(in providerConfigTableInput) {
 			tmpl := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 				WithFailureDomainsBuilder(in.failureDomainsBuilder).
@@ -57,7 +64,7 @@ var _ = Describe("Provider Config", func() {
 				in.modifyTemplate(&tmpl)
 			}
 
-			providerConfig, err := NewProviderConfigFromMachineTemplate(*tmpl.OpenShiftMachineV1Beta1Machine)
+			providerConfig, err := NewProviderConfigFromMachineTemplate(logger.Logger(), *tmpl.OpenShiftMachineV1Beta1Machine)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return
@@ -248,6 +255,12 @@ var _ = Describe("Provider Config", func() {
 			expectedError         error
 		}
 
+		var logger testutils.TestLogger
+
+		BeforeEach(func() {
+			logger = testutils.NewTestLogger()
+		})
+
 		DescribeTable("should extract the config", func(in providerConfigTableInput) {
 			machine := machinev1beta1resourcebuilder.Machine().WithProviderSpecBuilder(in.providerSpecBuilder).Build()
 
@@ -255,7 +268,7 @@ var _ = Describe("Provider Config", func() {
 				in.modifyMachine(machine)
 			}
 
-			providerConfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
+			providerConfig, err := NewProviderConfigFromMachineSpec(logger.Logger(), machine.Spec)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return
@@ -298,6 +311,12 @@ var _ = Describe("Provider Config", func() {
 			expectedFailureDomains []failuredomain.FailureDomain
 		}
 
+		var logger testutils.TestLogger
+
+		BeforeEach(func() {
+			logger = testutils.NewTestLogger()
+		})
+
 		awsSubnet := machinev1.AWSResourceReference{
 			Type: machinev1.AWSFiltersReferenceType,
 			Filters: &[]machinev1.AWSResourceFilter{
@@ -311,7 +330,7 @@ var _ = Describe("Provider Config", func() {
 		}
 
 		DescribeTable("should correctly extract the failure domains", func(in extractFailureDomainsFromMachinesTableInput) {
-			failureDomains, err := ExtractFailureDomainsFromMachines(in.machines)
+			failureDomains, err := ExtractFailureDomainsFromMachines(logger.Logger(), in.machines)
 
 			if in.expectedError != nil {
 				Expect(err).To(Equal(MatchError(in.expectedError)))

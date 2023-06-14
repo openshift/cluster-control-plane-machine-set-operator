@@ -23,6 +23,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.15.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230524094249-73949d01fbbe
 	sigs.k8s.io/controller-tools v0.12.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -229,5 +230,4 @@ require (
 	mvdan.cc/unparam v0.0.0-20221223090309-7455f1af531d // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0 // indirect
 )

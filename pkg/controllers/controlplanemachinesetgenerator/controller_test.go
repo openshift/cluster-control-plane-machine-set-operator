@@ -427,10 +427,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be
@@ -482,10 +482,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be
@@ -609,7 +609,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 			It("should recreate ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
 				// In this case expect the machine Provider Spec of the youngest machine to be used here.
 				// In this case it should be `machine-1` given that's the one we created last.
-				machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+				machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 				Expect(err).To(BeNil())
 
 				// Remove from the machine Provider Spec the fields that won't be
@@ -623,7 +623,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 				Eventually(komega.Object(cpms), time.Second*30).Should(
 					HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.Spec",
 						WithTransform(func(in machinev1beta1.MachineSpec) machinev1beta1.AWSMachineProviderConfig {
-							mPS, err := providerconfig.NewProviderConfigFromMachineSpec(in)
+							mPS, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), in)
 							if err != nil {
 								return machinev1beta1.AWSMachineProviderConfig{}
 							}
@@ -1001,10 +1001,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be
@@ -1055,10 +1055,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be
@@ -1181,7 +1181,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 			It("should recreate ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
 				// In this case expect the machine Provider Spec of the youngest machine to be used here.
 				// In this case it should be `machine-1` given that's the one we created last.
-				machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+				machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 				Expect(err).To(BeNil())
 
 				// Remove from the machine Provider Spec the fields that won't be
@@ -1194,7 +1194,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				Eventually(komega.Object(cpms), time.Second*30).Should(
 					HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.Spec",
 						WithTransform(func(in machinev1beta1.MachineSpec) machinev1beta1.AzureMachineProviderSpec {
-							mPS, err := providerconfig.NewProviderConfigFromMachineSpec(in)
+							mPS, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), in)
 							if err != nil {
 								return machinev1beta1.AzureMachineProviderSpec{}
 							}
@@ -1572,10 +1572,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be
@@ -1626,10 +1626,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be
@@ -1752,7 +1752,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 			It("should recreate ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
 				// In this case expect the machine Provider Spec of the youngest machine to be used here.
 				// In this case it should be `machine-1` given that's the one we created last.
-				machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+				machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 				Expect(err).To(BeNil())
 
 				// Remove from the machine Provider Spec the fields that won't be
@@ -1765,7 +1765,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 				Eventually(komega.Object(cpms), time.Second*30).Should(
 					HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.Spec",
 						WithTransform(func(in machinev1beta1.MachineSpec) machinev1beta1.GCPMachineProviderSpec {
-							mPS, err := providerconfig.NewProviderConfigFromMachineSpec(in)
+							mPS, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), in)
 							if err != nil {
 								return machinev1beta1.GCPMachineProviderSpec{}
 							}
@@ -2073,10 +2073,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					machineProviderConfig := machineProviderSpec.Generic()
@@ -2110,10 +2110,10 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 					Eventually(komega.Get(cpms)).Should(Succeed())
 					// In this case expect the machine Provider Spec of the youngest machine to be used here.
 					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
 					Expect(err).To(BeNil())
 
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(machine2.Spec)
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec)
 					Expect(err).To(BeNil())
 
 					// Remove from the machine Provider Spec the fields that won't be

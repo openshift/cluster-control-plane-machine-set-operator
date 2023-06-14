@@ -19,6 +19,7 @@ package controlplanemachinesetgenerator
 import (
 	"fmt"
 
+	"github.com/go-logr/logr"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinev1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1"
 	machinev1beta1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1"
@@ -28,8 +29,8 @@ import (
 )
 
 // generateControlPlaneMachineSetNutanixSpec generates a Nutanix flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetNutanixSpec(machines []machinev1beta1.Machine) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetNutanixMachineSpec(machines)
+func generateControlPlaneMachineSetNutanixSpec(logger logr.Logger, machines []machinev1beta1.Machine) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetNutanixMachineSpec(logger, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's Nutanix spec: %w", err)
 	}
@@ -42,10 +43,10 @@ func generateControlPlaneMachineSetNutanixSpec(machines []machinev1beta1.Machine
 }
 
 // buildControlPlaneMachineSetNutanixMachineSpec builds a Nutanix flavored MachineSpec for the ControlPlaneMachineSet.
-func buildControlPlaneMachineSetNutanixMachineSpec(machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
+func buildControlPlaneMachineSetNutanixMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's providerSpec: %w", err)
 	}

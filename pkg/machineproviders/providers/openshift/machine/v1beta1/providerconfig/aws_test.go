@@ -23,11 +23,14 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 )
 
 var _ = Describe("AWS Provider Config", func() {
+	var logger testutils.TestLogger
+
 	var providerConfig AWSProviderConfig
 
 	var azUSEast1a = "us-east-1a"
@@ -77,6 +80,8 @@ var _ = Describe("AWS Provider Config", func() {
 		providerConfig = AWSProviderConfig{
 			providerConfig: *machineProviderConfig,
 		}
+
+		logger = testutils.NewTestLogger()
 	})
 
 	Context("ExtractFailureDomain", func() {
@@ -141,7 +146,7 @@ var _ = Describe("AWS Provider Config", func() {
 			rawConfig := configBuilder.BuildRawExtension()
 
 			var err error
-			providerConfig, err = newAWSProviderConfig(rawConfig)
+			providerConfig, err = newAWSProviderConfig(logger.Logger(), rawConfig)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

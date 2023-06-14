@@ -158,7 +158,7 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *mach
 	indexToMachine := make(map[int32]machinev1beta1.Machine)
 
 	for _, machine := range machineList.Items {
-		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(machine)
+		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract failure domain from machine %s: %w", machine.Name, err)
 		}
@@ -181,7 +181,7 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *mach
 				continue
 			}
 
-			oldMachineFailureDomain, err := providerconfig.ExtractFailureDomainFromMachine(oldMachine)
+			oldMachineFailureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, oldMachine)
 			if err != nil {
 				return nil, fmt.Errorf("could not extract failure domain from machine %s: %w", oldMachine.Name, err)
 			}

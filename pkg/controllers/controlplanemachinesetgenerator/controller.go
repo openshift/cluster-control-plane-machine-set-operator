@@ -193,7 +193,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 	}
 
 	// Compare if the current and the newly generated ControlPlaneMachineSet spec match.
-	if diff, err := compareControlPlaneMachineSets(cpms, generatedCPMS); err != nil {
+	if diff, err := compareControlPlaneMachineSets(logger, cpms, generatedCPMS); err != nil {
 		return reconcile.Result{}, fmt.Errorf("unable to compare control plane machine sets: %w", err)
 	} else if diff != nil {
 		// The two ControlPlaneMachineSets don't match.
@@ -220,22 +220,22 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 
 	switch platformType {
 	case configv1.AWSPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAWSSpec(machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAWSSpec(logger, machines, machineSets)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.AzurePlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAzureSpec(machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAzureSpec(logger, machines, machineSets)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.GCPPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetGCPSpec(machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetGCPSpec(logger, machines, machineSets)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.NutanixPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(machines)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(logger, machines)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}

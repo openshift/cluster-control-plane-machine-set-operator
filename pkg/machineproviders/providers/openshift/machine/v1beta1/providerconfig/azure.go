@@ -17,9 +17,9 @@ limitations under the License.
 package providerconfig
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -60,10 +60,11 @@ func (a AzureProviderConfig) Config() machinev1beta1.AzureMachineProviderSpec {
 // newAzureProviderConfig creates an Azure type ProviderConfig from the raw extension.
 // It should return an error if the provided RawExtension does not represent
 // an AzureMachineProviderConfig.
-func newAzureProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
+func newAzureProviderConfig(logger logr.Logger, raw *runtime.RawExtension) (ProviderConfig, error) {
 	azureMachineProviderSpec := machinev1beta1.AzureMachineProviderSpec{}
-	if err := json.Unmarshal(raw.Raw, &azureMachineProviderSpec); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+
+	if err := checkForUnknownFieldsInProviderSpecAndUnmarshal(logger, raw, &azureMachineProviderSpec); err != nil {
+		return nil, fmt.Errorf("failed to check for unknown fields in the provider spec: %w", err)
 	}
 
 	azureProviderConfig := AzureProviderConfig{

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -31,13 +32,13 @@ import (
 )
 
 // generateControlPlaneMachineSetAzureSpec generates an Azure flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetAzureSpec(machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAzureFailureDomains(machineSets, machines)
+func generateControlPlaneMachineSetAzureSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's Azure failure domains: %w", err)
 	}
 
-	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAzureMachineSpec(machines)
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAzureMachineSpec(logger, machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's Azure spec: %w", err)
 	}
@@ -50,49 +51,11 @@ func generateControlPlaneMachineSetAzureSpec(machines []machinev1beta1.Machine, 
 	return controlPlaneMachineSetApplyConfigSpec, nil
 }
 
-// buildAzureFailureDomains builds an AzureFailureDomain config for the ControlPaneMachineSet from the cluster's Machines and MachineSets.
-func buildAzureFailureDomains(machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
-	// Fetch failure domains from the machines
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(machines)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
-	}
-
-	// Fetch failure domains from the machineSets
-	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
-	}
-
-	// We have to get rid of duplicates from the failure domains.
-	// We construct a set from the failure domains, since a set can't have duplicates.
-	failureDomains := failuredomain.NewSet(machineFailureDomains...)
-	// Construction of a union of failure domains of machines and machineSets.
-	failureDomains.Insert(machineSetFailureDomains...)
-
-	azureFailureDomains := []machinev1.AzureFailureDomain{}
-	for _, fd := range failureDomains.List() {
-		azureFailureDomains = append(azureFailureDomains, fd.Azure())
-	}
-
-	cpmsFailureDomain := machinev1.FailureDomains{
-		Azure:    &azureFailureDomains,
-		Platform: configv1.AzurePlatformType,
-	}
-
-	cpmsFailureDomainsApplyConfig := &machinev1builder.FailureDomainsApplyConfiguration{}
-	if err := convertViaJSON(cpmsFailureDomain, cpmsFailureDomainsApplyConfig); err != nil {
-		return nil, fmt.Errorf("failed to convert machinev1.FailureDomains to machinev1builder.FailureDomainsApplyConfiguration: %w", err)
-	}
-
-	return cpmsFailureDomainsApplyConfig, nil
-}
-
 // buildControlPlaneMachineSetAzureMachineSpec builds an Azure flavored MachineSpec for the ControlPlaneMachineSet.
-func buildControlPlaneMachineSetAzureMachineSpec(machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
+func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's azure providerSpec: %w", err)
 	}
@@ -113,4 +76,20 @@ func buildControlPlaneMachineSetAzureMachineSpec(machines []machinev1beta1.Machi
 	return &machinev1beta1builder.MachineSpecApplyConfiguration{
 		ProviderSpec: &machinev1beta1builder.ProviderSpecApplyConfiguration{Value: &re},
 	}, nil
+}
+
+// buildAzureFailureDomains builds an Azure flavored FailureDomains for the ControlPlaneMachineSet.
+func buildAzureFailureDomains(failureDomains *failuredomain.Set) machinev1.FailureDomains {
+	azureFailureDomains := []machinev1.AzureFailureDomain{}
+
+	for _, fd := range failureDomains.List() {
+		azureFailureDomains = append(azureFailureDomains, fd.Azure())
+	}
+
+	cpmsFailureDomain := machinev1.FailureDomains{
+		Azure:    &azureFailureDomains,
+		Platform: configv1.AzurePlatformType,
+	}
+
+	return cpmsFailureDomain
 }

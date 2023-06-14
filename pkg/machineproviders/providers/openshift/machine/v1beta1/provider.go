@@ -100,7 +100,7 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, errEmptyConfig
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*cpms.Spec.Template.OpenShiftMachineV1Beta1Machine)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger, *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine)
 	if err != nil {
 		return nil, fmt.Errorf("error building a provider config: %w", err)
 	}
@@ -240,7 +240,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not determine machine index: %w", err)
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machine.Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machine.Spec)
 	if err != nil {
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not compare existing and desired provider configs: %w", err)
 	}
@@ -262,7 +262,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 		}
 	}
 
-	validProviderConfig, err := m.ensureValidProviderConfig(ctx, templateProviderConfig)
+	validProviderConfig, err := m.ensureValidProviderConfig(ctx, logger, templateProviderConfig)
 	if err != nil {
 		return machineproviders.MachineInfo{}, fmt.Errorf("cannot ensure that the provider config is valid: %w", err)
 	}
@@ -288,7 +288,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 }
 
 // ensureValidProviderConfig makes sure that the provider config is valid by dry-run creating a machine.
-func (m *openshiftMachineProvider) ensureValidProviderConfig(ctx context.Context, providerConfig providerconfig.ProviderConfig) (providerconfig.ProviderConfig, error) {
+func (m *openshiftMachineProvider) ensureValidProviderConfig(ctx context.Context, logger logr.Logger, providerConfig providerconfig.ProviderConfig) (providerconfig.ProviderConfig, error) {
 	dryRunMachine := &machinev1beta1.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "tmp-machine-dry-run",
@@ -311,7 +311,7 @@ func (m *openshiftMachineProvider) ensureValidProviderConfig(ctx context.Context
 		return nil, fmt.Errorf("could not dry-run create the machine: %w", err)
 	}
 
-	machineProviderConfig, err := providerconfig.NewProviderConfigFromMachineSpec(dryRunMachine.Spec)
+	machineProviderConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, dryRunMachine.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("could not get provider config for machine: %w", err)
 	}
@@ -328,7 +328,7 @@ func (m *openshiftMachineProvider) getMachineIndex(logger logr.Logger, machine m
 
 	// If the Machine name format doesn't match, try to fallback to matching based on the failure domain
 	// with the Machine's provider spec.
-	failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(machine)
+	failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine)
 	if err != nil {
 		return 0, fmt.Errorf("cannot extract failure domain from machine: %w", err)
 	}

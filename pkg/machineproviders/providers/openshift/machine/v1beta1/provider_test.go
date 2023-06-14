@@ -217,7 +217,7 @@ var _ = Describe("MachineProvider", func() {
 				BuildTemplate().OpenShiftMachineV1Beta1Machine
 			Expect(template).ToNot(BeNil())
 
-			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template)
+			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template)
 			Expect(err).ToNot(HaveOccurred())
 
 			provider := &openshiftMachineProvider{
@@ -1456,7 +1456,7 @@ var _ = Describe("MachineProvider", func() {
 					WithLabel(machinev1beta1.MachineClusterIDLabel, "cpms-aws-cluster-id").
 					BuildTemplate()
 
-				providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template.OpenShiftMachineV1Beta1Machine)
+				providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template.OpenShiftMachineV1Beta1Machine)
 				Expect(err).ToNot(HaveOccurred())
 
 				provider = &openshiftMachineProvider{
@@ -1533,7 +1533,7 @@ var _ = Describe("MachineProvider", func() {
 						WithLabel(machinev1beta1.MachineClusterIDLabel, "cpms-aws-cluster-id").
 						BuildTemplate()
 
-					providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template.OpenShiftMachineV1Beta1Machine)
+					providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template.OpenShiftMachineV1Beta1Machine)
 					Expect(err).ToNot(HaveOccurred())
 
 					openshiftProvider, ok := provider.(*openshiftMachineProvider)
@@ -1565,7 +1565,7 @@ var _ = Describe("MachineProvider", func() {
 				BuildTemplate().OpenShiftMachineV1Beta1Machine
 			Expect(template).ToNot(BeNil())
 
-			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(*template)
+			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template)
 			Expect(err).ToNot(HaveOccurred())
 
 			machineProvider = &openshiftMachineProvider{
