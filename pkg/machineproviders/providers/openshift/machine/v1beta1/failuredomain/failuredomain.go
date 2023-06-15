@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -317,24 +318,29 @@ func gcpFailureDomainToString(fd machinev1.GCPFailureDomain) string {
 
 // openstackFailureDomainToString converts the OpenStackFailureDomain into a string.
 func openstackFailureDomainToString(fd machinev1.OpenStackFailureDomain) string {
-	displayRootVolume := func(rootVolume machinev1.RootVolume) string {
-		return fmt.Sprintf("{AvailabilityZone:%s}", rootVolume.AvailabilityZone)
+	if fd.AvailabilityZone == "" && fd.RootVolume == nil {
+		return unknownFailureDomain
 	}
 
-	// AvailabilityZone only
-	if fd.AvailabilityZone != "" && fd.RootVolume == nil {
-		return fmt.Sprintf("OpenStackFailureDomain{AvailabilityZone:%s}", fd.AvailabilityZone)
+	var failureDomain []string
+
+	if fd.AvailabilityZone != "" {
+		failureDomain = append(failureDomain, "AvailabilityZone:"+fd.AvailabilityZone)
 	}
 
-	// RootVolume only
-	if fd.AvailabilityZone == "" && fd.RootVolume != nil {
-		return fmt.Sprintf("OpenStackFailureDomain{RootVolume:%s}", displayRootVolume(*fd.RootVolume))
+	if fd.RootVolume != nil {
+		var rootVolume []string
+
+		if fd.RootVolume.AvailabilityZone != "" {
+			rootVolume = append(rootVolume, "AvailabilityZone:"+fd.RootVolume.AvailabilityZone)
+		}
+
+		if fd.RootVolume.VolumeType != "" {
+			rootVolume = append(rootVolume, "VolumeType:"+fd.RootVolume.VolumeType)
+		}
+
+		failureDomain = append(failureDomain, "RootVolume:{"+strings.Join(rootVolume, ", ")+"}")
 	}
 
-	// AvailabilityZone and RootVolume
-	if fd.AvailabilityZone != "" && fd.RootVolume != nil {
-		return fmt.Sprintf("OpenStackFailureDomain{AvailabilityZone:%s, RootVolume:%s}", fd.AvailabilityZone, displayRootVolume(*fd.RootVolume))
-	}
-
-	return unknownFailureDomain
+	return "OpenStackFailureDomain{" + strings.Join(failureDomain, ", ") + "}"
 }

@@ -32,16 +32,25 @@ var _ = Describe("OpenStack Provider Config", func() {
 	var logger testutils.TestLogger
 
 	var providerConfig OpenStackProviderConfig
+	var providerConfigWithVolumeType OpenStackProviderConfig
 
 	novaZone1 := "nova-az1"
 	novaZone2 := "nova-az2"
 	cinderZone1 := "cinder-az1"
+	volumeType1 := "volumetype-1"
 
 	machinev1alpha1RootVolume1 := &machinev1alpha1.RootVolume{
 		Zone: cinderZone1,
 	}
 	machinev1RootVolume1 := machinev1.RootVolume{
 		AvailabilityZone: cinderZone1,
+	}
+
+	machinev1alpha1RootVolume2 := &machinev1alpha1.RootVolume{
+		VolumeType: volumeType1,
+	}
+	machinev1RootVolume2 := machinev1.RootVolume{
+		VolumeType: volumeType1,
 	}
 
 	BeforeEach(func() {
@@ -52,6 +61,19 @@ var _ = Describe("OpenStack Provider Config", func() {
 
 		providerConfig = OpenStackProviderConfig{
 			providerConfig: *machineProviderConfig,
+		}
+
+		providerConfig = OpenStackProviderConfig{
+			providerConfig: *machineProviderConfig,
+		}
+
+		machineProviderConfigWithVolumeType := machinev1beta1resourcebuilder.OpenStackProviderSpec().
+			WithZone(novaZone1).
+			WithRootVolume(machinev1alpha1RootVolume2).
+			Build()
+
+		providerConfigWithVolumeType = OpenStackProviderConfig{
+			providerConfig: *machineProviderConfigWithVolumeType,
 		}
 
 		logger = testutils.NewTestLogger()
@@ -65,6 +87,17 @@ var _ = Describe("OpenStack Provider Config", func() {
 				Build()
 
 			Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
+		})
+	})
+
+	Context("ExtractFailureDomainWithVolumeType", func() {
+		It("returns the configured failure domain", func() {
+			expected := machinev1resourcebuilder.OpenStackFailureDomain().
+				WithComputeAvailabilityZone(novaZone1).
+				WithRootVolume(machinev1RootVolume2).
+				Build()
+
+			Expect(providerConfigWithVolumeType.ExtractFailureDomain()).To(Equal(expected))
 		})
 	})
 

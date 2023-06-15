@@ -196,6 +196,33 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With OpenStack failure domain configuration with volumeType", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az0", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostA"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az1", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostB"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az2", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostC"}},
+				).BuildFailureDomains()
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{VolumeType:volume.hostA}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{VolumeType:volume.hostB}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{VolumeType:volume.hostC}}"),
+				))
+			})
+		})
+
 		Context("With invalid OpenStack failure domain configuration", func() {
 			var failureDomains []FailureDomain
 			var err error

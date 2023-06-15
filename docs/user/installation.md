@@ -241,8 +241,10 @@ plane machines and you should populate this on both the Machine and the ControlP
 
 #### Configuring a control plane machine set on OpenStack
 
-Two fields are supported for now: `availabilityZone` (instance AZ) and `rootVolume.availabilityZone` (root volume AZ).
-Gather the existing control plane machines and note the value of the zones of each if they exist.
+The OpenStack failureDomain configuration supports three fields:
+`availabilityZone` (instance AZ), `rootVolume.availabilityZone` (root volume
+AZ) and `rootVolume.volumeType`.
+Gather the existing control plane machines and note the value of the properties of each if they differ from each other.
 Aside from these fields, the remaining in spec the machines should be identical.
 
 Copy the value from one of the machines into the `providerSpec.value` (6) on the example above.
@@ -253,9 +255,11 @@ For each AZ you have in the cluster, configure a failure domain like below:
 - availabilityZone: "<nova availability zone>"
   rootVolume:
     availabilityZone: "<cinder availability zone>"
+    volumeType: "<cinder volume type>"
 ```
 
-With these zones, the complete `failureDomains` (4 and 5) on the example above should look something like below:
+OpenStack failure domains may not be empty, however each individual property is optional.
+With these zones, the `failureDomains` (4 and 5) on the example above should look something like below:
 ```yaml
 failureDomains:
   platform: OpenStack
@@ -275,4 +279,3 @@ Prior to 4.14, if the masters were configured with Availability Zones (AZ), the 
 one ServerGroup in OpenStack (the one initially created for master-0, ending with the name of the AZ) but configure
 the Machine ProviderSpec with different ServerGroups, one per AZ.
 So if you upgrade a cluster from a previous release to 4.14, you'll need to follow this [solution](https://access.redhat.com/solutions/7013893).
-
