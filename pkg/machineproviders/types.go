@@ -43,6 +43,10 @@ type MachineInfo struct {
 	// This is used to inform the controller about decisions related to rolling out new machines.
 	NeedsUpdate bool
 
+	// Diff is the computed difference between the existing spec of the Machine and the desired spec of the Machine.
+	// This is only ever populated when NeedsUpdate is true.
+	Diff []string
+
 	// Index denotes the Control Plane Machine index. Each Control Plane Machine replica is index (typically 0-2 in a
 	// three node cluster) and the Index will be needed to generate a replacement of this replica,  if a replacement is
 	// required.

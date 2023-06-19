@@ -223,6 +223,7 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 			"index", machineInfo.Index,
 			"ready", machineInfo.Ready,
 			"needsUpdate", machineInfo.NeedsUpdate,
+			"diff", machineInfo.Diff,
 			"errorMessage", machineInfo.ErrorMessage,
 		)
 	}
@@ -267,10 +268,12 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 		return machineproviders.MachineInfo{}, fmt.Errorf("cannot ensure that the provider config is valid: %w", err)
 	}
 
-	configsEqual, err := validProviderConfig.Equal(providerConfig)
+	diff, err := validProviderConfig.Diff(providerConfig)
 	if err != nil {
 		return machineproviders.MachineInfo{}, fmt.Errorf("cannot compare provider configs: %w", err)
 	}
+
+	configsEqual := len(diff) == 0
 
 	ready, err := m.isMachineReady(ctx, machine)
 	if err != nil {
@@ -282,6 +285,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 		NodeRef:      nodeRef,
 		Ready:        ready,
 		NeedsUpdate:  !configsEqual,
+		Diff:         diff,
 		Index:        machineIndex,
 		ErrorMessage: pointer.StringDeref(machine.Status.ErrorMessage, ""),
 	}, nil

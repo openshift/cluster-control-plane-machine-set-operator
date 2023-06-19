@@ -52,10 +52,14 @@ const (
 	// for the update strategy.
 	invalidStrategyMessage = "invalid value for spec.strategy.type"
 
-	// machineRequiresUpdate is a log message used to inform the user that a Machine requires an update,
+	// machineRequiresUpdate is a log message used to inform the user that a Machine requires an update.
+	// This is used with the RollingUpdate replacement strategy.
+	machineRequiresUpdate = "Machine requires an update"
+
+	// machineRequiresDeleteBeforeUpdate is a log message used to inform the user that a Machine requires an update,
 	// but that they must first delete the Machine to trigger a replacement.
 	// This is used with the OnDelete replacement strategy.
-	machineRequiresUpdate = "Machine requires an update, delete the machine to trigger a replacement"
+	machineRequiresDeleteBeforeUpdate = "Machine requires an update, delete the machine to trigger a replacement"
 
 	// noUpdatesRequired is a log message used to inform the user that no updates are required within
 	// the current set of Machines.
@@ -424,7 +428,7 @@ func (r *ControlPlaneMachineSetReconciler) createOnDeleteReplacementMachines(ctx
 			return true, result, nil
 		} else {
 			// if not deleted, tell the user to delete it
-			logger.V(2).Info(machineRequiresUpdate)
+			logger.V(2).WithValues("diff", machines[0].Diff).Info(machineRequiresDeleteBeforeUpdate)
 			return true, ctrl.Result{}, nil
 		}
 	}
@@ -462,6 +466,12 @@ func (r *ControlPlaneMachineSetReconciler) createRollingUpdateReplacementMachine
 		// Consider the first found outdated machine for this index to be the one in need of update.
 		outdatedMachine := machinesNeedingReplacement[0]
 		logger := logger.WithValues("index", outdatedMachine.Index, "namespace", r.Namespace, "name", outdatedMachine.MachineRef.ObjectMeta.Name)
+
+		// The diff will be nil if the machine has been deleted.
+		// Only log whether a machine requires an update if diff is not nil.
+		if outdatedMachine.Diff != nil {
+			logger.V(2).WithValues("diff", outdatedMachine.Diff).Info(machineRequiresUpdate)
+		}
 
 		result, err := r.createMachineWithSurge(ctx, logger, machineProvider, outdatedMachine.Index, maxSurge, surgeCount)
 		if err != nil {

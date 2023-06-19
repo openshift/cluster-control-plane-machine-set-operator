@@ -47,6 +47,7 @@ type MachineInfoBuilder struct {
 	index        int32
 	needsUpdate  bool
 	ready        bool
+	diff         []string
 }
 
 // Build builds a new machineinfo based on the configuration provided.
@@ -56,6 +57,7 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 		Index:        m.index,
 		Ready:        m.ready,
 		NeedsUpdate:  m.needsUpdate,
+		Diff:         m.diff,
 	}
 
 	if m.machineName != "" {
@@ -81,7 +83,22 @@ func (m MachineInfoBuilder) Build() machineproviders.MachineInfo {
 		}
 	}
 
+	if !m.needsUpdate && m.diff != nil {
+		panic("There shall not be Diff if NeedsUpdate is false")
+	}
+
 	return info
+}
+
+// WithDiff sets the needsupdate for the machineinfo builder.
+func (m MachineInfoBuilder) WithDiff(diff []string) MachineInfoBuilder {
+	if diff != nil {
+		m.needsUpdate = true
+	}
+
+	m.diff = diff
+
+	return m
 }
 
 // WithMachineCreationTimestamp sets the machine creation timestamp for the machineinfo builder.
