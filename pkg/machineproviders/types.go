@@ -79,7 +79,7 @@ type MachineProvider interface {
 	// WithClient is used to set API client for the Machine Provider.
 	// It should not mutate the state of the existing provider but return
 	// a copy of the provider with the new client.
-	WithClient(client client.Client) MachineProvider
+	WithClient(context.Context, logr.Logger, client.Client) (MachineProvider, error)
 
 	// CreateMachine is used to instruct the Machine Provider to create a new Machine. The only input is the index for
 	// the new Machine. During construction of the MachineProvider, it should map indexes to failure domains so that it

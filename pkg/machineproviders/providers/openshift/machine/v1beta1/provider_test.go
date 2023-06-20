@@ -179,15 +179,9 @@ var _ = Describe("MachineProvider", func() {
 		}
 
 		DescribeTable("builds machine info based on the cluster state", func(in getMachineInfosTableInput) {
+			machines := []machinev1beta1.Machine{}
 			for _, machine := range in.machines {
-				machine.SetNamespace(namespaceName)
-
-				status := machine.Status.DeepCopy()
-
-				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
-
-				machine.Status = *status
-				Expect(k8sClient.Status().Update(ctx, machine)).To(Succeed())
+				machines = append(machines, *machine)
 			}
 
 			for _, node := range in.nodes {
@@ -197,12 +191,6 @@ var _ = Describe("MachineProvider", func() {
 
 				node.Status = *status
 				Expect(k8sClient.Status().Update(ctx, node)).To(Succeed())
-			}
-
-			// Inject namespace in the expected machine infos since it doesn't happen during
-			// initial building.
-			for i := 0; i < len(in.expectedMachineInfos); i++ {
-				in.expectedMachineInfos[i].MachineRef.ObjectMeta.SetNamespace(namespaceName)
 			}
 
 			providerSpec := providerSpecBuilder
@@ -222,10 +210,14 @@ var _ = Describe("MachineProvider", func() {
 			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template)
 			Expect(err).ToNot(HaveOccurred())
 
+			selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
+			Expect(err).ToNot(HaveOccurred())
+
 			provider := &openshiftMachineProvider{
 				client:               k8sClient,
 				indexToFailureDomain: in.failureDomains,
-				machineSelector:      cpms.Spec.Selector,
+				machines:             machines,
+				machineSelector:      selector,
 				machineTemplate:      *template,
 				providerConfig:       providerConfig,
 				namespace:            namespaceName,
@@ -1068,58 +1060,6 @@ var _ = Describe("MachineProvider", func() {
 					},
 				},
 			}),
-			Entry("with additional Machines, not matched by the selector, ignores them", getMachineInfosTableInput{
-				machines: []*machinev1beta1.Machine{
-					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
-						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-0"}).Build(),
-					masterMachineBuilder.WithName(masterMachineName("1")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnetbeta1)).
-						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-1"}).Build(),
-					machinev1beta1resourcebuilder.Machine().AsWorker().WithNamespace(namespaceName).WithName("worker-abcde").WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnetbeta1)).
-						WithPhase("Running").WithNodeRef(corev1.ObjectReference{Name: "node-2"}).Build(),
-				},
-				nodes: []*corev1.Node{
-					masterNodeBuilder.WithName("node-0").Build(),
-					masterNodeBuilder.WithName("node-1").Build(),
-					masterNodeBuilder.WithName("node-2").Build(),
-				},
-				failureDomains: map[int32]failuredomain.FailureDomain{
-					0: failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnet).Build()),
-					1: failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
-					2: failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
-				},
-				expectedMachineInfos: []machineproviders.MachineInfo{
-					readyMachineInfoBuilder.WithIndex(0).WithMachineName(masterMachineName("0")).WithNodeName("node-0").Build(),
-					readyMachineInfoBuilder.WithIndex(1).WithMachineName(masterMachineName("1")).WithNodeName("node-1").Build(),
-				},
-				expectedLogs: []testutils.LogEntry{
-					{
-						Level: 4,
-						KeysAndValues: []interface{}{
-							"machineName", masterMachineName("0"),
-							"nodeName", "node-0",
-							"index", int32(0),
-							"ready", true,
-							"needsUpdate", false,
-							"diff", nilDiff,
-							"errorMessage", "",
-						},
-						Message: "Gathered Machine Info",
-					},
-					{
-						Level: 4,
-						KeysAndValues: []interface{}{
-							"machineName", masterMachineName("1"),
-							"nodeName", "node-1",
-							"index", int32(1),
-							"ready", true,
-							"needsUpdate", false,
-							"diff", nilDiff,
-							"errorMessage", "",
-						},
-						Message: "Gathered Machine Info",
-					},
-				},
-			}),
 			Entry("with a Machine whose failure domain does not match the mapping, should update the Machine", getMachineInfosTableInput{
 				machines: []*machinev1beta1.Machine{
 					masterMachineBuilder.WithName(masterMachineName("0")).WithProviderSpecBuilder(providerSpecBuilder.WithAvailabilityZone("us-east-1a").WithSubnet(usEast1aSubnetbeta1)).
@@ -1560,6 +1500,9 @@ var _ = Describe("MachineProvider", func() {
 				providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template.OpenShiftMachineV1Beta1Machine)
 				Expect(err).ToNot(HaveOccurred())
 
+				selector, err := metav1.LabelSelectorAsSelector(&machinev1resourcebuilder.ControlPlaneMachineSet().Build().Spec.Selector)
+				Expect(err).ToNot(HaveOccurred())
+
 				provider = &openshiftMachineProvider{
 					client: k8sClient,
 					indexToFailureDomain: map[int32]failuredomain.FailureDomain{
@@ -1567,7 +1510,7 @@ var _ = Describe("MachineProvider", func() {
 						1: failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1b").WithSubnet(usEast1bSubnet).Build()),
 						2: failuredomain.NewAWSFailureDomain(machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-east-1c").WithSubnet(usEast1cSubnet).Build()),
 					},
-					machineSelector: machinev1resourcebuilder.ControlPlaneMachineSet().Build().Spec.Selector,
+					machineSelector: selector,
 					machineTemplate: *template.OpenShiftMachineV1Beta1Machine,
 					ownerMetadata: metav1.ObjectMeta{
 						Name: ownerName,
@@ -1669,10 +1612,13 @@ var _ = Describe("MachineProvider", func() {
 			providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger.Logger(), *template)
 			Expect(err).ToNot(HaveOccurred())
 
+			selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
+			Expect(err).ToNot(HaveOccurred())
+
 			machineProvider = &openshiftMachineProvider{
 				client:               k8sClient,
 				indexToFailureDomain: map[int32]failuredomain.FailureDomain{},
-				machineSelector:      cpms.Spec.Selector,
+				machineSelector:      selector,
 				machineTemplate:      *template,
 				ownerMetadata: metav1.ObjectMeta{
 					UID: types.UID(ownerUID),

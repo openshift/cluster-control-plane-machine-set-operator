@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -26,15 +25,11 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -51,21 +46,21 @@ var (
 // to by external code to create new Machines in the same failure domain. It should start with a basic mapping and
 // then use existing Machine information to map failure domains, if possible, so that the Machine names match the
 // index of the failure domain in which they currently reside.
-func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet, failureDomains []failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
+func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1beta1.Machine, replicas int32, failureDomains []failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
 	if len(failureDomains) == 0 {
 		logger.V(4).Info("No failure domains provided")
 
 		return nil, errNoFailureDomains
 	}
 
-	machineMapping, deletingIndexes, err := createMachineMapping(ctx, logger, cl, cpms)
+	machineMapping, deletingIndexes, err := createMachineMapping(logger, machines)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct machine mapping: %w", err)
 	}
 
 	failureDomainsSet := failuredomain.NewSet(failureDomains...)
 
-	baseMapping, err := createBaseFailureDomainMapping(cpms, failureDomainsSet.List(), machineMapping)
+	baseMapping, err := createBaseFailureDomainMapping(replicas, failureDomainsSet.List(), machineMapping)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct base failure domain mapping: %w", err)
 	}
@@ -86,10 +81,10 @@ func mapMachineIndexesToFailureDomains(ctx context.Context, logger logr.Logger, 
 // domains.
 // Create the output based on the longer of the number of Machines or replicas so that when we reconcile the machine
 // mappings we always have enough candidates which are balanced between the available failure domains.
-func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, failureDomains []failuredomain.FailureDomain, machineMapping map[int32]failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
+func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredomain.FailureDomain, machineMapping map[int32]failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
 	out := make(map[int32]failuredomain.FailureDomain)
 
-	if cpms.Spec.Replicas == nil || *cpms.Spec.Replicas < 1 {
+	if replicas < 1 {
 		return nil, errReplicasRequired
 	}
 
@@ -102,8 +97,8 @@ func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, fail
 
 	// Create a base mapping which account for the larger of the number of machines or
 	// the desired replica count.
-	if *cpms.Spec.Replicas > int32(machineIndexCount) {
-		machineIndexCount = int(*cpms.Spec.Replicas)
+	if replicas > int32(machineIndexCount) {
+		machineIndexCount = int(replicas)
 	}
 
 	if len(failureDomains) == 0 {
@@ -128,36 +123,26 @@ func createBaseFailureDomainMapping(cpms *machinev1.ControlPlaneMachineSet, fail
 // createMachineMapping inspects the state of the Machines on the cluster, selected by the ControlPlaneMachineSet, and
 // creates a mapping of their indexes (if available) to their failure domain to allow the mapping to be customised
 // to the state of the cluster.
-func createMachineMapping(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (map[int32]failuredomain.FailureDomain, sets.Set[int32], error) {
-	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not convert label selector to selector: %w", err)
-	}
-
-	machineList := &machinev1beta1.MachineList{}
-	if err := cl.List(ctx, machineList, &client.ListOptions{LabelSelector: selector}); err != nil {
-		return nil, nil, fmt.Errorf("failed to list machines: %w", err)
-	}
-
-	mapping, err := mapIndexesToFailureDomainsForMachines(logger, machineList)
+func createMachineMapping(logger logr.Logger, machines []machinev1beta1.Machine) (map[int32]failuredomain.FailureDomain, sets.Set[int32], error) {
+	mapping, err := mapIndexesToFailureDomainsForMachines(logger, machines)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not map indexes to failure domains for machines: %w", err)
 	}
 
-	deletingIndexes := listDeletingIndexes(machineList.Items)
+	deletingIndexes := listDeletingIndexes(machines)
 
 	return mapping, deletingIndexes, nil
 }
 
 // mapIndexesToFailureDomainsForMachines creates an index to failure domain mapping for machine in the list.
-func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machineList *machinev1beta1.MachineList) (map[int32]failuredomain.FailureDomain, error) {
+func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machinev1beta1.Machine) (map[int32]failuredomain.FailureDomain, error) {
 	out := make(map[int32]failuredomain.FailureDomain)
 
 	// indexToMachine contains a mapping between the machine domain index in the newest machine
 	// for this particular index.
 	indexToMachine := make(map[int32]machinev1beta1.Machine)
 
-	for _, machine := range machineList.Items {
+	for _, machine := range machines {
 		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract failure domain from machine %s: %w", machine.Name, err)

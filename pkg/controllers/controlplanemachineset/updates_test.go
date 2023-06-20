@@ -162,7 +162,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -201,7 +201,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(
 						func(mI map[int32][]machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
 							mICopy := make(map[int32][]machineproviders.MachineInfo)
@@ -241,7 +241,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -410,7 +410,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					// Note, in this case it should only create a single machine.
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -633,7 +633,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -688,7 +688,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					// The missing index should take priority over the index in need of an update.
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
@@ -741,7 +741,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-replacement-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1209,7 +1209,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1389,7 +1389,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(
 						func(mI map[int32][]machineproviders.MachineInfo) map[int32][]machineproviders.MachineInfo {
 							mICopy := make(map[int32][]machineproviders.MachineInfo)
@@ -1430,7 +1430,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1460,7 +1460,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					5: {updatedMachineBuilder.WithIndex(5).WithMachineName("machine-5").WithNodeName("node-5").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(4)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1490,7 +1490,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1624,7 +1624,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1666,7 +1666,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -1710,7 +1710,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(0)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
@@ -1960,7 +1960,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -2015,7 +2015,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Return(nil).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -2092,7 +2092,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").WithMachineDeletionTimestamp(metav1.Now()).Build()},
 				},
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
-					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
 					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(2)).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
