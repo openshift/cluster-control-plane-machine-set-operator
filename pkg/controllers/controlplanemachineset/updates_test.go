@@ -1216,17 +1216,6 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				},
 				expectedLogsBuilder: func() []testutils.LogEntry {
 					return []testutils.LogEntry{
-						// {
-						// 	Level: 2,
-						// 	KeysAndValues: []interface{}{
-						// 		"updateStrategy", machinev1.RollingUpdate,
-						// 		"index", int32(1),
-						// 		"namespace", namespaceName,
-						// 		"name", "machine-1",
-						// 		"diff", instanceDiff,
-						// 	},
-						// 	Message: machineRequiresUpdate,
-						// },
 						// We wouldn't normally continue operation when a Machine is pending removal, however,
 						// when a user has manually deleted a Machine and the etcd deletion hook is present,
 						// we still need to handle creating the replacement Machine to unblock the rollout.
