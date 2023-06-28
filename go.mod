@@ -7,10 +7,11 @@ require (
 	github.com/go-test/deep v1.1.0
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.52.2
+	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
 	github.com/openshift/api v0.0.0-20230627091025-b88ff67980ac
-	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
+	github.com/openshift/client-go v0.0.0-20230607134213-3cd0021bbee3
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230622171654-75c6bcfa831c
 	github.com/openshift/library-go v0.0.0-20230523150659-ab179469ba38
 	github.com/spf13/pflag v1.0.5
@@ -97,7 +98,6 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gordonklaus/ineffassign v0.0.0-20230107090616-13ace0543b28 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
 	github.com/gostaticanalysis/comment v1.4.2 // indirect
