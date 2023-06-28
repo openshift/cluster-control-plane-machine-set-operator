@@ -6,6 +6,7 @@ metadata:
   labels:
     k8s-app: control-plane-machine-set-operator
   annotations:
+    capability.openshift.io/name: MachineAPI
     exclude.release.openshift.io/internal-openshift-hosted: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 spec:
