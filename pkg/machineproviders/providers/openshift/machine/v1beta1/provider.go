@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -110,9 +111,11 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, fmt.Errorf("error constructing failure domain config: %w", err)
 	}
 
-	indexToFailureDomain, err := mapMachineIndexesToFailureDomains(ctx, logger, cl, cpms, failureDomains)
-	if err != nil && !errors.Is(err, errNoFailureDomains) {
-		return nil, fmt.Errorf("error mapping machine indexes: %w", err)
+	replicas := pointer.Int32Deref(cpms.Spec.Replicas, 0)
+
+	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert label selector to selector: %w", err)
 	}
 
 	machineAPIScheme := apimachineryruntime.NewScheme()
@@ -124,16 +127,23 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, fmt.Errorf("unable to add machine.openshift.io/v1beta1 scheme: %w", err)
 	}
 
-	return &openshiftMachineProvider{
-		client:               cl,
-		indexToFailureDomain: indexToFailureDomain,
-		machineSelector:      cpms.Spec.Selector,
-		machineTemplate:      *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine,
-		ownerMetadata:        cpms.ObjectMeta,
-		providerConfig:       providerConfig,
-		namespace:            cpms.Namespace,
-		machineAPIScheme:     machineAPIScheme,
-	}, nil
+	o := &openshiftMachineProvider{
+		client:           cl,
+		failureDomains:   failureDomains,
+		machineSelector:  selector,
+		machineTemplate:  *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine,
+		ownerMetadata:    cpms.ObjectMeta,
+		providerConfig:   providerConfig,
+		replicas:         replicas,
+		namespace:        cpms.Namespace,
+		machineAPIScheme: machineAPIScheme,
+	}
+
+	if err := o.updateMachineCache(ctx, logger); err != nil {
+		return nil, fmt.Errorf("error updating machine cache: %w", err)
+	}
+
+	return o, nil
 }
 
 // openshiftMachineProvider holds the implementation of the MachineProvider interface.
@@ -147,9 +157,20 @@ type openshiftMachineProvider struct {
 	// We use a built in type to avoid leaking implementation specific details.
 	indexToFailureDomain map[int32]failuredomain.FailureDomain
 
+	// failureDomains is the list of failure domains collected from the CPMS spec when
+	// the machine provider was constructed.
+	failureDomains []failuredomain.FailureDomain
+
+	// machines is the list of machines collected from the API when the cache was built.
+	// This should be tied to the lifecycle of indexToFailureDomain since the domain mapping
+	// logic is affected by the contents of these machines.
+	// Should the machine list ever be refreshed (e.g. by changing client), then the mapping
+	// must also be refreshed.
+	machines []machinev1beta1.Machine
+
 	// machineSelector is used to identify which Machines should be considered by
 	// the machine provider when constructing machine information.
-	machineSelector metav1.LabelSelector
+	machineSelector labels.Selector
 
 	// machineTemplate is used to create new Machines.
 	machineTemplate machinev1.OpenShiftMachineV1Beta1MachineTemplate
@@ -161,6 +182,8 @@ type openshiftMachineProvider struct {
 	// providerConfig stores the providerConfig for creating new Machines.
 	providerConfig providerconfig.ProviderConfig
 
+	replicas int32
+
 	// namespace store the namespace where new machines will be created.
 	namespace string
 
@@ -168,15 +191,41 @@ type openshiftMachineProvider struct {
 	machineAPIScheme *apimachineryruntime.Scheme
 }
 
+// updateMachineCache fetches the current list of Machines and calculates from these the appropriate index
+// to failure domain mapping. The machine list and index to failure domain must be updated in lock-step since
+// the mapping relies on the content of the machines.
+func (m *openshiftMachineProvider) updateMachineCache(ctx context.Context, logger logr.Logger) error {
+	machineList := &machinev1beta1.MachineList{}
+	if err := m.client.List(ctx, machineList, &client.ListOptions{LabelSelector: m.machineSelector}); err != nil {
+		return fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	// Since the mapping depends on the state of the machines, we must re-map the failure domains if the machines have changed.
+	indexToFailureDomain, err := mapMachineIndexesToFailureDomains(logger, machineList.Items, m.replicas, m.failureDomains)
+	if err != nil && !errors.Is(err, errNoFailureDomains) {
+		return fmt.Errorf("error mapping machine indexes: %w", err)
+	}
+
+	m.machines = machineList.Items
+	m.indexToFailureDomain = indexToFailureDomain
+
+	return nil
+}
+
 // WithClient sets the desired client to the Machine Provider.
-func (m *openshiftMachineProvider) WithClient(client client.Client) machineproviders.MachineProvider {
+func (m *openshiftMachineProvider) WithClient(ctx context.Context, logger logr.Logger, cl client.Client) (machineproviders.MachineProvider, error) {
 	// Take a shallow copy, this should be sufficient for the usage of the provider.
 	o := &openshiftMachineProvider{}
 	*o = *m
 
-	o.client = client
+	o.client = cl
 
-	return o
+	// Make sure to update the cached machine data now that we have a new client.
+	if err := o.updateMachineCache(ctx, logger); err != nil {
+		return nil, fmt.Errorf("error updating machine cache: %w", err)
+	}
+
+	return o, nil
 }
 
 // GetMachineInfos inspects the current state of the Machines matched by the selector
@@ -190,17 +239,7 @@ func (m *openshiftMachineProvider) WithClient(client client.Client) machineprovi
 func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger logr.Logger) ([]machineproviders.MachineInfo, error) {
 	machineInfos := []machineproviders.MachineInfo{}
 
-	selector, err := metav1.LabelSelectorAsSelector(&m.machineSelector)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert label selector to selector: %w", err)
-	}
-
-	machineList := &machinev1beta1.MachineList{}
-	if err := m.client.List(ctx, machineList, &client.ListOptions{LabelSelector: selector}); err != nil {
-		return nil, fmt.Errorf("failed to list machines: %w", err)
-	}
-
-	for _, machine := range machineList.Items {
+	for _, machine := range m.machines {
 		machineInfo, err := m.generateMachineInfo(ctx, logger, machine)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate machine info for machine %s: %w", machine.Name, err)
@@ -218,7 +257,7 @@ func (m *openshiftMachineProvider) GetMachineInfos(ctx context.Context, logger l
 
 		logger.V(4).Info(
 			"Gathered Machine Info",
-			"machineName", machineList.Items[i].Name,
+			"machineName", m.machines[i].Name,
 			"nodeName", nodeName,
 			"index", machineInfo.Index,
 			"ready", machineInfo.Ready,

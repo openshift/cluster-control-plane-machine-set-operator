@@ -560,7 +560,10 @@ func (r *ControlPlaneMachineSetReconciler) createMachineWithSurge(ctx context.Co
 // already has an existing, up to date, replacement machine.
 func (r *ControlPlaneMachineSetReconciler) checkForExistingReplacement(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, idx int32) (bool, error) {
 	// Define an uncached machine provider.
-	uncachedMachineProvider := machineProvider.WithClient(r.UncachedClient)
+	uncachedMachineProvider, err := machineProvider.WithClient(ctx, logger, r.UncachedClient)
+	if err != nil {
+		return false, fmt.Errorf("could not get uncached machine provider: %w", err)
+	}
 
 	mInfos, err := uncachedMachineProvider.GetMachineInfos(ctx, logger)
 	if err != nil {

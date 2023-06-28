@@ -81,15 +81,16 @@ func (mr *MockMachineProviderMockRecorder) GetMachineInfos(arg0, arg1 interface{
 }
 
 // WithClient mocks base method.
-func (m *MockMachineProvider) WithClient(arg0 client.Client) machineproviders.MachineProvider {
+func (m *MockMachineProvider) WithClient(arg0 context.Context, arg1 logr.Logger, arg2 client.Client) (machineproviders.MachineProvider, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WithClient", arg0)
+	ret := m.ctrl.Call(m, "WithClient", arg0, arg1, arg2)
 	ret0, _ := ret[0].(machineproviders.MachineProvider)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // WithClient indicates an expected call of WithClient.
-func (mr *MockMachineProviderMockRecorder) WithClient(arg0 interface{}) *gomock.Call {
+func (mr *MockMachineProviderMockRecorder) WithClient(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithClient", reflect.TypeOf((*MockMachineProvider)(nil).WithClient), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithClient", reflect.TypeOf((*MockMachineProvider)(nil).WithClient), arg0, arg1, arg2)
 }
