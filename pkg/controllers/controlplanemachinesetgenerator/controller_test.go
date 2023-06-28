@@ -2235,7 +2235,11 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 			Zone: "cinder-az5",
 		})
 
-		cpmsNoFailureDomainsBuilderOpenStack = machinev1.FailureDomains{}
+		cpmsEmptyFailureDomainsBuilderOpenStack = machinev1.FailureDomains{}
+
+		cpmsNoFailureDomainsBuilderOpenStack = machinev1.FailureDomains{
+			Platform: "",
+		}
 
 		cpms3FailureDomainsBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
 			az1FailureDomainBuilderOpenStack,
@@ -2550,6 +2554,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpmsEmptyFailureDomainsBuilderOpenStack))
 					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpmsNoFailureDomainsBuilderOpenStack))
 				})
 

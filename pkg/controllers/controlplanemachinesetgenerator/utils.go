@@ -201,7 +201,7 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 			return nil, fmt.Errorf("failed to build OpenStack failure domains: %w", err)
 		}
 
-		if cpmsFailureDomain.OpenStack == nil {
+		if cpmsFailureDomain.OpenStack == nil || cpmsFailureDomain.Platform == "" {
 			return nil, nil //nolint:nilnil
 		}
 	default:
