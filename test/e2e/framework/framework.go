@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 
@@ -56,6 +57,9 @@ var (
 	// This means that even though the format is correct, we haven't implemented the logic to increase
 	// this instance size.
 	errInstanceTypeNotSupported = errors.New("instance type is not supported")
+
+	// errMissingInstanceSize is returned when the instance size is missing.
+	errMissingInstanceSize = errors.New("instance size is missing")
 )
 
 // Framework is an interface for getting clients and information
@@ -236,6 +240,8 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 		return increaseGCPInstanceSize(rawProviderSpec, providerConfig)
 	case configv1.NutanixPlatformType:
 		return increaseNutanixInstanceSize(rawProviderSpec, providerConfig)
+	case configv1.OpenStackPlatformType:
+		return increaseOpenStackInstanceSize(rawProviderSpec, providerConfig)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -675,6 +681,23 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 func increaseNutanixInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
 	cfg := providerConfig.Nutanix().Config()
 	cfg.VCPUSockets++
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// increase OpenStackInstanceSize increases the instance size of the instance on the providerSpec for an OpenStack providerSpec.
+func increaseOpenStackInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.OpenStack().Config()
+
+	if os.Getenv("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE") == "" {
+		return fmt.Errorf("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE environment variable not set: %w", errMissingInstanceSize)
+	} else {
+		cfg.Flavor = os.Getenv("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")
+	}
 
 	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
 		return fmt.Errorf("failed to set provider spec value: %w", err)

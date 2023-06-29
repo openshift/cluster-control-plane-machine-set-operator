@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -409,8 +410,13 @@ func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, 
 
 	switch platformType {
 	case configv1.OpenStackPlatformType:
-		// OpenStack flavors are not predictable, so we just tag the instance with a new tag, which will trigger the redeployment.
-		Expect(testFramework.TagInstanceInProviderSpec(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with a new tag")
+		// OpenStack flavors are not predictable. So if OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE is set in the environment, we'll use it
+		// to change the instance flavor, otherwise we just tag the instance with a new tag, which will trigger the redeployment.
+		if os.Getenv("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE") == "" {
+			Expect(testFramework.TagInstanceInProviderSpec(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with a new tag")
+		} else {
+			Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
+		}
 	default:
 		Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
 	}
