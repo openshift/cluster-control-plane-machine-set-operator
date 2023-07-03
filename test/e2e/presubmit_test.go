@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
@@ -106,6 +107,12 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 		Context("and a defaulted value is deleted from the ControlPlaneMachineSet", func() {
 			var originalProviderSpec machinev1beta1.ProviderSpec
 			BeforeEach(func() {
+				// There is no defaulting webhook for the machines running on the following platforms.
+				switch testFramework.GetPlatformType() {
+				case configv1.OpenStackPlatformType:
+					Skip("Skipping test on OpenStack platform")
+				}
+
 				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
 				originalProviderSpec = helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework)
 			})

@@ -21,10 +21,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -55,6 +57,9 @@ var (
 	// This means that even though the format is correct, we haven't implemented the logic to increase
 	// this instance size.
 	errInstanceTypeNotSupported = errors.New("instance type is not supported")
+
+	// errMissingInstanceSize is returned when the instance size is missing.
+	errMissingInstanceSize = errors.New("instance size is missing")
 )
 
 // Framework is an interface for getting clients and information
@@ -87,6 +92,9 @@ type Framework interface {
 	// providerSpec passed. This is used to trigger updates to the Machines
 	// managed by the control plane machine set.
 	IncreaseProviderSpecInstanceSize(providerSpec *runtime.RawExtension) error
+
+	// TagInstanceInProviderSpec tags the instance in the provider spec.
+	TagInstanceInProviderSpec(providerSpec *runtime.RawExtension) error
 
 	// ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
 	// to a control plane machine set suitable provider spec.
@@ -232,6 +240,27 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 		return increaseGCPInstanceSize(rawProviderSpec, providerConfig)
 	case configv1.NutanixPlatformType:
 		return increaseNutanixInstanceSize(rawProviderSpec, providerConfig)
+	case configv1.OpenStackPlatformType:
+		return increaseOpenStackInstanceSize(rawProviderSpec, providerConfig)
+	default:
+		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
+	}
+}
+
+// TagInstanceInProviderSpec tags the instance in the providerSpec.
+func (f *framework) TagInstanceInProviderSpec(rawProviderSpec *runtime.RawExtension) error {
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(f.logger, machinev1beta1.MachineSpec{
+		ProviderSpec: machinev1beta1.ProviderSpec{
+			Value: rawProviderSpec,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get provider config: %w", err)
+	}
+
+	switch f.platform {
+	case configv1.OpenStackPlatformType:
+		return tagOpenStackProviderSpec(rawProviderSpec, providerConfig)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -342,6 +371,8 @@ func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec mac
 		return convertGCPProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	case configv1.NutanixPlatformType:
 		return convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	case configv1.OpenStackPlatformType:
+		return convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -404,6 +435,27 @@ func convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerCo
 	rawBytes, err := json.Marshal(nutanixProviderConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling nutanix providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
+// convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec converts an OpenStack providerConfig into a
+// raw control plane machine set provider spec.
+func convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	openStackPs := providerConfig.OpenStack().Config()
+
+	openStackPs.AvailabilityZone = ""
+
+	if openStackPs.RootVolume != nil {
+		openStackPs.RootVolume.Zone = ""
+	}
+
+	rawBytes, err := json.Marshal(openStackPs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling openstack providerSpec: %w", err)
 	}
 
 	return &runtime.RawExtension{
@@ -474,6 +526,8 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	case configv1.GCPPlatformType:
 		return Manual, platformType, nil
 	case configv1.NutanixPlatformType:
+		return Manual, platformType, nil
+	case configv1.OpenStackPlatformType:
 		return Manual, platformType, nil
 	default:
 		return Unsupported, platformType, nil
@@ -555,6 +609,20 @@ func increaseAzureInstanceSize(rawProviderSpec *runtime.RawExtension, providerCo
 	return nil
 }
 
+// tagOpenStackProviderSpec adds a tag to the providerSpec for an OpenStack providerSpec.
+func tagOpenStackProviderSpec(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.OpenStack().Config()
+
+	randomTag := uuid.New().String()
+	cfg.Tags = append(cfg.Tags, fmt.Sprintf("cpms-test-tag-%s", randomTag))
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
 // nextAzureVMSize returns the next Azure VM size in the series.
 // In Azure terms this normally means doubling the size of the underlying instance.
 // This should mean we do not need to update this when the installer changes the default instance size.
@@ -613,6 +681,23 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 func increaseNutanixInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
 	cfg := providerConfig.Nutanix().Config()
 	cfg.VCPUSockets++
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// increase OpenStackInstanceSize increases the instance size of the instance on the providerSpec for an OpenStack providerSpec.
+func increaseOpenStackInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.OpenStack().Config()
+
+	if os.Getenv("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE") == "" {
+		return fmt.Errorf("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE environment variable not set: %w", errMissingInstanceSize)
+	} else {
+		cfg.Flavor = os.Getenv("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")
+	}
 
 	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
 		return fmt.Errorf("failed to set provider spec value: %w", err)

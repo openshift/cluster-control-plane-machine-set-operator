@@ -533,7 +533,7 @@ github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/machine/v1
 github.com/openshift/api/machine/v1alpha1
 github.com/openshift/api/machine/v1beta1
-# github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
+# github.com/openshift/client-go v0.0.0-20230607134213-3cd0021bbee3
 ## explicit; go 1.20
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/internal

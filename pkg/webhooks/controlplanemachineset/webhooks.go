@@ -279,6 +279,8 @@ func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path,
 		return validateOpenShiftAzureProviderConfig(providerSpecPath.Child("value"), providerConfig.Azure())
 	case configv1.GCPPlatformType:
 		return validateOpenShiftGCPProviderConfig(providerSpecPath.Child("value"), providerConfig.GCP())
+	case configv1.OpenStackPlatformType:
+		return validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
 	}
 
 	return []error{}
@@ -301,6 +303,12 @@ func validateOpenShiftAzureProviderConfig(parentPath *field.Path, providerConfig
 // validateOpenShiftGCPProviderConfig runs GCP specific checks on the provider config on the ControlPlaneMachineSet.
 // This ensure that the ControlPlaneMachineSet can safely replace GCP control plane machines.
 func validateOpenShiftGCPProviderConfig(parentPath *field.Path, providerConfig providerconfig.GCPProviderConfig) []error {
+	return []error{}
+}
+
+// validateOpenShiftOpenStackProviderConfig runs OpenStack specific checks on the provider config on the ControlPlaneMachineSet.
+// This ensure that the ControlPlaneMachineSet can safely replace OpenStack control plane machines.
+func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerConfig providerconfig.OpenStackProviderConfig) []error {
 	return []error{}
 }
 

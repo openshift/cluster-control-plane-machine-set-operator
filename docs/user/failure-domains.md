@@ -83,3 +83,24 @@ An Azure failure domain will look something like the example below:
 ```yaml
 - zone: "<zone>"
 ```
+
+## OpenStack
+
+On OpenStack, the failure domains represented in the control plane machine set can be considered analogous to the
+OpenStack availability zones (for Nova and Cinder).
+
+> OpenStack Availability Zones are an end-user visible logical abstraction for partitioning an OpenStack cloud without
+> knowing the physical infrastructure. They are used to partition a cloud on arbitrary factors, such as location (country, datacenter, rack),
+> network layout and/or power source.
+> Compute (Nova) Availability Zones are presented under Host Aggregates and can help to group the compute nodes
+> associated with a particular Failure Domain.
+> Storage (Cinder) Availability Zones are presented under Availability Zones and help to group the storage backend types by Failure Domain.
+> Depending on how the cloud is deployed, a storage backend can expand across multiple Failure Domains or be limited to a single Failure Domain.
+> The name of the Availability Zones depend on the cloud deployment and can be retrieved from the OpenStack administrator.
+
+An OpenStack failure domain will look something like the example below:
+```yaml
+- availabilityZone: "<nova availability zone>"
+  rootVolume:
+    availabilityZone: "<cinder availability zone>"
+```

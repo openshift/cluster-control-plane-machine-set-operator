@@ -173,6 +173,49 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With OpenStack failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.OpenStackFailureDomains().BuildFailureDomains()
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{AvailabilityZone:cinder-az1}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{AvailabilityZone:cinder-az2}}"),
+				))
+			})
+		})
+
+		Context("With invalid OpenStack failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.OpenStackFailureDomains().BuildFailureDomains()
+				config.OpenStack = nil
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("returns an error", func() {
+				Expect(err).To(MatchError("missing failure domain configuration"))
+			})
+
+			It("returns an empty list of failure domains", func() {
+				Expect(failureDomains).To(BeEmpty())
+			})
+		})
+
 		Context("With an unsupported platform type", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -296,9 +339,64 @@ var _ = Describe("FailureDomains", func() {
 		})
 	})
 
+	Context("an OpenStack failure domain", func() {
+		var fd failureDomain
+		var filterRootVolume = machinev1.RootVolume{
+			AvailabilityZone: "cinder-az0",
+		}
+
+		BeforeEach(func() {
+			fd = failureDomain{
+				platformType: configv1.OpenStackPlatformType,
+			}
+		})
+
+		Context("with a Compute and Storage availability zone", func() {
+			BeforeEach(func() {
+				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+					WithRootVolume(filterRootVolume).Build()
+			})
+
+			It("returns the Compute and Storage availability zones for String()", func() {
+				Expect(fd.String()).To(Equal("OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0}}"))
+			})
+		})
+
+		Context("with a Compute availability zone only", func() {
+			BeforeEach(func() {
+				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").Build()
+			})
+
+			It("returns the Compute availability zone for String()", func() {
+				Expect(fd.String()).To(Equal("OpenStackFailureDomain{AvailabilityZone:nova-az0}"))
+			})
+		})
+		Context("with a Storage availability zone only", func() {
+			BeforeEach(func() {
+				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(filterRootVolume).Build()
+			})
+
+			It("returns the Storage availability zone for String()", func() {
+				Expect(fd.String()).To(Equal("OpenStackFailureDomain{RootVolume:{AvailabilityZone:cinder-az0}}"))
+			})
+		})
+		Context("with no availability zones", func() {
+			BeforeEach(func() {
+				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().Build()
+			})
+
+			It("returns <unknown> for String()", func() {
+				Expect(fd.String()).To(Equal("<unknown>"))
+			})
+		})
+	})
+
 	Context("Equal", func() {
 		var fd1 failureDomain
 		var fd2 failureDomain
+		var filterRootVolume = machinev1.RootVolume{
+			AvailabilityZone: "cinder-az0",
+		}
 
 		Context("With two identical AWS failure domains", func() {
 			BeforeEach(func() {
@@ -381,6 +479,23 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With two identical OpenStack failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.OpenStackPlatformType,
+					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(filterRootVolume).Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.OpenStackPlatformType,
+					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(filterRootVolume).Build(),
+				}
+			})
+
+			It("returns true", func() {
+				Expect(fd1.Equal(fd2)).To(BeTrue())
+			})
+		})
+
 		Context("With two different Azure failure domains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
@@ -390,6 +505,23 @@ var _ = Describe("FailureDomains", func() {
 				fd2 = failureDomain{
 					platformType: configv1.GCPPlatformType,
 					gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("us-central1-b").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(fd2)).To(BeFalse())
+			})
+		})
+
+		Context("With two different OpenStack failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.OpenStackPlatformType,
+					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.GCPPlatformType,
+					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").Build(),
 				}
 			})
 
