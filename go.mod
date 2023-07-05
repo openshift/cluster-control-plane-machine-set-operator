@@ -10,13 +10,13 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
-	github.com/openshift/api v0.0.0-20230627091025-b88ff67980ac
+	github.com/openshift/api v0.0.0-20230705100138-391aead809e1
 	github.com/openshift/client-go v0.0.0-20230607134213-3cd0021bbee3
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230622171654-75c6bcfa831c
 	github.com/openshift/library-go v0.0.0-20230523150659-ab179469ba38
 	github.com/spf13/pflag v1.0.5
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
 	k8s.io/client-go v0.27.2
 	k8s.io/component-base v0.27.2
 	k8s.io/klog/v2 v2.100.1
@@ -206,12 +206,12 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230224173230-c95f2b4c22f2 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/term v0.9.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
