@@ -83,7 +83,7 @@ var _ = Describe("OpenStack Provider Config", func() {
 		It("returns the configured failure domain", func() {
 			expected := machinev1resourcebuilder.OpenStackFailureDomain().
 				WithComputeAvailabilityZone(novaZone1).
-				WithRootVolume(machinev1RootVolume1).
+				WithRootVolume(&machinev1RootVolume1).
 				Build()
 
 			Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
@@ -94,7 +94,7 @@ var _ = Describe("OpenStack Provider Config", func() {
 		It("returns the configured failure domain", func() {
 			expected := machinev1resourcebuilder.OpenStackFailureDomain().
 				WithComputeAvailabilityZone(novaZone1).
-				WithRootVolume(machinev1RootVolume2).
+				WithRootVolume(&machinev1RootVolume2).
 				Build()
 
 			Expect(providerConfigWithVolumeType.ExtractFailureDomain()).To(Equal(expected))
@@ -107,7 +107,7 @@ var _ = Describe("OpenStack Provider Config", func() {
 		BeforeEach(func() {
 			changedFailureDomain := machinev1resourcebuilder.OpenStackFailureDomain().
 				WithComputeAvailabilityZone(novaZone2).
-				WithRootVolume(machinev1RootVolume1).
+				WithRootVolume(&machinev1RootVolume1).
 				Build()
 
 			changedProviderConfig = providerConfig.InjectFailureDomain(changedFailureDomain)
@@ -117,7 +117,7 @@ var _ = Describe("OpenStack Provider Config", func() {
 			It("returns the changed failure domain from the changed config", func() {
 				expected := machinev1resourcebuilder.OpenStackFailureDomain().
 					WithComputeAvailabilityZone(novaZone2).
-					WithRootVolume(machinev1RootVolume1).
+					WithRootVolume(&machinev1RootVolume1).
 					Build()
 
 				Expect(changedProviderConfig.ExtractFailureDomain()).To(Equal(expected))
@@ -126,7 +126,7 @@ var _ = Describe("OpenStack Provider Config", func() {
 			It("returns the original failure domain from the original config", func() {
 				expected := machinev1resourcebuilder.OpenStackFailureDomain().
 					WithComputeAvailabilityZone(novaZone1).
-					WithRootVolume(machinev1RootVolume1).
+					WithRootVolume(&machinev1RootVolume1).
 					Build()
 
 				Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))

@@ -279,7 +279,7 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				failureDomain: failuredomain.NewOpenStackFailureDomain(
-					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(machinev1.RootVolume{
+					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&machinev1.RootVolume{
 						AvailabilityZone: "cinder-az1",
 					}).Build(),
 				),
@@ -309,7 +309,7 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				failureDomain: failuredomain.NewOpenStackFailureDomain(
-					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(machinev1.RootVolume{
+					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&machinev1.RootVolume{
 						AvailabilityZone: "cinder-az1",
 					}).Build(),
 				),
@@ -527,7 +527,7 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedFailureDomain: failuredomain.NewOpenStackFailureDomain(
-					machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(machinev1.RootVolume{
+					machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(&machinev1.RootVolume{
 						AvailabilityZone: "cinder-az2",
 					}).Build(),
 				),
