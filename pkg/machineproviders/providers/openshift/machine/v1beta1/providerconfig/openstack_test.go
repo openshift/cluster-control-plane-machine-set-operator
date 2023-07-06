@@ -90,6 +90,23 @@ var _ = Describe("OpenStack Provider Config", func() {
 		})
 	})
 
+	Context("ExtractFailureDomainDespiteEmptyRootVolume", func() {
+		It("returns the configured failure domain", func() {
+			expected := machinev1resourcebuilder.OpenStackFailureDomain().
+				WithComputeAvailabilityZone(novaZone1).
+				Build()
+
+			providerConfigWithEmptyRootVolume := OpenStackProviderConfig{
+				providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().
+					WithZone(novaZone1).
+					WithRootVolume(&machinev1alpha1.RootVolume{}).
+					Build(),
+			}
+
+			Expect(providerConfigWithEmptyRootVolume.ExtractFailureDomain()).To(Equal(expected))
+		})
+	})
+
 	Context("ExtractFailureDomainWithVolumeType", func() {
 		It("returns the configured failure domain", func() {
 			expected := machinev1resourcebuilder.OpenStackFailureDomain().
