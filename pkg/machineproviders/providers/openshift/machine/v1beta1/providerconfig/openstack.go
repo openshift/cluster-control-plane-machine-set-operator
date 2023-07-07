@@ -42,8 +42,14 @@ func (a OpenStackProviderConfig) InjectFailureDomain(fd machinev1.OpenStackFailu
 		newOpenStackProviderConfig.providerConfig.AvailabilityZone = fd.AvailabilityZone
 	}
 
-	if fd.RootVolume != nil && newOpenStackProviderConfig.providerConfig.RootVolume != nil && fd.RootVolume.AvailabilityZone != "" {
-		newOpenStackProviderConfig.providerConfig.RootVolume.Zone = fd.RootVolume.AvailabilityZone
+	if fd.RootVolume != nil && newOpenStackProviderConfig.providerConfig.RootVolume != nil {
+		if fd.RootVolume.AvailabilityZone != "" {
+			newOpenStackProviderConfig.providerConfig.RootVolume.Zone = fd.RootVolume.AvailabilityZone
+		}
+
+		if fd.RootVolume.VolumeType != "" {
+			newOpenStackProviderConfig.providerConfig.RootVolume.VolumeType = fd.RootVolume.VolumeType
+		}
 	}
 
 	return newOpenStackProviderConfig
@@ -52,20 +58,22 @@ func (a OpenStackProviderConfig) InjectFailureDomain(fd machinev1.OpenStackFailu
 // ExtractFailureDomain returns an OpenStackFailureDomain based on the failure domain
 // information stored within the OpenStackProviderConfig.
 func (a OpenStackProviderConfig) ExtractFailureDomain() machinev1.OpenStackFailureDomain {
-	rootVolume := func(pc machinev1alpha1.OpenstackProviderSpec) *machinev1.RootVolume {
-		if pc.RootVolume != nil && pc.RootVolume.Zone != "" {
-			rootVolume := &machinev1.RootVolume{}
-			rootVolume.AvailabilityZone = a.providerConfig.RootVolume.Zone
+	var failureDomainRootVolume *machinev1.RootVolume
 
-			return rootVolume
-		} else {
-			return nil
+	if a.providerConfig.RootVolume != nil {
+		// Be liberal in accepting an empty rootVolume in the
+		// OpenStackFailureDomain. It should count as nil.
+		if az, vt := a.providerConfig.RootVolume.Zone, a.providerConfig.RootVolume.VolumeType; az != "" || vt != "" {
+			failureDomainRootVolume = &machinev1.RootVolume{
+				AvailabilityZone: az,
+				VolumeType:       vt,
+			}
 		}
 	}
 
 	return machinev1.OpenStackFailureDomain{
 		AvailabilityZone: a.providerConfig.AvailabilityZone,
-		RootVolume:       rootVolume(a.providerConfig),
+		RootVolume:       failureDomainRootVolume,
 	}
 }
 

@@ -196,6 +196,33 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With OpenStack failure domain configuration with volumeType", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az0", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostA"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az1", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostB"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az2", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostC"}},
+				).BuildFailureDomains()
+
+				failureDomains, err = NewFailureDomains(config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{VolumeType:volume.hostA}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{VolumeType:volume.hostB}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{VolumeType:volume.hostC}}"),
+				))
+			})
+		})
+
 		Context("With invalid OpenStack failure domain configuration", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -354,7 +381,7 @@ var _ = Describe("FailureDomains", func() {
 		Context("with a Compute and Storage availability zone", func() {
 			BeforeEach(func() {
 				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
-					WithRootVolume(filterRootVolume).Build()
+					WithRootVolume(&filterRootVolume).Build()
 			})
 
 			It("returns the Compute and Storage availability zones for String()", func() {
@@ -373,7 +400,7 @@ var _ = Describe("FailureDomains", func() {
 		})
 		Context("with a Storage availability zone only", func() {
 			BeforeEach(func() {
-				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(filterRootVolume).Build()
+				fd.openstack = machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&filterRootVolume).Build()
 			})
 
 			It("returns the Storage availability zone for String()", func() {
@@ -483,11 +510,11 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.OpenStackPlatformType,
-					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(filterRootVolume).Build(),
+					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&filterRootVolume).Build(),
 				}
 				fd2 = failureDomain{
 					platformType: configv1.OpenStackPlatformType,
-					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(filterRootVolume).Build(),
+					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&filterRootVolume).Build(),
 				}
 			})
 

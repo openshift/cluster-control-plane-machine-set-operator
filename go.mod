@@ -12,7 +12,7 @@ require (
 	github.com/onsi/gomega v1.27.7
 	github.com/openshift/api v0.0.0-20230705100138-391aead809e1
 	github.com/openshift/client-go v0.0.0-20230607134213-3cd0021bbee3
-	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230622171654-75c6bcfa831c
+	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230706132925-77764237f2e6
 	github.com/openshift/library-go v0.0.0-20230523150659-ab179469ba38
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.27.3

@@ -70,7 +70,7 @@ func generateControlPlaneMachineSetOpenStackSpec(logger logr.Logger, machines []
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's OpenStack failure domains: %w", err)
 	}
 
-	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetOpenStackMachineSpec(logger, machines)
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetOpenStackMachineSpec(logger, machines, controlPlaneMachineSetMachineFailureDomainsApplyConfig)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's OpenStack spec: %w", err)
 	}
@@ -84,7 +84,7 @@ func generateControlPlaneMachineSetOpenStackSpec(logger logr.Logger, machines []
 }
 
 // buildControlPlaneMachineSetOpenStackMachineSpec builds an OpenStack flavored MachineSpec for the ControlPlaneMachineSet.
-func buildControlPlaneMachineSetOpenStackMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
+func buildControlPlaneMachineSetOpenStackMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine, failureDomains *machinev1builder.FailureDomainsApplyConfiguration) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
@@ -94,11 +94,14 @@ func buildControlPlaneMachineSetOpenStackMachineSpec(logger logr.Logger, machine
 
 	openStackProviderSpec := providerConfig.OpenStack().Config()
 
-	// Remove field related to the failure domain.
-	openStackProviderSpec.AvailabilityZone = ""
+	// If there are failure domains, remove the corresponding managed fields from the providerSpec.
+	if failureDomains != nil && len(failureDomains.OpenStack) > 0 {
+		openStackProviderSpec.AvailabilityZone = ""
 
-	if openStackProviderSpec.RootVolume != nil {
-		openStackProviderSpec.RootVolume.Zone = ""
+		if openStackProviderSpec.RootVolume != nil {
+			openStackProviderSpec.RootVolume.Zone = ""
+			openStackProviderSpec.RootVolume.VolumeType = ""
+		}
 	}
 
 	rawBytes, err := json.Marshal(openStackProviderSpec)

@@ -2197,21 +2197,21 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func() {
 
 	var (
-		az1FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").WithRootVolume(machinev1.RootVolume{
+		az1FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az1",
 		})
 
-		az2FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(machinev1.RootVolume{
+		az2FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az2",
 		})
 
-		az3FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az3").WithRootVolume(machinev1.RootVolume{
+		az3FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az3").WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az3",
 		})
 
 		az4FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az4")
 
-		az5FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(machinev1.RootVolume{
+		az5FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az5",
 		})
 
