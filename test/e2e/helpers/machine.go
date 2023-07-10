@@ -408,10 +408,9 @@ func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, 
 
 	By(fmt.Sprintf("Updating the provider spec of the control plane machine at index %d", index))
 
-	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
+	Eventually(komega.Update(machine, func() {
 		machine.Spec.ProviderSpec = *updatedProviderSpec
-	})}, gomegaArgs...)
-	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+	}), gomegaArgs...).Should(Succeed(), "control plane machine should be able to be updated")
 
 	return originalProviderSpec, machine.Spec.ProviderSpec
 }
@@ -424,10 +423,9 @@ func UpdateControlPlaneMachineProviderSpec(testFramework framework.Framework, in
 	machine, err := machineForIndex(testFramework, index)
 	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
 
-	updateMachineArgs := append([]interface{}{komega.Update(machine, func() {
+	Eventually(komega.Update(machine, func() {
 		machine.Spec.ProviderSpec = updatedProviderSpec
-	})}, gomegaArgs...)
-	Eventually(updateMachineArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+	}), gomegaArgs...).Should(Succeed(), "control plane machine should be able to be updated")
 }
 
 // IncreaseNewestControlPlaneMachineInstanceSize increases the instance size of the the newest control plane machine

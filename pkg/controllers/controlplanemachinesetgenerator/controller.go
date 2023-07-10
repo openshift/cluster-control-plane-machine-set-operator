@@ -239,6 +239,8 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 }
 
 // ensureControlPlaneMachineSet ensures that the ControlPlaneMachineSet has been created.
+//
+//nolint:unparam
 func (r *ControlPlaneMachineSetGeneratorReconciler) ensureControlPlaneMachineSet(ctx context.Context, logger logr.Logger,
 	cpms *machinev1.ControlPlaneMachineSet, generatedCPMS *machinev1.ControlPlaneMachineSet) (bool, ctrl.Result, error) {
 	if cpms.Name == "" {

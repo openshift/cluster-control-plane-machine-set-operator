@@ -226,6 +226,7 @@ var _ = Describe("MachineProvider", func() {
 				machineSelector:      cpms.Spec.Selector,
 				machineTemplate:      *template,
 				providerConfig:       providerConfig,
+				namespace:            namespaceName,
 			}
 
 			machineInfos, err := provider.GetMachineInfos(ctx, logger.Logger())
@@ -1675,6 +1676,7 @@ var _ = Describe("MachineProvider", func() {
 					UID: types.UID(ownerUID),
 				},
 				providerConfig: providerConfig,
+				namespace:      namespaceName,
 			}
 
 			machineBuilder := resourcebuilder.Machine().AsMaster().
