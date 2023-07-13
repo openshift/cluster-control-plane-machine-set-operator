@@ -528,7 +528,7 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	case configv1.NutanixPlatformType:
 		return Manual, platformType, nil
 	case configv1.OpenStackPlatformType:
-		return Manual, platformType, nil
+		return Full, platformType, nil
 	default:
 		return Unsupported, platformType, nil
 	}
