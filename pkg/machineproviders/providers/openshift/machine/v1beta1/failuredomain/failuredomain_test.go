@@ -189,9 +189,9 @@ var _ = Describe("FailureDomains", func() {
 
 			It("should construct a list of failure domains", func() {
 				Expect(failureDomains).To(ConsistOf(
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0}}"),
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{AvailabilityZone:cinder-az1}}"),
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{AvailabilityZone:cinder-az2}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0, VolumeType: fast-az0}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{AvailabilityZone:cinder-az1, VolumeType: fast-az1}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{AvailabilityZone:cinder-az2, VolumeType: fast-az2}}"),
 				))
 			})
 		})
@@ -202,9 +202,9 @@ var _ = Describe("FailureDomains", func() {
 
 			BeforeEach(func() {
 				config := machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
-					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az0", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostA"}},
-					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az1", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostB"}},
-					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az2", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostC"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az0", RootVolume: &machinev1.RootVolume{AvailabilityZone: "cinder-az0", VolumeType: "volume.hostA"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az1", RootVolume: &machinev1.RootVolume{AvailabilityZone: "cinder-az1", VolumeType: "volume.hostB"}},
+					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az2", RootVolume: &machinev1.RootVolume{AvailabilityZone: "cinder-az2", VolumeType: "volume.hostC"}},
 				).BuildFailureDomains()
 
 				failureDomains, err = NewFailureDomains(config)
@@ -216,9 +216,9 @@ var _ = Describe("FailureDomains", func() {
 
 			It("should construct a list of failure domains", func() {
 				Expect(failureDomains).To(ConsistOf(
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{VolumeType:volume.hostA}}"),
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{VolumeType:volume.hostB}}"),
-					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{VolumeType:volume.hostC}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0, VolumeType:volume.hostA}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az1, RootVolume:{AvailabilityZone:cinder-az1, VolumeType:volume.hostB}}"),
+					HaveField("String()", "OpenStackFailureDomain{AvailabilityZone:nova-az2, RootVolume:{AvailabilityZone:cinder-az2, VolumeType:volume.hostC}}"),
 				))
 			})
 		})
@@ -370,6 +370,7 @@ var _ = Describe("FailureDomains", func() {
 		var fd failureDomain
 		var filterRootVolume = machinev1.RootVolume{
 			AvailabilityZone: "cinder-az0",
+			VolumeType:       "fast-az0",
 		}
 
 		BeforeEach(func() {
@@ -385,7 +386,7 @@ var _ = Describe("FailureDomains", func() {
 			})
 
 			It("returns the Compute and Storage availability zones for String()", func() {
-				Expect(fd.String()).To(Equal("OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0}}"))
+				Expect(fd.String()).To(Equal("OpenStackFailureDomain{AvailabilityZone:nova-az0, RootVolume:{AvailabilityZone:cinder-az0, VolumeType:fast-az0}}"))
 			})
 		})
 
@@ -404,7 +405,7 @@ var _ = Describe("FailureDomains", func() {
 			})
 
 			It("returns the Storage availability zone for String()", func() {
-				Expect(fd.String()).To(Equal("OpenStackFailureDomain{RootVolume:{AvailabilityZone:cinder-az0}}"))
+				Expect(fd.String()).To(Equal("OpenStackFailureDomain{RootVolume:{AvailabilityZone:cinder-az0, VolumeType:fast-az0}}"))
 			})
 		})
 		Context("with no availability zones", func() {
@@ -423,6 +424,7 @@ var _ = Describe("FailureDomains", func() {
 		var fd2 failureDomain
 		var filterRootVolume = machinev1.RootVolume{
 			AvailabilityZone: "cinder-az0",
+			VolumeType:       "fast-az0",
 		}
 
 		Context("With two identical AWS failure domains", func() {

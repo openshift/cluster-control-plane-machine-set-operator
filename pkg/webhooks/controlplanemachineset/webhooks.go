@@ -373,6 +373,8 @@ func checkOpenShiftFailureDomainsMatchMachines(logger logr.Logger, parentPath *f
 		return append(errs, field.Invalid(parentPath, failureDomains, fmt.Sprintf("error getting failure domains from control plane machine set machine template: %v", err)))
 	}
 
+	errs = append(errs, checkOpenShiftFailureDomains(specifiedFailureDomains)...)
+
 	// Failure domains used by control plane machines but not specified in the control plane machine set
 	if missingFailureDomains := missingFailureDomains(machineFailureDomains, specifiedFailureDomains); len(missingFailureDomains) > 0 {
 		errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("control plane machines are using unspecified failure domain(s) %s", missingFailureDomains)))
@@ -382,6 +384,39 @@ func checkOpenShiftFailureDomainsMatchMachines(logger logr.Logger, parentPath *f
 	if missingFailureDomains := missingFailureDomains(specifiedFailureDomains, machineFailureDomains); len(missingFailureDomains) > 0 {
 		if duplicatedFailureDomains := duplicatedFailureDomains(machineFailureDomains); len(duplicatedFailureDomains) > 0 {
 			errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("no control plane machine is using specified failure domain(s) %s, failure domain(s) %s are duplicated within the control plane machines, please correct failure domains to match control plane machines", missingFailureDomains, duplicatedFailureDomains)))
+		}
+	}
+
+	return errs
+}
+
+// checkOpenShiftFailureDomains checks that the failure domains are valid.
+func checkOpenShiftFailureDomains(failureDomains []failuredomain.FailureDomain) []error {
+	errs := []error{}
+
+	for _, failureDomain := range failureDomains {
+		switch failureDomain.Type() {
+		case configv1.OpenStackPlatformType:
+			errs = append(errs, checkOpenShiftOpenStackFailureDomains(failureDomain.OpenStack())...)
+		default:
+			return errs
+		}
+	}
+
+	return errs
+}
+
+// checkOpenShiftOpenStackFailureDomains checks that the OpenStack failure domains are valid.
+func checkOpenShiftOpenStackFailureDomains(failureDomain machinev1.OpenStackFailureDomain) []error {
+	errs := []error{}
+
+	if failureDomain.RootVolume != nil {
+		if failureDomain.AvailabilityZone != "" && failureDomain.RootVolume.AvailabilityZone == "" {
+			errs = append(errs, fmt.Errorf("rootVolume availabilityZone must be specified when availabilityZone is specified")) //nolint:goerr113
+		}
+
+		if failureDomain.RootVolume.VolumeType == "" {
+			errs = append(errs, fmt.Errorf("rootVolume volumeType must be specified")) //nolint:goerr113
 		}
 	}
 

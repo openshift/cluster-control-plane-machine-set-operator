@@ -704,20 +704,32 @@ var _ = Describe("Webhooks", func() {
 
 			var filterRootVolumeOne = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az1",
+				VolumeType:       "fast-az1",
 			}
 			var filterRootVolumeTwo = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az2",
+				VolumeType:       "fast-az2",
 			}
 			var filterRootVolumeThree = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az3",
+				VolumeType:       "fast-az3",
 			}
 			var filterRootVolumeFour = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az4",
+				VolumeType:       "fast-az4",
+			}
+			var filterRootVolumeFive = machinev1.RootVolume{
+				AvailabilityZone: "cinder-az5",
+			}
+			var filterRootVolumeSix = machinev1.RootVolume{
+				VolumeType: "fast-az6",
 			}
 			var zone1Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").WithRootVolume(&filterRootVolumeOne)
 			var zone2Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(&filterRootVolumeTwo)
 			var zone3Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az3").WithRootVolume(&filterRootVolumeThree)
 			var zone4Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az4").WithRootVolume(&filterRootVolumeFour)
+			var zone5Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az5").WithRootVolume(&filterRootVolumeFive)
+			var zone6Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az6").WithRootVolume(&filterRootVolumeSix)
 
 			BeforeEach(func() {
 				providerSpec := machinev1beta1resourcebuilder.OpenStackProviderSpec()
@@ -730,7 +742,8 @@ var _ = Describe("Webhooks", func() {
 				By("Creating a selection of Machines")
 				for _, az := range []string{"az1", "az2", "az3"} {
 					rootVolume := &machinev1alpha1.RootVolume{
-						Zone: "cinder-" + az,
+						VolumeType: "fast-" + az,
+						Zone:       "cinder-" + az,
 					}
 					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec.WithZone("nova-" + az).WithRootVolume(rootVolume))
 
@@ -761,7 +774,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3, VolumeType:fast-az3}}]"),
 				))
 			})
 
@@ -774,11 +787,11 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3, VolumeType:fast-az3}}]"),
 				))
 			})
 
-			It("when increasing the availability", func() {
+			It("when increasing the availability with a valid failure domain", func() {
 				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
 					machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
 						zone1Builder,
@@ -789,6 +802,36 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
+
+			It("when increasing the availability with a failure domain missing root volume type", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+						zone5Builder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("rootVolume volumeType must be specified"),
+				))
+			})
+
+			It("when increasing the availability with a failure domain missing root volume availability zone", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+						zone6Builder,
+					),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("rootVolume.availabilityZone is required when availabilityZone is set"),
+				))
 			})
 		})
 
