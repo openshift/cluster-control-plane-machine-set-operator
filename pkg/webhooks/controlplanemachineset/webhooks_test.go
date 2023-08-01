@@ -57,6 +57,7 @@ var _ = Describe("Webhooks", func() {
 		By("Setting up a namespace for the test")
 		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-webhook-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+
 		namespaceName = ns.GetName()
 
 		By("Setting up a manager and webhook")
