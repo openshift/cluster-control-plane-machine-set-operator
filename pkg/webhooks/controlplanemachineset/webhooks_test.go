@@ -704,15 +704,19 @@ var _ = Describe("Webhooks", func() {
 
 			var filterRootVolumeOne = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az1",
+				VolumeType:       "fast-az1",
 			}
 			var filterRootVolumeTwo = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az2",
+				VolumeType:       "fast-az2",
 			}
 			var filterRootVolumeThree = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az3",
+				VolumeType:       "fast-az3",
 			}
 			var filterRootVolumeFour = machinev1.RootVolume{
 				AvailabilityZone: "cinder-az4",
+				VolumeType:       "fast-az4",
 			}
 			var zone1Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").WithRootVolume(&filterRootVolumeOne)
 			var zone2Builder = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(&filterRootVolumeTwo)
@@ -730,7 +734,8 @@ var _ = Describe("Webhooks", func() {
 				By("Creating a selection of Machines")
 				for _, az := range []string{"az1", "az2", "az3"} {
 					rootVolume := &machinev1alpha1.RootVolume{
-						Zone: "cinder-" + az,
+						VolumeType: "fast-" + az,
+						Zone:       "cinder-" + az,
 					}
 					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec.WithZone("nova-" + az).WithRootVolume(rootVolume))
 
@@ -761,7 +766,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3, VolumeType:fast-az3}}]"),
 				))
 			})
 
@@ -774,7 +779,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3}}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [OpenStackFailureDomain{AvailabilityZone:nova-az3, RootVolume:{AvailabilityZone:cinder-az3, VolumeType:fast-az3}}]"),
 				))
 			})
 

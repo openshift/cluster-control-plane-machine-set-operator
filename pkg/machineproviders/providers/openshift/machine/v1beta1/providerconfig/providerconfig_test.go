@@ -274,13 +274,15 @@ var _ = Describe("Provider Config", func() {
 					platformType: configv1.OpenStackPlatformType,
 					openstack: OpenStackProviderConfig{
 						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithRootVolume(&machinev1alpha1.RootVolume{
-							Zone: "cinder-az1",
+							VolumeType: "fast-az1",
+							Zone:       "cinder-az1",
 						}).Build(),
 					},
 				},
 				failureDomain: failuredomain.NewOpenStackFailureDomain(
 					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&machinev1.RootVolume{
 						AvailabilityZone: "cinder-az1",
+						VolumeType:       "fast-az1",
 					}).Build(),
 				),
 				matchPath:        "OpenStack().Config().RootVolume.Zone",
@@ -304,13 +306,15 @@ var _ = Describe("Provider Config", func() {
 					platformType: configv1.OpenStackPlatformType,
 					openstack: OpenStackProviderConfig{
 						providerConfig: *machinev1beta1resourcebuilder.OpenStackProviderSpec().WithRootVolume(&machinev1alpha1.RootVolume{
-							Zone: "cinder-az0",
+							VolumeType: "fast-az0",
+							Zone:       "cinder-az0",
 						}).Build(),
 					},
 				},
 				failureDomain: failuredomain.NewOpenStackFailureDomain(
 					machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&machinev1.RootVolume{
 						AvailabilityZone: "cinder-az1",
+						VolumeType:       "fast-az1",
 					}).Build(),
 				),
 				matchPath:        "OpenStack().Config().RootVolume.Zone",
@@ -467,7 +471,8 @@ var _ = Describe("Provider Config", func() {
 		}
 
 		rootVolume := &machinev1alpha1.RootVolume{
-			Zone: "cinder-az2",
+			VolumeType: "fast-az2",
+			Zone:       "cinder-az2",
 		}
 
 		DescribeTable("should correctly extract the failure domain", func(in extractFailureDomainTableInput) {
@@ -529,6 +534,7 @@ var _ = Describe("Provider Config", func() {
 				expectedFailureDomain: failuredomain.NewOpenStackFailureDomain(
 					machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(&machinev1.RootVolume{
 						AvailabilityZone: "cinder-az2",
+						VolumeType:       "fast-az2",
 					}).Build(),
 				),
 			}),
@@ -553,7 +559,8 @@ var _ = Describe("Provider Config", func() {
 		}
 
 		rootVolume := &machinev1alpha1.RootVolume{
-			Zone: "cinder-az0",
+			VolumeType: "fast-az0",
+			Zone:       "cinder-az0",
 		}
 
 		DescribeTable("should compare provider configs", func(in equalTableInput) {

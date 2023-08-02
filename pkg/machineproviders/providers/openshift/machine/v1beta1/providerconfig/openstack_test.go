@@ -40,10 +40,12 @@ var _ = Describe("OpenStack Provider Config", func() {
 	volumeType1 := "volumetype-1"
 
 	machinev1alpha1RootVolume1 := &machinev1alpha1.RootVolume{
-		Zone: cinderZone1,
+		VolumeType: volumeType1,
+		Zone:       cinderZone1,
 	}
 	machinev1RootVolume1 := machinev1.RootVolume{
 		AvailabilityZone: cinderZone1,
+		VolumeType:       volumeType1,
 	}
 
 	machinev1alpha1RootVolume2 := &machinev1alpha1.RootVolume{
