@@ -2199,40 +2199,48 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 	var (
 		az1FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az1",
+			VolumeType:       "fast-az1",
 		})
 
 		az2FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az2").WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az2",
+			VolumeType:       "fast-az2",
 		})
 
 		az3FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az3").WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az3",
+			VolumeType:       "fast-az3",
 		})
 
 		az4FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az4")
 
 		az5FailureDomainBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomain().WithRootVolume(&machinev1.RootVolume{
 			AvailabilityZone: "cinder-az5",
+			VolumeType:       "fast-az5",
 		})
 
 		defaultProviderSpecBuilderOpenStack = machinev1beta1resourcebuilder.OpenStackProviderSpec()
 
 		az1ProviderSpecBuilderOpenStack = machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az1").WithRootVolume(&machinev1alpha1.RootVolume{
-			Zone: "cinder-az1",
+			VolumeType: "fast-az1",
+			Zone:       "cinder-az1",
 		})
 
 		az2ProviderSpecBuilderOpenStack = machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az2").WithRootVolume(&machinev1alpha1.RootVolume{
-			Zone: "cinder-az2",
+			VolumeType: "fast-az2",
+			Zone:       "cinder-az2",
 		})
 
 		az3ProviderSpecBuilderOpenStack = machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az3").WithRootVolume(&machinev1alpha1.RootVolume{
-			Zone: "cinder-az3",
+			VolumeType: "fast-az3",
+			Zone:       "cinder-az3",
 		})
 
 		az4ProviderSpecBuilderOpenStack = machinev1beta1resourcebuilder.OpenStackProviderSpec().WithZone("nova-az4")
 
 		az5ProviderSpecBuilderOpenStack = machinev1beta1resourcebuilder.OpenStackProviderSpec().WithRootVolume(&machinev1alpha1.RootVolume{
-			Zone: "cinder-az5",
+			VolumeType: "fast-az5",
+			Zone:       "cinder-az5",
 		})
 
 		cpmsEmptyFailureDomainsBuilderOpenStack = machinev1.FailureDomains{}
@@ -2609,8 +2617,13 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 					if openStackMachineProviderConfig.AvailabilityZone != "" {
 						openStackMachineProviderConfig.AvailabilityZone = ""
 					}
-					if openStackMachineProviderConfig.RootVolume != nil && openStackMachineProviderConfig.RootVolume.Zone != "" {
-						openStackMachineProviderConfig.RootVolume.Zone = ""
+					if openStackMachineProviderConfig.RootVolume != nil {
+						if openStackMachineProviderConfig.RootVolume.VolumeType != "" {
+							openStackMachineProviderConfig.RootVolume.VolumeType = ""
+						}
+						if openStackMachineProviderConfig.RootVolume.Zone != "" {
+							openStackMachineProviderConfig.RootVolume.Zone = ""
+						}
 					}
 
 					Expect(cpmsProviderSpec.OpenStack().Config()).To(Equal(openStackMachineProviderConfig))
@@ -2668,8 +2681,13 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 					if openStackMachineProviderConfig.AvailabilityZone != "" {
 						openStackMachineProviderConfig.AvailabilityZone = ""
 					}
-					if openStackMachineProviderConfig.RootVolume != nil && openStackMachineProviderConfig.RootVolume.Zone != "" {
-						openStackMachineProviderConfig.RootVolume.Zone = ""
+					if openStackMachineProviderConfig.RootVolume != nil {
+						if openStackMachineProviderConfig.RootVolume.VolumeType != "" {
+							openStackMachineProviderConfig.RootVolume.VolumeType = ""
+						}
+						if openStackMachineProviderConfig.RootVolume.Zone != "" {
+							openStackMachineProviderConfig.RootVolume.Zone = ""
+						}
 					}
 
 					Expect(cpmsProviderSpec.OpenStack().Config()).To(Equal(openStackMachineProviderConfig))
@@ -2796,8 +2814,13 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 				if openStackMachineProviderConfig.AvailabilityZone != "" {
 					openStackMachineProviderConfig.AvailabilityZone = ""
 				}
-				if openStackMachineProviderConfig.RootVolume != nil && openStackMachineProviderConfig.RootVolume.Zone != "" {
-					openStackMachineProviderConfig.RootVolume.Zone = ""
+				if openStackMachineProviderConfig.RootVolume != nil {
+					if openStackMachineProviderConfig.RootVolume.VolumeType != "" {
+						openStackMachineProviderConfig.RootVolume.VolumeType = ""
+					}
+					if openStackMachineProviderConfig.RootVolume.Zone != "" {
+						openStackMachineProviderConfig.RootVolume.Zone = ""
+					}
 				}
 
 				oldUID := cpms.UID
