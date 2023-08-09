@@ -450,6 +450,7 @@ func convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec(provider
 	openStackPs.AvailabilityZone = ""
 
 	if openStackPs.RootVolume != nil {
+		openStackPs.RootVolume.VolumeType = ""
 		openStackPs.RootVolume.Zone = ""
 	}
 
