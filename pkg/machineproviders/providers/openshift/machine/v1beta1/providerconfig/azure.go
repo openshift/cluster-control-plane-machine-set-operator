@@ -39,7 +39,13 @@ type AzureProviderConfig struct {
 func (a AzureProviderConfig) InjectFailureDomain(fd machinev1.AzureFailureDomain) AzureProviderConfig {
 	newAzureProviderConfig := a
 
-	newAzureProviderConfig.providerConfig.Zone = &fd.Zone
+	if fd.Zone != "" {
+		newAzureProviderConfig.providerConfig.Zone = &fd.Zone
+	}
+
+	if fd.Subnet != "" {
+		newAzureProviderConfig.providerConfig.Subnet = fd.Subnet
+	}
 
 	return newAzureProviderConfig
 }
@@ -48,7 +54,8 @@ func (a AzureProviderConfig) InjectFailureDomain(fd machinev1.AzureFailureDomain
 // information stored within the AzureProviderConfig.
 func (a AzureProviderConfig) ExtractFailureDomain() machinev1.AzureFailureDomain {
 	return machinev1.AzureFailureDomain{
-		Zone: pointer.StringDeref(a.providerConfig.Zone, ""),
+		Zone:   pointer.StringDeref(a.providerConfig.Zone, ""),
+		Subnet: a.providerConfig.Subnet,
 	}
 }
 

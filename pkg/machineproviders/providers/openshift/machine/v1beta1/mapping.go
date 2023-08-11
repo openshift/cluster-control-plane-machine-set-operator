@@ -46,7 +46,7 @@ var (
 // to by external code to create new Machines in the same failure domain. It should start with a basic mapping and
 // then use existing Machine information to map failure domains, if possible, so that the Machine names match the
 // index of the failure domain in which they currently reside.
-func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1beta1.Machine, replicas int32, failureDomains []failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
+func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1beta1.Machine, replicas int32, failureDomains []failuredomain.FailureDomain, templateFailureDomain failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
 	if len(failureDomains) == 0 {
 		logger.V(4).Info("No failure domains provided")
 
@@ -60,19 +60,19 @@ func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1b
 
 	failureDomainsSet := failuredomain.NewSet(failureDomains...)
 
-	baseMapping, err := createBaseFailureDomainMapping(replicas, failureDomainsSet.List(), machineMapping)
+	comparableBaseMapping, err := createBaseFailureDomainMapping(replicas, failureDomainsSet.List(), templateFailureDomain, machineMapping)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct base failure domain mapping: %w", err)
 	}
 
-	out := reconcileMappings(logger, baseMapping, machineMapping, deletingIndexes)
+	machineIndexesToFailureDomains := reconcileMappings(logger, comparableBaseMapping, machineMapping, deletingIndexes)
 
 	logger.V(4).Info(
 		"Mapped provided failure domains",
-		"mapping", fmt.Sprintf("%v", out),
+		"mapping", fmt.Sprintf("%v", machineIndexesToFailureDomains),
 	)
 
-	return out, nil
+	return machineIndexesToFailureDomains, nil
 }
 
 // createBaseFailureDomainMapping is used to create the basic failure domain mapping based on the number of failure
@@ -81,7 +81,7 @@ func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1b
 // domains.
 // Create the output based on the longer of the number of Machines or replicas so that when we reconcile the machine
 // mappings we always have enough candidates which are balanced between the available failure domains.
-func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredomain.FailureDomain, machineMapping map[int32]failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
+func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredomain.FailureDomain, templateFailureDomain failuredomain.FailureDomain, machineMapping map[int32]failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
 	out := make(map[int32]failuredomain.FailureDomain)
 
 	if replicas < 1 {
@@ -105,16 +105,23 @@ func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredoma
 		return nil, errNoFailureDomains
 	}
 
+	comparableFailureDomains, err := failuredomain.CompleteFailureDomains(failureDomains, templateFailureDomain)
+	if err != nil {
+		return nil, fmt.Errorf("unable to make failure domains comparable: %w", err)
+	}
+
 	// Sort failure domains alphabetically
-	sort.Slice(failureDomains, func(i, j int) bool { return failureDomains[i].String() < failureDomains[j].String() })
+	sort.Slice(comparableFailureDomains, func(i, j int) bool {
+		return comparableFailureDomains[i].String() < comparableFailureDomains[j].String()
+	})
 
 	// Deprioritise any failure domain that is not present in the machine mapping.
-	sort.Slice(failureDomains, func(i, j int) bool {
-		return machineFailureDomains.Has(failureDomains[i]) && !machineFailureDomains.Has(failureDomains[j])
+	sort.Slice(comparableFailureDomains, func(i, j int) bool {
+		return machineFailureDomains.Has(comparableFailureDomains[i]) && !machineFailureDomains.Has(comparableFailureDomains[j])
 	})
 
 	for i := int32(0); i < int32(machineIndexCount); i++ {
-		out[i] = failureDomains[i%int32(len(failureDomains))]
+		out[i] = comparableFailureDomains[i%int32(len(comparableFailureDomains))]
 	}
 
 	return out, nil

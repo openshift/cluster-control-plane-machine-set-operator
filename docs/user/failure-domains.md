@@ -76,12 +76,13 @@ a minimum of three separate availability zones are present in all availability z
 Azure describes the availability zones as separate locations within each region, providing more tolerance to local
 failures.
 
-When configuring Azure failure domains in the control plane machine set, there is currently only one supported option,
-the availability zone name.
+When configuring Azure failure domains in the control plane machine set, there are currently two options that must be
+selected; the availability zone name, and the subnet to use.
 
 An Azure failure domain will look something like the example below:
 ```yaml
 - zone: "<zone>"
+  subnet: "<subnet>"
 ```
 
 ## OpenStack
