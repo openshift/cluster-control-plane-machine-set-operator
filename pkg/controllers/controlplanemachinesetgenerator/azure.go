@@ -64,6 +64,9 @@ func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []
 	// Remove field related to the faliure domain.
 	azureProviderSpec.Zone = nil
 
+	// Remove field related to the subnet.
+	azureProviderSpec.Subnet = ""
+
 	rawBytes, err := json.Marshal(azureProviderSpec)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling azure providerSpec: %w", err)
