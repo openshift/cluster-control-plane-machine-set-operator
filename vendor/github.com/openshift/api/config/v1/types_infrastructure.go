@@ -114,6 +114,7 @@ type InfrastructureStatus struct {
 	// +kubebuilder:default=None
 	// +default="None"
 	// +kubebuilder:validation:Enum=None;AllNodes
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	CPUPartitioning CPUPartitioningMode `json:"cpuPartitioning,omitempty"`
 }

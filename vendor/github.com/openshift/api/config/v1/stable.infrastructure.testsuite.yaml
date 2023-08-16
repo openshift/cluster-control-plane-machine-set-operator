@@ -208,7 +208,6 @@ tests:
         status:
           controlPlaneTopology: "HighlyAvailable"
           infrastructureTopology: "HighlyAvailable"
-          cpuPartitioning: None
           platform: Azure
           platformStatus:
             azure:
@@ -341,7 +340,6 @@ tests:
             type: OpenStack
         status:
           controlPlaneTopology: HighlyAvailable
-          cpuPartitioning: None
           infrastructureTopology: HighlyAvailable
           platform: OpenStack
           platformStatus:
@@ -380,7 +378,6 @@ tests:
             type: OpenStack
         status:
           controlPlaneTopology: HighlyAvailable
-          cpuPartitioning: None
           infrastructureTopology: HighlyAvailable
           platform: OpenStack
           platformStatus:
@@ -553,7 +550,6 @@ tests:
         status:
           controlPlaneTopology: HighlyAvailable
           infrastructureTopology: HighlyAvailable
-          cpuPartitioning: None
           platform: External
           platformStatus:
             type: External
@@ -661,7 +657,6 @@ tests:
         status:
           controlPlaneTopology: HighlyAvailable
           infrastructureTopology: HighlyAvailable
-          cpuPartitioning: None
           platform: External
           platformStatus:
             type: External
@@ -769,7 +764,6 @@ tests:
         status:
           controlPlaneTopology: HighlyAvailable
           infrastructureTopology: HighlyAvailable
-          cpuPartitioning: None
           platform: External
           platformStatus:
             type: External
@@ -828,7 +822,6 @@ tests:
         status:
           controlPlaneTopology: HighlyAvailable
           infrastructureTopology: HighlyAvailable
-          cpuPartitioning: None
           platform: External
           platformStatus:
             type: External
@@ -864,7 +857,6 @@ tests:
         status:
           controlPlaneTopology: HighlyAvailable
           infrastructureTopology: HighlyAvailable
-          cpuPartitioning: None
           platform: External
           platformStatus:
             type: External
@@ -922,7 +914,6 @@ tests:
         status:
           controlPlaneTopology: HighlyAvailable
           infrastructureTopology: HighlyAvailable
-          cpuPartitioning: None
           platform: External
           platformStatus:
             type: External

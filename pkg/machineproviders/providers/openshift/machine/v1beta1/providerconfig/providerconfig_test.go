@@ -176,7 +176,7 @@ var _ = Describe("Provider Config", func() {
 				),
 				expectedError:    nil,
 				matchPath:        "AWS().Config().Placement.AvailabilityZone",
-				matchExpectation: "us-east-1a", // from the provider config
+				matchExpectation: "",
 			}),
 			Entry("when keeping an AWS availability zone the same", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
@@ -510,7 +510,7 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAzureFailureDomain(
-					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").WithSubnet("cluster-subnet-12345678").Build(),
+					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				),
 			}),
 			Entry("with a GCP us-central1-a failure domain", extractFailureDomainTableInput{

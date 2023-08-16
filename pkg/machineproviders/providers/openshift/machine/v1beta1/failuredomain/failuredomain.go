@@ -40,12 +40,6 @@ var (
 	// errMissingFailureDomain is an error used when failure domain platform is set
 	// but the failure domain list is nil.
 	errMissingFailureDomain = errors.New("missing failure domain configuration")
-
-	// errMissingTemplateFailureDomain is an error used when you attempt to combine a failure domain with a nil template failure domain.
-	errMissingTemplateFailureDomain = errors.New("failure domain extracted from machine template is nil")
-
-	// errMismatchedPlatformType is an error used when attempting to compare failure domains of different platform types.
-	errMismatchedPlatformType = errors.New("platform types do not match")
 )
 
 // FailureDomain is an interface that allows external code to interact with
@@ -71,9 +65,6 @@ type FailureDomain interface {
 
 	// Equal compares the underlying failure domain.
 	Equal(other FailureDomain) bool
-
-	// Complete ensures that any empty value in the failure domain is populated based on the template failure domain, to create a fully specified failure domain.
-	Complete(templateFailureDomain FailureDomain) (FailureDomain, error)
 }
 
 // failureDomain holds an implementation of the FailureDomain interface.
@@ -149,106 +140,6 @@ func (f failureDomain) Equal(other FailureDomain) bool {
 	}
 
 	return true
-}
-
-// CompleteFailureDomains calls Complete on each failure domain in the list.
-func CompleteFailureDomains(failureDomains []FailureDomain, templateFailureDomain FailureDomain) ([]FailureDomain, error) {
-	comparableFailureDomains := []FailureDomain{}
-
-	for _, failureDomain := range failureDomains {
-		failureDomain, err := failureDomain.Complete(templateFailureDomain)
-		if err != nil {
-			return nil, fmt.Errorf("cannot combine failure domain with template failure domain: %w", err)
-		}
-
-		comparableFailureDomains = append(comparableFailureDomains, failureDomain)
-	}
-
-	return comparableFailureDomains, nil
-}
-
-// Complete creates a copy of templateFailureDomain and overrides any set values with the values from the current failure domain.
-func (f failureDomain) Complete(templateFailureDomain FailureDomain) (FailureDomain, error) {
-	if templateFailureDomain == nil {
-		return nil, errMissingTemplateFailureDomain
-	}
-
-	if f.platformType != templateFailureDomain.Type() {
-		return nil, errMismatchedPlatformType
-	}
-
-	switch f.platformType {
-	case configv1.AWSPlatformType:
-		return f.completeAWS(templateFailureDomain.AWS()), nil
-	case configv1.AzurePlatformType:
-		return f.completeAzure(templateFailureDomain.Azure()), nil
-	case configv1.GCPPlatformType:
-		return f.completeGCP(templateFailureDomain.GCP()), nil
-	case configv1.OpenStackPlatformType:
-		return f.completeOpenStack(templateFailureDomain.OpenStack()), nil
-	default:
-		return NewGenericFailureDomain(), nil
-	}
-}
-
-func (f failureDomain) completeAWS(templateFailureDomain machinev1.AWSFailureDomain) FailureDomain {
-	fd := templateFailureDomain.DeepCopy()
-
-	if f.aws.Placement.AvailabilityZone != "" {
-		fd.Placement = f.aws.Placement
-	}
-
-	if f.aws.Subnet != nil && !reflect.DeepEqual(f.aws.Subnet, machinev1.AWSResourceReference{}) {
-		fd.Subnet = f.aws.Subnet
-	}
-
-	return NewAWSFailureDomain(*fd)
-}
-
-func (f failureDomain) completeAzure(templateFailureDomain machinev1.AzureFailureDomain) FailureDomain {
-	fd := templateFailureDomain.DeepCopy()
-
-	if f.azure.Zone != "" {
-		fd.Zone = f.azure.Zone
-	}
-
-	if f.azure.Subnet != "" {
-		fd.Subnet = f.azure.Subnet
-	}
-
-	return NewAzureFailureDomain(*fd)
-}
-
-func (f failureDomain) completeGCP(templateFailureDomain machinev1.GCPFailureDomain) FailureDomain {
-	fd := templateFailureDomain.DeepCopy()
-
-	if f.gcp.Zone != "" {
-		fd.Zone = f.gcp.Zone
-	}
-
-	return NewGCPFailureDomain(*fd)
-}
-
-func (f failureDomain) completeOpenStack(templateFailureDomain machinev1.OpenStackFailureDomain) FailureDomain {
-	fd := templateFailureDomain.DeepCopy()
-
-	if f.openstack.AvailabilityZone != "" {
-		fd.AvailabilityZone = f.openstack.AvailabilityZone
-	}
-
-	if fd.RootVolume == nil {
-		fd.RootVolume = f.openstack.RootVolume
-	} else if f.openstack.RootVolume != nil {
-		if f.openstack.RootVolume.AvailabilityZone != "" {
-			fd.RootVolume.AvailabilityZone = f.openstack.RootVolume.AvailabilityZone
-		}
-
-		if f.openstack.RootVolume.VolumeType != "" {
-			fd.RootVolume.VolumeType = f.openstack.RootVolume.VolumeType
-		}
-	}
-
-	return NewOpenStackFailureDomain(*fd)
 }
 
 // NewFailureDomains creates a set of FailureDomains representing the input failure
@@ -409,21 +300,11 @@ func awsFailureDomainToString(fd machinev1.AWSFailureDomain) string {
 
 // azureFailureDomainToString converts the AzureFailureDomain into a string.
 func azureFailureDomainToString(fd machinev1.AzureFailureDomain) string {
-	var failureDomain []string
-
 	if fd.Zone != "" {
-		failureDomain = append(failureDomain, fmt.Sprintf("Zone:%s", fd.Zone))
+		return fmt.Sprintf("AzureFailureDomain{Zone:%s}", fd.Zone)
 	}
 
-	if fd.Subnet != "" {
-		failureDomain = append(failureDomain, fmt.Sprintf("Subnet:%s", fd.Subnet))
-	}
-
-	if len(failureDomain) == 0 {
-		return unknownFailureDomain
-	}
-
-	return "AzureFailureDomain{" + strings.Join(failureDomain, ", ") + "}"
+	return unknownFailureDomain
 }
 
 // gcpFailureDomainToString converts the GCPFailureDomain into a string.

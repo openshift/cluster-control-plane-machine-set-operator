@@ -1012,7 +1012,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					// present on the ControlPlaneMachineSet Provider Spec.
 					azureMachineProviderConfig := machineProviderSpec.Azure().Config()
 					azureMachineProviderConfig.Zone = nil
-					azureMachineProviderConfig.Subnet = ""
 
 					Expect(cpmsProviderSpec.Azure().Config()).To(Equal(azureMachineProviderConfig))
 				})
@@ -1067,7 +1066,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					// present on the ControlPlaneMachineSet Provider Spec.
 					azureMachineProviderConfig := machineProviderSpec.Azure().Config()
 					azureMachineProviderConfig.Zone = nil
-					azureMachineProviderConfig.Subnet = ""
 
 					Expect(cpmsProviderSpec.Azure().Config()).To(Equal(azureMachineProviderConfig))
 				})
@@ -1191,7 +1189,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				// present on the ControlPlaneMachineSet Provider Spec.
 				azureMachineProviderConfig := machineProviderSpec.Azure().Config()
 				azureMachineProviderConfig.Zone = nil
-				azureMachineProviderConfig.Subnet = ""
 
 				oldUID := cpms.UID
 
