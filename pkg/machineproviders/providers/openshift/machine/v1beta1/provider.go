@@ -200,15 +200,8 @@ func (m *openshiftMachineProvider) updateMachineCache(ctx context.Context, logge
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
 
-	config, err := providerconfig.NewProviderConfigFromMachineSpec(logger, m.machineTemplate.Spec)
-	if err != nil {
-		return fmt.Errorf("error building provider config from machine template: %w", err)
-	}
-
-	templateFailureDomain := config.ExtractFailureDomain()
-
 	// Since the mapping depends on the state of the machines, we must re-map the failure domains if the machines have changed.
-	indexToFailureDomain, err := mapMachineIndexesToFailureDomains(logger, machineList.Items, m.replicas, m.failureDomains, templateFailureDomain)
+	indexToFailureDomain, err := mapMachineIndexesToFailureDomains(logger, machineList.Items, m.replicas, m.failureDomains)
 	if err != nil && !errors.Is(err, errNoFailureDomains) {
 		return fmt.Errorf("error mapping machine indexes: %w", err)
 	}
@@ -383,20 +376,7 @@ func (m *openshiftMachineProvider) getMachineIndex(logger logr.Logger, machine m
 		return 0, fmt.Errorf("cannot extract failure domain from machine: %w", err)
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, m.machineTemplate.Spec)
-	if err != nil {
-		return 0, fmt.Errorf("cannot get provider config for machine: %w", err)
-	}
-	// templateFailureDomain is a failure domain from the machine template provider spec.
-	templateFailureDomain := providerConfig.ExtractFailureDomain()
-
-	// To be able to compare specified failure domains with failure domains from machines we need to combine them with fields set from the template.
-	comparableFailureDomain, err := failureDomain.Complete(templateFailureDomain)
-	if err != nil {
-		return 0, fmt.Errorf("cannot combine failure domain with template failure domain: %w", err)
-	}
-
-	index, indexFound := m.failureDomainToIndex(comparableFailureDomain)
+	index, indexFound := m.failureDomainToIndex(failureDomain)
 	if !indexFound {
 		// When the machine names do not fit the pattern, and the failure domains are
 		// not recognised, returns an error.

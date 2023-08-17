@@ -562,7 +562,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3, Subnet:cluster-subnet-12345678}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3}]"),
 				))
 			})
 
@@ -575,7 +575,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3, Subnet:cluster-subnet-12345678}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3}]"),
 				))
 			})
 
