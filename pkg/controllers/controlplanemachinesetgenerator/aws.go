@@ -18,6 +18,7 @@ package controlplanemachinesetgenerator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -42,7 +43,9 @@ const (
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
 func generateControlPlaneMachineSetAWSSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
 	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
-	if err != nil {
+	if errors.Is(err, errNoFailureDomains) {
+		// This is a special case where we don't have any failure domains.
+	} else if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS failure domains: %w", err)
 	}
 

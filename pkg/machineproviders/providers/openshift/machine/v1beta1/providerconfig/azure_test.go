@@ -35,9 +35,13 @@ var _ = Describe("Azure Provider Config", func() {
 	zone1 := "1"
 	zone2 := "2"
 
+	subnetZone1 := "subnet-zone-1"
+	subnetZone2 := "subnet-zone-2"
+
 	BeforeEach(func() {
 		machineProviderConfig := machinev1beta1resourcebuilder.AzureProviderSpec().
 			WithZone(zone1).
+			WithSubnet(subnetZone1).
 			Build()
 
 		providerConfig = AzureProviderConfig{
@@ -51,6 +55,7 @@ var _ = Describe("Azure Provider Config", func() {
 		It("returns the configured failure domain", func() {
 			expected := machinev1resourcebuilder.AzureFailureDomain().
 				WithZone(zone1).
+				WithSubnet(subnetZone1).
 				Build()
 
 			Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
@@ -63,6 +68,7 @@ var _ = Describe("Azure Provider Config", func() {
 		BeforeEach(func() {
 			changedFailureDomain := machinev1resourcebuilder.AzureFailureDomain().
 				WithZone(zone2).
+				WithSubnet(subnetZone2).
 				Build()
 
 			changedProviderConfig = providerConfig.InjectFailureDomain(changedFailureDomain)
@@ -72,6 +78,7 @@ var _ = Describe("Azure Provider Config", func() {
 			It("returns the changed failure domain from the changed config", func() {
 				expected := machinev1resourcebuilder.AzureFailureDomain().
 					WithZone(zone2).
+					WithSubnet(subnetZone2).
 					Build()
 
 				Expect(changedProviderConfig.ExtractFailureDomain()).To(Equal(expected))
@@ -80,6 +87,7 @@ var _ = Describe("Azure Provider Config", func() {
 			It("returns the original failure domain from the original config", func() {
 				expected := machinev1resourcebuilder.AzureFailureDomain().
 					WithZone(zone1).
+					WithSubnet(subnetZone1).
 					Build()
 
 				Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))

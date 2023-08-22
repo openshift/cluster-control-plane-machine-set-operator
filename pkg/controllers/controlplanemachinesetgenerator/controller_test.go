@@ -465,7 +465,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
 					})
 				})
 			})
@@ -514,7 +514,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains()))
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains())))
 				})
 
 				Context("With additional Machines adding additional failure domains", func() {
@@ -528,7 +528,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
 					})
 				})
 			})
@@ -664,7 +664,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 				})
 
 				It("should update, but not duplicate the failure domains on the ControlPlaneMachineSet", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -735,7 +735,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 			})
 
 			It("should update ControlPlaneMachineSet with the expected failure domains", func() {
-				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains())))
+				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains()))))
 			})
 
 			Context("With additional Machines adding additional failure domains", func() {
@@ -746,7 +746,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 				})
 
 				It("should include additional failure domains from Machines, not present in the Machine Sets", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -790,12 +790,12 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 			usEast1eFailureDomainBuilderAzure,
 		)
 
-		cpmsInactive3FDsBuilderAzure = machinev1resourcebuilder.ControlPlaneMachineSet().
-						WithState(machinev1.ControlPlaneMachineSetStateInactive).
-						WithMachineTemplateBuilder(
+		cpmsInactiveOutdated3FDsBuilderAzure = machinev1resourcebuilder.ControlPlaneMachineSet().
+							WithState(machinev1.ControlPlaneMachineSetStateInactive).
+							WithMachineTemplateBuilder(
 				machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 					WithProviderSpecBuilder(
-						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
+						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("outdatedInstancetype"),
 					).
 					WithFailureDomainsBuilder(machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						usEast1aFailureDomainBuilderAzure,
@@ -1034,7 +1034,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					// Remove from the machine Provider Spec the fields that won't be
 					// present on the ControlPlaneMachineSet Provider Spec.
 					azureMachineProviderConfig := machineProviderSpec.Azure().Config()
-					azureMachineProviderConfig.Zone = nil
+					azureMachineProviderConfig.Zone = ""
 
 					Expect(cpmsProviderSpec.Azure().Config()).To(Equal(azureMachineProviderConfig))
 				})
@@ -1045,11 +1045,15 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 						create3MachineSets()
 					})
 
-					It("should create the ControlPlaneMachineSet with only one copy of each failure domain", func() {
+					It("should create the ControlPlaneMachineSet with only failure domains from control plane machines", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderAzure.BuildFailureDomains()))
+						azureMachineSpec := machinev1beta1.AzureMachineProviderSpec{}
+						Expect(json.Unmarshal(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw, &azureMachineSpec)).To(Succeed())
+						Expect(azureMachineSpec.Subnet).To(Equal("cluster-subnet-12345678"))
+
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms3FailureDomainsBuilderAzure.BuildFailureDomains())))
 					})
 				})
 			})
@@ -1088,7 +1092,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					// Remove from the machine Provider Spec the fields that won't be
 					// present on the ControlPlaneMachineSet Provider Spec.
 					azureMachineProviderConfig := machineProviderSpec.Azure().Config()
-					azureMachineProviderConfig.Zone = nil
+					azureMachineProviderConfig.Zone = ""
 
 					Expect(cpmsProviderSpec.Azure().Config()).To(Equal(azureMachineProviderConfig))
 				})
@@ -1097,7 +1101,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms3FailureDomainsBuilderAzure.BuildFailureDomains()))
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms3FailureDomainsBuilderAzure.BuildFailureDomains())))
 				})
 
 				Context("With additional Machines adding additional failure domains", func() {
@@ -1111,7 +1115,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderAzure.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderAzure.BuildFailureDomains())))
 					})
 				})
 			})
@@ -1205,7 +1209,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				By("Creating an outdated and Inactive Control Plane Machine Set")
 				// Create an Inactive ControlPlaneMachineSet with a Provider Spec that
 				// doesn't match the one of the youngest control plane machine (i.e. it's outdated).
-				cpms = cpmsInactive3FDsBuilderAzure.WithNamespace(namespaceName).Build()
+				cpms = cpmsInactiveOutdated3FDsBuilderAzure.WithNamespace(namespaceName).Build()
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
 
@@ -1218,7 +1222,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				// Remove from the machine Provider Spec the fields that won't be
 				// present on the ControlPlaneMachineSet Provider Spec.
 				azureMachineProviderConfig := machineProviderSpec.Azure().Config()
-				azureMachineProviderConfig.Zone = nil
+				azureMachineProviderConfig.Zone = ""
 
 				oldUID := cpms.UID
 
@@ -1245,8 +1249,13 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					create3MachineSets()
 				})
 
-				It("should update, but not duplicate the failure domains on the ControlPlaneMachineSet", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderAzure.BuildFailureDomains())))
+				It("should update, but only contain failure domains from control plane machines", func() {
+
+					azureMachineSpec := machinev1beta1.AzureMachineProviderSpec{}
+					Expect(json.Unmarshal(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw, &azureMachineSpec)).To(Succeed())
+					Expect(azureMachineSpec.Subnet).To(Equal("cluster-subnet-12345678"))
+
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderAzure.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -1317,7 +1326,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 			})
 
 			It("should update ControlPlaneMachineSet with the expected failure domains", func() {
-				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms3FailureDomainsBuilderAzure.BuildFailureDomains())))
+				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderAzure.BuildFailureDomains()))))
 			})
 
 			Context("With additional Machines adding additional failure domains", func() {
@@ -1328,7 +1337,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				})
 
 				It("should include additional failure domains from Machines, not present in the Machine Sets", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderAzure.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderAzure.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -1631,7 +1640,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains())))
 					})
 				})
 			})
@@ -1679,7 +1688,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms3FailureDomainsBuilderGCP.BuildFailureDomains()))
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms3FailureDomainsBuilderGCP.BuildFailureDomains())))
 				})
 
 				Context("With additional Machines adding additional failure domains", func() {
@@ -1693,7 +1702,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains())))
 					})
 				})
 			})
@@ -1828,7 +1837,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 				})
 
 				It("should update, but not duplicate the failure domains on the ControlPlaneMachineSet", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -1899,7 +1908,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 			})
 
 			It("should update ControlPlaneMachineSet with the expected failure domains", func() {
-				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms3FailureDomainsBuilderGCP.BuildFailureDomains())))
+				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderGCP.BuildFailureDomains()))))
 			})
 
 			Context("With additional Machines adding additional failure domains", func() {
@@ -1910,7 +1919,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 				})
 
 				It("should include additional failure domains from Machines, not present in the Machine Sets", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderGCP.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -2296,12 +2305,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 			Zone:       "cinder-az5",
 		})
 
-		cpmsEmptyFailureDomainsBuilderOpenStack = machinev1.FailureDomains{}
-
-		cpmsNoFailureDomainsBuilderOpenStack = machinev1.FailureDomains{
-			Platform: "",
-		}
-
 		cpms3FailureDomainsBuilderOpenStack = machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
 			az1FailureDomainBuilderOpenStack,
 			az2FailureDomainBuilderOpenStack,
@@ -2619,8 +2622,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpmsEmptyFailureDomainsBuilderOpenStack))
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpmsNoFailureDomainsBuilderOpenStack))
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(BeNil())
 				})
 
 				Context("With additional Machines adding additional failure domains", func() {
@@ -2696,7 +2698,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains())))
 					})
 				})
 			})
@@ -2754,7 +2756,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 					By("Checking the Control Plane Machine Set has been created")
 					Eventually(komega.Get(cpms)).Should(Succeed())
 
-					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms3FailureDomainsBuilderOpenStack.BuildFailureDomains()))
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms3FailureDomainsBuilderOpenStack.BuildFailureDomains())))
 				})
 
 				Context("With additional Machines adding additional failure domains", func() {
@@ -2768,7 +2770,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 						By("Checking the Control Plane Machine Set has been created")
 						Eventually(komega.Get(cpms)).Should(Succeed())
 
-						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains()))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains())))
 					})
 				})
 			})
@@ -2913,7 +2915,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 				})
 
 				It("should update, but not duplicate the failure domains on the ControlPlaneMachineSet", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains()))))
 				})
 			})
 		})
@@ -2984,7 +2986,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 			})
 
 			It("should update ControlPlaneMachineSet with the expected failure domains", func() {
-				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms3FailureDomainsBuilderOpenStack.BuildFailureDomains())))
+				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderOpenStack.BuildFailureDomains()))))
 			})
 
 			Context("With additional Machines adding additional failure domains", func() {
@@ -2995,7 +2997,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 				})
 
 				It("should include additional failure domains from Machines, not present in the Machine Sets", func() {
-					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains())))
+					Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms5FailureDomainsBuilderOpenStack.BuildFailureDomains()))))
 				})
 			})
 		})

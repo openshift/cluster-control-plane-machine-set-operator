@@ -38,8 +38,13 @@ type AWSProviderConfig struct {
 func (a AWSProviderConfig) InjectFailureDomain(fd machinev1.AWSFailureDomain) AWSProviderConfig {
 	newAWSProviderConfig := a
 
-	newAWSProviderConfig.providerConfig.Placement.AvailabilityZone = fd.Placement.AvailabilityZone
-	newAWSProviderConfig.providerConfig.Subnet = convertAWSResourceReferenceV1ToV1Beta1(fd.Subnet)
+	if fd.Placement.AvailabilityZone != "" {
+		newAWSProviderConfig.providerConfig.Placement.AvailabilityZone = fd.Placement.AvailabilityZone
+	}
+
+	if fd.Subnet != nil {
+		newAWSProviderConfig.providerConfig.Subnet = convertAWSResourceReferenceV1ToV1Beta1(fd.Subnet)
+	}
 
 	return newAWSProviderConfig
 }

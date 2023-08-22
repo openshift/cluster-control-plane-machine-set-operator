@@ -416,7 +416,8 @@ func convertGCPProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig
 // raw control plane machine set provider spec.
 func convertAzureProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
 	azurePs := providerConfig.Azure().Config()
-	azurePs.Zone = nil
+	azurePs.Zone = ""
+	azurePs.Subnet = ""
 
 	rawBytes, err := json.Marshal(azurePs)
 	if err != nil {

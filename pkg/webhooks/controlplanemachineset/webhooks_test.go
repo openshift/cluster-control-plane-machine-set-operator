@@ -267,10 +267,12 @@ var _ = Describe("Webhooks", func() {
 			It("with invalid failure domain information", func() {
 				cpms := builder.Build()
 
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &[]machinev1.AzureFailureDomain{
-					{
-						Zone: "us-central-1",
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					Azure: &[]machinev1.AzureFailureDomain{
+						{
+							Zone: "us-central-1",
+						},
 					},
 				}
 
@@ -283,12 +285,14 @@ var _ = Describe("Webhooks", func() {
 			It("when adding invalid subnets in the faliure domains", func() {
 				cpms := builder.Build()
 
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
-				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &[]machinev1.AWSFailureDomain{
-					{
-						Subnet: &machinev1.AWSResourceReference{
-							Type: machinev1.AWSARNReferenceType,
-							ID:   ptr.To[string]("id-123"),
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{
+					Platform: configv1.AWSPlatformType,
+					AWS: &[]machinev1.AWSFailureDomain{
+						{
+							Subnet: &machinev1.AWSResourceReference{
+								Type: machinev1.AWSARNReferenceType,
+								ID:   ptr.To[string]("id-123"),
+							},
 						},
 					},
 				}
@@ -569,7 +573,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3, Subnet:cluster-subnet-12345678}]"),
 				))
 			})
 
@@ -582,7 +586,7 @@ var _ = Describe("Webhooks", func() {
 				)).Build()
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3}]"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Forbidden: control plane machines are using unspecified failure domain(s) [AzureFailureDomain{Zone:3, Subnet:cluster-subnet-12345678}]"),
 				))
 			})
 
@@ -884,10 +888,12 @@ var _ = Describe("Webhooks", func() {
 
 			It("when adding invalid failure domain information", func() {
 				Expect(komega.Update(cpms, func() {
-					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
-					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &[]machinev1.AzureFailureDomain{
-						{
-							Zone: "us-central-1",
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{
+						Platform: configv1.AWSPlatformType,
+						Azure: &[]machinev1.AzureFailureDomain{
+							{
+								Zone: "us-central-1",
+							},
 						},
 					}
 				})()).To(MatchError(SatisfyAll(
@@ -898,12 +904,14 @@ var _ = Describe("Webhooks", func() {
 
 			It("when adding invalid subnets in the faliure domains", func() {
 				Expect(komega.Update(cpms, func() {
-					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.AWSPlatformType
-					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &[]machinev1.AWSFailureDomain{
-						{
-							Subnet: &machinev1.AWSResourceReference{
-								Type: machinev1.AWSARNReferenceType,
-								ID:   ptr.To[string]("id-123"),
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{
+						Platform: configv1.AWSPlatformType,
+						AWS: &[]machinev1.AWSFailureDomain{
+							{
+								Subnet: &machinev1.AWSResourceReference{
+									Type: machinev1.AWSARNReferenceType,
+									ID:   ptr.To[string]("id-123"),
+								},
 							},
 						},
 					}

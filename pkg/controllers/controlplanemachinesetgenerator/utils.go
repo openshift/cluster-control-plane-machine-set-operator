@@ -18,6 +18,7 @@ package controlplanemachinesetgenerator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -32,6 +33,8 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var errNoFailureDomains = errors.New("no failure domains were generated")
 
 // sortMachinesByCreationTimeDescending sorts a slice of Machines by CreationTime, Name (descending).
 func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []machinev1beta1.Machine {
@@ -176,10 +179,17 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
 	}
 
-	// Fetch failure domains from the machineSets
-	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets, infrastructure)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
+	var machineSetFailureDomains []failuredomain.FailureDomain
+
+	switch machineFailureDomains[0].Type() {
+	case configv1.AzurePlatformType:
+		// On some platforms, failure domains from machineSets are not suitable for control plane machines.
+	default:
+		// Fetch failure domains from the machineSets
+		machineSetFailureDomains, err = providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets, infrastructure)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
+		}
 	}
 
 	// We have to get rid of duplicates from the failure domains.
@@ -208,6 +218,10 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 		}
 	default:
 		return nil, fmt.Errorf("%w: %sFailureDomain{}", errUnsupportedPlatform, machineFailureDomains[0].Type())
+	}
+
+	if cpmsFailureDomain.Platform == "" {
+		return nil, errNoFailureDomains
 	}
 
 	cpmsFailureDomainsApplyConfig := &machinev1builder.FailureDomainsApplyConfiguration{}

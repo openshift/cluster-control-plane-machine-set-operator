@@ -18,6 +18,7 @@ package controlplanemachinesetgenerator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -66,7 +67,9 @@ func generateControlPlaneMachineSetOpenStackSpec(logger logr.Logger, machines []
 	}
 
 	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
-	if err != nil {
+	if errors.Is(err, errNoFailureDomains) {
+		// This is a special case where we don't have any failure domains.
+	} else if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's OpenStack failure domains: %w", err)
 	}
 

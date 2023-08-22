@@ -10,9 +10,9 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo/v2 v2.12.1
 	github.com/onsi/gomega v1.28.0
-	github.com/openshift/api v0.0.0-20231002140248-174e989c9ee1
-	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
-	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230807182045-90182bd8375e
+	github.com/openshift/api v0.0.0-20231024112103-79b9cd5e6020
+	github.com/openshift/client-go v0.0.0-20231024221206-506d798bc61c
+	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231024153329-5007f8cfa182
 	github.com/openshift/library-go v0.0.0-20231003133513-3a0c1fc00519
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.28.2
@@ -26,9 +26,6 @@ require (
 	sigs.k8s.io/controller-tools v0.13.0
 	sigs.k8s.io/yaml v1.3.0
 )
-
-// (rmanak) OCPBUGS-17851 Keep old version of API pinned until this bug is fixed.
-replace github.com/openshift/api => github.com/openshift/api v0.0.0-20230807121159-a81c3efc8824
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect

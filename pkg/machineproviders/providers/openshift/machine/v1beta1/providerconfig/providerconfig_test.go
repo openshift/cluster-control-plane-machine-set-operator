@@ -79,7 +79,9 @@ var _ = Describe("Provider Config", func() {
 			Entry("with missing provider spec on unknown platform type", providerConfigTableInput{
 				modifyTemplate: func(in *machinev1.ControlPlaneMachineSetTemplate) {
 					// The platform type should be inferred from here first.
-					in.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform = configv1.PlatformType("unknown")
+					in.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{
+						Platform: configv1.PlatformType("unknown"),
+					}
 				},
 				expectedError: errNilProviderSpec,
 			}),
@@ -177,7 +179,7 @@ var _ = Describe("Provider Config", func() {
 				),
 				expectedError:    nil,
 				matchPath:        "AWS().Config().Placement.AvailabilityZone",
-				matchExpectation: "",
+				matchExpectation: "us-east-1a", // from the provider config
 			}),
 			Entry("when keeping an AWS availability zone the same", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
@@ -216,7 +218,7 @@ var _ = Describe("Provider Config", func() {
 					machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				),
 				matchPath:        "Azure().Config().Zone",
-				matchExpectation: stringPtr("1"),
+				matchExpectation: "1",
 			}),
 			Entry("when changing an Azure zone", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
@@ -229,7 +231,7 @@ var _ = Describe("Provider Config", func() {
 					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				),
 				matchPath:        "Azure().Config().Zone",
-				matchExpectation: stringPtr("2"),
+				matchExpectation: "2",
 			}),
 			Entry("when keeping a GCP zone the same", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
@@ -513,7 +515,7 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedFailureDomain: failuredomain.NewAzureFailureDomain(
-					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").WithSubnet("cluster-subnet-12345678").Build(),
 				),
 			}),
 			Entry("with a GCP us-central1-a failure domain", extractFailureDomainTableInput{

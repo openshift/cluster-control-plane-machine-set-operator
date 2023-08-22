@@ -346,9 +346,11 @@ func getPlatformTypeFromProviderSpecKind(kind string) configv1.PlatformType {
 // or if that isn't present, by inspecting the providerSpec kind and inferring from there
 // what the configured platform type is.
 func getPlatformTypeFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1MachineTemplate) (configv1.PlatformType, error) {
-	platformType := tmpl.FailureDomains.Platform
-	if platformType != "" {
-		return platformType, nil
+	if tmpl.FailureDomains != nil {
+		platformType := tmpl.FailureDomains.Platform
+		if platformType != "" {
+			return platformType, nil
+		}
 	}
 
 	return getPlatformTypeFromProviderSpec(tmpl.Spec.ProviderSpec)
