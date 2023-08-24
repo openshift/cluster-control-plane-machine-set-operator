@@ -107,17 +107,18 @@ func main() { //nolint:funlen,cyclop
 	})
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                  scheme,
-		MetricsBindAddress:      metricsAddr,
-		Port:                    webhookPort,
-		HealthProbeBindAddress:  probeAddr,
-		LeaderElectionNamespace: leaderElectionConfig.ResourceNamespace,
-		LeaderElection:          leaderElectionConfig.LeaderElect,
-		LeaderElectionID:        leaderElectionConfig.ResourceName,
-		LeaseDuration:           &le.LeaseDuration.Duration,
-		RetryPeriod:             &le.RetryPeriod.Duration,
-		RenewDeadline:           &le.RenewDeadline.Duration,
-		Namespace:               managedNamespace,
+		Scheme:                        scheme,
+		MetricsBindAddress:            metricsAddr,
+		Port:                          webhookPort,
+		HealthProbeBindAddress:        probeAddr,
+		LeaderElectionNamespace:       leaderElectionConfig.ResourceNamespace,
+		LeaderElection:                leaderElectionConfig.LeaderElect,
+		LeaderElectionID:              leaderElectionConfig.ResourceName,
+		LeaderElectionReleaseOnCancel: true,
+		LeaseDuration:                 &le.LeaseDuration.Duration,
+		RetryPeriod:                   &le.RetryPeriod.Duration,
+		RenewDeadline:                 &le.RenewDeadline.Duration,
+		Namespace:                     managedNamespace,
 		// Do a full resync to catch up in case of missing events.
 		SyncPeriod: &defaultSyncPeriod,
 	})
