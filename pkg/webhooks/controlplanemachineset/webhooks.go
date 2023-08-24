@@ -100,7 +100,7 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
-	errs = append(errs, validateSpec(r.logger, field.NewPath("spec"), cpms)...)
+	errs = append(errs, r.validateSpec(ctx, field.NewPath("spec"), cpms)...)
 	errs = append(errs, r.validateSpecOnCreate(ctx, field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
@@ -126,7 +126,7 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
-	errs = append(errs, validateSpec(r.logger, field.NewPath("spec"), cpms)...)
+	errs = append(errs, r.validateSpec(ctx, field.NewPath("spec"), cpms)...)
 
 	if len(errs) > 0 {
 		return warnings, utilerrors.NewAggregate(errs)
@@ -177,16 +177,16 @@ func validateMetadata(parentPath *field.Path, metadata metav1.ObjectMeta) []erro
 }
 
 // validateSpec validates that the spec of the ControlPlaneMachineSet resource is valid.
-func validateSpec(logger logr.Logger, parentPath *field.Path, cpms *machinev1.ControlPlaneMachineSet) []error {
+func (r *ControlPlaneMachineSetWebhook) validateSpec(ctx context.Context, parentPath *field.Path, cpms *machinev1.ControlPlaneMachineSet) []error {
 	errs := []error{}
 
-	errs = append(errs, validateTemplate(logger, parentPath.Child("template"), cpms.Spec.Template, cpms.Spec.Selector)...)
+	errs = append(errs, r.validateTemplate(ctx, cpms.Namespace, parentPath.Child("template"), cpms.Spec.Template, cpms.Spec.Selector)...)
 
 	return errs
 }
 
 // validateTemplate validates the common (on create and update) checks for the ControlPlaneMachineSet template.
-func validateTemplate(logger logr.Logger, parentPath *field.Path, template machinev1.ControlPlaneMachineSetTemplate, selector metav1.LabelSelector) []error {
+func (r *ControlPlaneMachineSetWebhook) validateTemplate(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.ControlPlaneMachineSetTemplate, selector metav1.LabelSelector) []error {
 	switch template.MachineType {
 	case machinev1.OpenShiftMachineV1Beta1MachineType:
 		openshiftMachineTemplatePath := parentPath.Child(string(machinev1.OpenShiftMachineV1Beta1MachineType))
@@ -197,7 +197,7 @@ func validateTemplate(logger logr.Logger, parentPath *field.Path, template machi
 			return []error{field.Required(openshiftMachineTemplatePath, fmt.Sprintf("%s is required when machine type is %s", machinev1.OpenShiftMachineV1Beta1MachineType, machinev1.OpenShiftMachineV1Beta1MachineType))}
 		}
 
-		return validateOpenShiftMachineV1BetaTemplate(logger, openshiftMachineTemplatePath, *template.OpenShiftMachineV1Beta1Machine, selector)
+		return r.validateOpenShiftMachineV1BetaTemplate(ctx, namespaceName, openshiftMachineTemplatePath, *template.OpenShiftMachineV1Beta1Machine, selector)
 	default:
 		return []error{field.NotSupported(parentPath.Child("machineType"), template.MachineType, []string{string(machinev1.OpenShiftMachineV1Beta1MachineType)})}
 	}
@@ -223,11 +223,63 @@ func validateTemplateOnCreate(logger logr.Logger, parentPath *field.Path, templa
 }
 
 // validateOpenShiftMachineV1BetaTemplate validates the OpenShift Machine API v1beta1 template.
-func validateOpenShiftMachineV1BetaTemplate(logger logr.Logger, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, selector metav1.LabelSelector) []error {
+func (r *ControlPlaneMachineSetWebhook) validateOpenShiftMachineV1BetaTemplate(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, selector metav1.LabelSelector) []error {
 	errs := []error{}
 
 	errs = append(errs, validateTemplateLabels(parentPath.Child("metadata", "labels"), template.ObjectMeta.Labels, selector)...)
-	errs = append(errs, validateOpenShiftProviderConfig(logger, parentPath, template)...)
+	errs = append(errs, validateOpenShiftProviderConfig(r.logger, parentPath, template)...)
+	errs = append(errs, r.validateOpenShiftProviderMachineSpec(ctx, namespaceName, parentPath.Child("spec", "providerSpec"), template)...)
+
+	return errs
+}
+
+func (r *ControlPlaneMachineSetWebhook) validateOpenShiftProviderMachineSpec(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate) []error {
+	errs := []error{}
+
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(r.logger, template)
+	if err != nil {
+		return []error{field.Invalid(parentPath, template.Spec.ProviderSpec.Value, fmt.Sprintf("error determining provider configuration: %s", err))}
+	}
+
+	templateProviderConfig := providerConfig
+
+	if template.FailureDomains.Platform != "" {
+		failureDomains, err := failuredomain.NewFailureDomains(template.FailureDomains)
+		if err != nil {
+			return []error{field.Invalid(parentPath, template.FailureDomains, fmt.Sprintf("error constructing failure domain config: %s", err))}
+		}
+
+		if len(failureDomains) > 0 {
+			injectedProviderConfig, err := templateProviderConfig.InjectFailureDomain(failureDomains[0])
+			if err != nil {
+				return []error{field.Invalid(parentPath, template.FailureDomains, fmt.Sprintf("error injecting failure domain into provider config: %s", err))}
+			}
+
+			templateProviderConfig = injectedProviderConfig
+		}
+	}
+
+	dryRunMachine := &machinev1beta1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "tmp-machine-dry-run",
+			Namespace:    namespaceName,
+			Annotations:  template.ObjectMeta.Annotations,
+			Labels:       template.ObjectMeta.Labels,
+		},
+		Spec: template.Spec,
+	}
+
+	rawConfig, err := templateProviderConfig.RawConfig()
+	if err != nil {
+		return []error{field.Invalid(parentPath, template.Spec.ProviderSpec, fmt.Sprintf("could not fetch raw config from provider config: %s", err))}
+	}
+
+	dryRunMachine.Spec.ProviderSpec.Value.Raw = rawConfig
+
+	dryRunClient := client.NewDryRunClient(r.client)
+	if err := dryRunClient.Create(ctx, dryRunMachine); err != nil {
+		errs = append(errs, fmt.Errorf("invalid machine spec: %w", err))
+	}
 
 	return errs
 }
