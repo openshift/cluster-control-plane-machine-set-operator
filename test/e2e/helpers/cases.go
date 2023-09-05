@@ -141,7 +141,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.RollingUpdate)
+			return CheckRolloutForIndex(testFramework, rolloutCtx, index, machinev1.RollingUpdate)
 		})
 
 		wg.Wait()

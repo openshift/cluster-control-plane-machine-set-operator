@@ -40,7 +40,8 @@ type Route struct {
 	ParameterDocs           []*Parameter
 	ResponseErrors          map[int]ResponseError
 	DefaultResponse         *ResponseError
-	ReadSample, WriteSample interface{} // structs that model an example request or response payload
+	ReadSample, WriteSample interface{}   // structs that model an example request or response payload
+	WriteSamples            []interface{} // if more than one return types is possible (oneof) then this will contain multiple values
 
 	// Extra information used to store custom information about the route.
 	Metadata map[string]interface{}
@@ -164,7 +165,17 @@ func tokenizePath(path string) []string {
 	if "/" == path {
 		return nil
 	}
+<<<<<<< HEAD
 	return strings.Split(strings.TrimLeft(path, "/"), "/")
+=======
+	if TrimRightSlashEnabled {
+		// 3.9.0
+		return strings.Split(strings.Trim(path, "/"), "/")
+	} else {
+		// 3.10.2
+		return strings.Split(strings.TrimLeft(path, "/"), "/")
+	}
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 }
 
 // for debugging
@@ -177,4 +188,12 @@ func (r *Route) EnableContentEncoding(enabled bool) {
 	r.contentEncodingEnabled = &enabled
 }
 
+<<<<<<< HEAD
 var TrimRightSlashEnabled = false
+=======
+// TrimRightSlashEnabled controls whether
+// - path on route building is using path.Join
+// - the path of the incoming request is trimmed of its slash suffux.
+// Value of true matches the behavior of <= 3.9.0
+var TrimRightSlashEnabled = true
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)

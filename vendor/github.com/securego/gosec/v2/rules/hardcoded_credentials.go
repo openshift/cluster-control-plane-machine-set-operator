@@ -20,7 +20,11 @@ import (
 	"regexp"
 	"strconv"
 
+<<<<<<< HEAD
 	zxcvbn "github.com/ccojocar/zxcvbn-go"
+=======
+	zxcvbn "github.com/nbutton23/zxcvbn-go"
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	"github.com/securego/gosec/v2"
 	"github.com/securego/gosec/v2/issue"
@@ -101,8 +105,11 @@ func (r *credentials) matchAssign(assign *ast.AssignStmt, ctx *gosec.Context) (*
 }
 
 func (r *credentials) matchValueSpec(valueSpec *ast.ValueSpec, ctx *gosec.Context) (*issue.Issue, error) {
+<<<<<<< HEAD
 	// Running match against the variable name(s) first. Will catch any creds whose var name matches the pattern,
 	// then will go back over to check the values themselves.
+=======
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	for index, ident := range valueSpec.Names {
 		if r.pattern.MatchString(ident.Name) && valueSpec.Values != nil {
 			// const foo, bar = "same value"
@@ -146,6 +153,7 @@ func (r *credentials) matchEqualityCheck(binaryExpr *ast.BinaryExpr, ctx *gosec.
 			if val, err := gosec.GetString(valueNode); err == nil {
 				if r.ignoreEntropy || (!r.ignoreEntropy && r.isHighEntropyString(val)) {
 					return ctx.NewIssue(binaryExpr, r.ID(), r.What, r.Severity, r.Confidence), nil
+<<<<<<< HEAD
 				}
 			}
 		}
@@ -162,6 +170,8 @@ func (r *credentials) matchEqualityCheck(binaryExpr *ast.BinaryExpr, ctx *gosec.
 			if r.patternValue.MatchString(s) {
 				if r.ignoreEntropy || r.isHighEntropyString(s) {
 					return ctx.NewIssue(binaryExpr, r.ID(), r.What, r.Severity, r.Confidence), nil
+=======
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 				}
 			}
 		}

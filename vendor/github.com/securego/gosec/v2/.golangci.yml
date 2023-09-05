@@ -2,6 +2,10 @@ linters:
   enable:
     - asciicheck
     - bodyclose
+<<<<<<< HEAD
+=======
+    - depguard
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
     - dogsled
     - durationcheck
     - errcheck

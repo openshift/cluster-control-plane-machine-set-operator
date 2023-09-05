@@ -3,7 +3,11 @@ package uniseg
 import "unicode/utf8"
 
 // FirstWord returns the first word found in the given byte slice according to
+<<<<<<< HEAD
 // the rules of Unicode Standard Annex #29, Word Boundaries. This function can
+=======
+// the rules of [Unicode Standard Annex #29, Word Boundaries]. This function can
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 // be called continuously to extract all words from a byte slice, as illustrated
 // in the example below.
 //
@@ -17,6 +21,11 @@ import "unicode/utf8"
 // the sub-slice of the input slice containing the identified word.
 //
 // Given an empty byte slice "b", the function returns nil values.
+<<<<<<< HEAD
+=======
+//
+// [Unicode Standard Annex #29, Word Boundaries]: http://unicode.org/reports/tr29/#Word_Boundaries
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func FirstWord(b []byte, state int) (word, rest []byte, newState int) {
 	// An empty byte slice returns nothing.
 	if len(b) == 0 {

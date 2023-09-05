@@ -10,7 +10,11 @@ inputs:
 
 runs:
     using: 'docker'
+<<<<<<< HEAD
     image: 'docker://securego/gosec:2.16.0'
+=======
+    image: 'docker://securego/gosec:2.15.0'
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
     args:
       - ${{ inputs.args }}
 

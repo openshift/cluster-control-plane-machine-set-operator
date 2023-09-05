@@ -20,9 +20,12 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-
+	. "github.com/onsi/gomega"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func() {
@@ -45,5 +48,29 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 			})
 		})
 
+		Context("and an instance is terminated on the cloud provider", func() {
+			var client runtimeclient.Client
+			var machineList machinev1beta1.MachineList
+			var machineSelector runtimeclient.MatchingLabels
+
+			BeforeEach(func() {
+				client = testFramework.GetClient()
+
+				By("Getting a list of all control plane machines")
+				machineSelector = runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+				Expect(client.List(testFramework.GetContext(), &machineList, machineSelector)).To(Succeed(), "should be able to retrieve list of control plane machines")
+
+				By("Deleting an instance from the cloud provider")
+				Expect(testFramework.DeleteAnInstanceFromCloudProvider()).To(Succeed())
+
+				By("Waiting for a machine to get into failed phase")
+				Eventually(komega.Object(&machineList.Items[0]), 10*time.Minute).Should(HaveField("Status.Phase", HaveValue(Equal("Failed"))))
+
+				By("Deleting a control plane machine in state Failed at index 0")
+				Expect(client.Delete(testFramework.GetContext(), &machineList.Items[0])).To(Succeed())
+			})
+
+			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 0)
+		})
 	})
 })

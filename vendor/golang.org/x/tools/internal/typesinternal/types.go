@@ -11,8 +11,6 @@ import (
 	"go/types"
 	"reflect"
 	"unsafe"
-
-	"golang.org/x/tools/go/types/objectpath"
 )
 
 func SetUsesCgo(conf *types.Config) bool {
@@ -52,6 +50,7 @@ func ReadGo116ErrorData(err types.Error) (code ErrorCode, start, end token.Pos, 
 }
 
 var SetGoVersion = func(conf *types.Config, version string) bool { return false }
+<<<<<<< HEAD
 
 // SkipEncoderMethodSorting marks the encoder as not requiring sorted methods,
 // as an optimization for gopls (which guarantees the order of parsed source files).
@@ -66,3 +65,5 @@ func SkipEncoderMethodSorting(enc *objectpath.Encoder)
 //
 //go:linkname ObjectpathObject golang.org/x/tools/go/types/objectpath.object
 func ObjectpathObject(pkg *types.Package, p objectpath.Path, skipMethodSorting bool) (types.Object, error)
+=======
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)

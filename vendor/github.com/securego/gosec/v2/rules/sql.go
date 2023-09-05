@@ -162,6 +162,7 @@ func (s *sqlStrConcat) checkQuery(call *ast.CallExpr, ctx *gosec.Context) (*issu
 					continue
 				}
 				return ctx.NewIssue(be, s.ID(), s.What, s.Severity, s.Confidence), nil
+<<<<<<< HEAD
 			}
 		}
 	}
@@ -184,6 +185,8 @@ func (s *sqlStrConcat) checkQuery(call *ast.CallExpr, ctx *gosec.Context) (*issu
 		case *ast.AssignStmt:
 			if injection := s.findInjectionInBranch(ctx, decl.Rhs); injection != nil {
 				return ctx.NewIssue(injection, s.ID(), s.What, s.Severity, s.Confidence), nil
+=======
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 			}
 		}
 	}

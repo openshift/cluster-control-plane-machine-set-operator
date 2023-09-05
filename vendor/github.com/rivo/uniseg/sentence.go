@@ -3,7 +3,11 @@ package uniseg
 import "unicode/utf8"
 
 // FirstSentence returns the first sentence found in the given byte slice
+<<<<<<< HEAD
 // according to the rules of Unicode Standard Annex #29, Sentence Boundaries.
+=======
+// according to the rules of [Unicode Standard Annex #29, Sentence Boundaries].
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 // This function can be called continuously to extract all sentences from a byte
 // slice, as illustrated in the example below.
 //
@@ -17,6 +21,11 @@ import "unicode/utf8"
 // slice is the sub-slice of the input slice containing the identified sentence.
 //
 // Given an empty byte slice "b", the function returns nil values.
+<<<<<<< HEAD
+=======
+//
+// [Unicode Standard Annex #29, Sentence Boundaries]: http://unicode.org/reports/tr29/#Sentence_Boundaries
+>>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func FirstSentence(b []byte, state int) (sentence, rest []byte, newState int) {
 	// An empty byte slice returns nothing.
 	if len(b) == 0 {
