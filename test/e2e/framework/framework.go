@@ -38,6 +38,8 @@ import (
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	azurecompute "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
+	azureauth "github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -139,6 +141,9 @@ const (
 
 	// Name of the cloud credentials secret for AWS.
 	awsCredentialsSecretName = "aws-cloud-credentials"
+
+	// Name of the cloud credentials secret for Azure.
+	azureCredentialsSecretName = "azure-cloud-credentials"
 
 	// Name of the cloud credentials secret for GCP.
 	gcpCredentialsSecretName = "gcp-cloud-credentials"
@@ -341,7 +346,7 @@ func (f *framework) DeleteAnInstanceFromCloudProvider() error {
 	case configv1.AWSPlatformType:
 		return deleteAWSInstance(ctx, client)
 	case configv1.AzurePlatformType:
-		return deleteAzureInstance()
+		return deleteAzureInstance(ctx, client)
 	case configv1.GCPPlatformType:
 		return deleteGCPInstance(ctx, client, f.logger, rawExtension)
 	}
@@ -1048,7 +1053,57 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client) error {
 }
 
 // deleteAzureInstance deletes an instance from the Azure cloud provider.
-func deleteAzureInstance() error {
+func deleteAzureInstance(ctx context.Context, client runtimeclient.Client) error {
+	machineSelector := runtimeclient.MatchingLabels(ControlPlaneMachineSetSelectorLabels())
+	machineList := &machinev1beta1.MachineList{}
+	client.List(ctx, machineList, machineSelector)
+
+	var credentialsSecret corev1.Secret
+	Expect(client.Get(ctx, runtimeclient.ObjectKey{
+		Namespace: namespaceSecret,
+		Name:      azureCredentialsSecretName,
+	}, &credentialsSecret)).To(Succeed(), "should be able to retrieve the cloud credentials secret for GCP")
+
+	subscriptionID, ok := credentialsSecret.Data["azure_subscription_id"]
+	if !ok {
+		return fmt.Errorf("could not get subscriptionID from Azure credentials secret")
+	}
+
+	resourceGroup, ok := credentialsSecret.Data["azure_resourcegroup"]
+	if !ok {
+		return fmt.Errorf("could not get resourceGroup from Azure credentials secret")
+	}
+
+	clientID, ok := credentialsSecret.Data["azure_client_id"]
+	if !ok {
+		return fmt.Errorf("could not get clientID from Azure credentials secret")
+	}
+
+	clientSecret, ok := credentialsSecret.Data["azure_client_secret"]
+	if !ok {
+		return fmt.Errorf("could not get clientSecret from Azure credentials secret")
+	}
+
+	tenantID, ok := credentialsSecret.Data["azure_tenant_id"]
+	if !ok {
+		return fmt.Errorf("could not get tenantID from Azure credentials secret")
+	}
+
+	vmName := machineList.Items[0].Status.NodeRef.Name
+
+	authorizer, err := azureauth.NewClientCredentialsConfig(string(clientID), string(clientSecret), string(tenantID)).Authorizer()
+	if err != nil {
+		return fmt.Errorf("failed to authenticate with Azure: %w", err)
+	}
+
+	vmClient := azurecompute.NewVirtualMachinesClient(string(subscriptionID))
+	vmClient.Authorizer = authorizer
+
+	_, err = vmClient.Delete(context.Background(), string(resourceGroup), vmName, aws.Bool(true))
+	if err != nil {
+		return fmt.Errorf("should be able to delete a gcp instance: %w", err)
+	}
+
 	return nil
 }
 

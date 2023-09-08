@@ -70,7 +70,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				Expect(client.Delete(testFramework.GetContext(), &machineList.Items[0])).To(Succeed())
 			})
 
-			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 0)
+			helpers.ItShouldReplaceTheOutDatedMachineInDeleting(testFramework, 0)
 		})
 	})
 })

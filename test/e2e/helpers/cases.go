@@ -228,6 +228,51 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 	})
 }
 
+// ItShouldReplaceTheOutDatedMachineInDeleting checks that the control plane machine set replaces the outdated
+// machine in phase Deleting in the given index.
+func ItShouldReplaceTheOutDatedMachineInDeleting(testFramework framework.Framework, index int) {
+	It("should replace the outdated machine when deleted", func() {
+		k8sClient := testFramework.GetClient()
+		ctx := testFramework.GetContext()
+
+		machine, err := machineForIndex(testFramework, index)
+		Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+		By(fmt.Sprintf("The machine at index %d should be deleting phase", index))
+		Eventually(komega.Object(machine), 10*time.Second).Should(
+			HaveField("Status.Phase", HaveValue(Equal("Deleting"))),
+		)
+
+		// Make sure the CPMS exists before we delete the Machine, just in case.
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		// Deleting the Machine triggers a rollout, give the rollout 30 minutes to complete.
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
+		defer cancel()
+
+		wg := &sync.WaitGroup{}
+
+		framework.Async(wg, cancel, func() bool {
+			return CheckReplicasDoesNotExceedSurgeCapacity(rolloutCtx)
+		})
+
+		framework.Async(wg, cancel, func() bool {
+			return WaitForControlPlaneMachineSetDesiredReplicas(rolloutCtx, cpms.DeepCopy())
+		})
+
+		wg.Wait()
+
+		// If there's an error in the context, either it timed out or one of the async checks failed.
+		Expect(rolloutCtx.Err()).ToNot(HaveOccurred(), "rollout should have completed successfully")
+		By("Control plane machine rollout completed successfully")
+
+		By("Waiting for the cluster to stabilise after the rollout")
+		EventuallyClusterOperatorsShouldStabilise(30*time.Minute, 30*time.Second)
+		By("Cluster stabilised after the rollout")
+	})
+}
+
 // ItShouldUninstallTheControlPlaneMachineSet checks that the control plane machine set is correctly uninstalled
 // when a deletion is triggered, without triggering control plane machines changes.
 func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framework) {
