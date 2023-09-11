@@ -340,15 +340,13 @@ func (f *framework) DeleteAnInstanceFromCloudProvider() error {
 		return fmt.Errorf("control plane machine set should exist: %w", err)
 	}
 
-	rawExtension := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value
-
 	switch f.GetPlatformType() {
 	case configv1.AWSPlatformType:
 		return deleteAWSInstance(ctx, client)
 	case configv1.AzurePlatformType:
 		return deleteAzureInstance(ctx, client)
 	case configv1.GCPPlatformType:
-		return deleteGCPInstance(ctx, client, f.logger, rawExtension)
+		return deleteGCPInstance(ctx, client, f.logger)
 	}
 
 	return nil
@@ -1046,7 +1044,7 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client) error {
 
 	_, err = awsClient.TerminateInstances(input)
 	if err != nil {
-		return fmt.Errorf("should be able to delete an aws instance: %w", err)
+		return fmt.Errorf("should be able to delete an AWS instance: %w", err)
 	}
 
 	return nil
@@ -1099,16 +1097,18 @@ func deleteAzureInstance(ctx context.Context, client runtimeclient.Client) error
 	vmClient := azurecompute.NewVirtualMachinesClient(string(subscriptionID))
 	vmClient.Authorizer = authorizer
 
-	_, err = vmClient.Delete(context.Background(), string(resourceGroup), vmName, aws.Bool(true))
+	forceDeletion := false
+
+	_, err = vmClient.Delete(context.Background(), string(resourceGroup), vmName, &forceDeletion)
 	if err != nil {
-		return fmt.Errorf("should be able to delete a gcp instance: %w", err)
+		return fmt.Errorf("should be able to delete an Azure instance: %w", err)
 	}
 
 	return nil
 }
 
 // deleteGCPInstance deletes an instance from the GCP cloud provider.
-func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger logr.Logger, rawProviderSpec *runtime.RawExtension) error {
+func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger logr.Logger) error {
 	var credentialsSecret corev1.Secret
 	Expect(client.Get(ctx, runtimeclient.ObjectKey{
 		Namespace: namespaceSecret,
@@ -1130,18 +1130,18 @@ func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger 
 		return err
 	}
 
+	machineSelector := runtimeclient.MatchingLabels(ControlPlaneMachineSetSelectorLabels())
+	machineList := &machinev1beta1.MachineList{}
+	Expect(client.List(ctx, machineList, machineSelector)).To(Succeed(), "should be able to get a list of control plane machines")
+
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machinev1beta1.MachineSpec{
 		ProviderSpec: machinev1beta1.ProviderSpec{
-			Value: rawProviderSpec,
+			Value: machineList.Items[0].Spec.ProviderSpec.Value,
 		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get provider config: %w", err)
 	}
-
-	machineSelector := runtimeclient.MatchingLabels(ControlPlaneMachineSetSelectorLabels())
-	machineList := &machinev1beta1.MachineList{}
-	client.List(ctx, machineList, machineSelector)
 
 	gcpProviderSpec := providerConfig.GCP().Config()
 
@@ -1149,9 +1149,9 @@ func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger 
 	zone := gcpProviderSpec.Zone
 	instanceName := machineList.Items[0].Status.NodeRef.Name
 
-	computeService.Instances.Delete(projectID, zone, instanceName).Context(ctx).Do()
+	_, err = computeService.Instances.Delete(projectID, zone, instanceName).Context(ctx).Do()
 	if err != nil {
-		return fmt.Errorf("should be able to delete a gcp instance: %w", err)
+		return fmt.Errorf("should be able to delete a GCP instance: %w", err)
 	}
 
 	return nil

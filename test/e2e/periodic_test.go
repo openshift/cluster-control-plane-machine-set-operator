@@ -49,16 +49,13 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 		})
 
 		Context("and an instance is terminated on the cloud provider", func() {
-			var client runtimeclient.Client
-			var machineList machinev1beta1.MachineList
-			var machineSelector runtimeclient.MatchingLabels
-
 			BeforeEach(func() {
-				client = testFramework.GetClient()
+				client := testFramework.GetClient()
+				machineList := &machinev1beta1.MachineList{}
+				machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
 
 				By("Getting a list of all control plane machines")
-				machineSelector = runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
-				Expect(client.List(testFramework.GetContext(), &machineList, machineSelector)).To(Succeed(), "should be able to retrieve list of control plane machines")
+				Expect(client.List(testFramework.GetContext(), machineList, machineSelector)).To(Succeed(), "should be able to retrieve list of control plane machines")
 
 				By("Deleting an instance from the cloud provider")
 				Expect(testFramework.DeleteAnInstanceFromCloudProvider()).To(Succeed())
