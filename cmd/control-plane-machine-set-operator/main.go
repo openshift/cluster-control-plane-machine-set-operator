@@ -146,6 +146,7 @@ func main() { //nolint:funlen,cyclop
 		Namespace:      managedNamespace,
 		OperatorName:   "control-plane-machine-set",
 		ReleaseVersion: getReleaseVersion(setupLog),
+		Recorder:       mgr.GetEventRecorderFor("control-plane-machine-set-controller-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
 		os.Exit(1)

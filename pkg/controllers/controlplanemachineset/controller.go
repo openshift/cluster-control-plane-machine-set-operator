@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,6 +83,7 @@ var (
 type ControlPlaneMachineSetReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
+	Recorder       record.EventRecorder
 	RESTMapper     meta.RESTMapper
 	UncachedClient client.Client
 
@@ -144,6 +146,7 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 	// Set up API helpers from the manager.
 	r.Scheme = mgr.GetScheme()
+	r.Recorder = mgr.GetEventRecorderFor("control-plane-machine-set-controller")
 	r.RESTMapper = mgr.GetRESTMapper()
 
 	return nil
@@ -229,7 +232,7 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	machineProvider, err := providers.NewMachineProvider(ctx, logger, r.Client, cpms)
+	machineProvider, err := providers.NewMachineProvider(ctx, logger, r.Client, r.Recorder, cpms)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error constructing machine provider: %w", err)
 	}

@@ -28,6 +28,7 @@ import (
 	openshiftmachinev1beta1 "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,10 +40,10 @@ var (
 
 // NewMachineProvider constructs a MachineProvider based on the machine type passed.
 // This can then be used to access and manipulate machines within the cluster.
-func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
+func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, recorder record.EventRecorder, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
 	switch cpms.Spec.Template.MachineType {
 	case machinev1.OpenShiftMachineV1Beta1MachineType:
-		provider, err := openshiftmachinev1beta1.NewMachineProvider(ctx, logger, cl, cpms)
+		provider, err := openshiftmachinev1beta1.NewMachineProvider(ctx, logger, cl, recorder, cpms)
 		if err != nil {
 			return nil, fmt.Errorf("error constructing %s machine provider: %w", machinev1.OpenShiftMachineV1Beta1MachineType, err)
 		}
