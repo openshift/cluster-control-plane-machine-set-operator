@@ -58,7 +58,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				Expect(client.List(testFramework.GetContext(), machineList, machineSelector)).To(Succeed(), "should be able to retrieve list of control plane machines")
 
 				By("Deleting an instance from the cloud provider")
-				Expect(testFramework.DeleteAnInstanceFromCloudProvider()).To(Succeed())
+				Expect(testFramework.DeleteAnInstanceFromCloudProvider(&machineList.Items[0])).To(Succeed())
 
 				By("Waiting for a machine to get into failed phase")
 				Eventually(komega.Object(&machineList.Items[0]), 10*time.Minute).Should(HaveField("Status.Phase", HaveValue(Equal("Failed"))))

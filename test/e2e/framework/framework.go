@@ -43,7 +43,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	. "github.com/onsi/gomega"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
@@ -116,7 +115,7 @@ type Framework interface {
 	UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension) (*runtime.RawExtension, error)
 
 	// DeleteAnInstanceFromCloudProvider deletes an instance from the cloud provider.
-	DeleteAnInstanceFromCloudProvider() error
+	DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Machine) error
 }
 
 // PlatformSupportLevel is used to identify which tests should run
@@ -331,7 +330,7 @@ func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExt
 
 // DeleteAnInstanceFromCloudProvider deletes an instances from a cloud provider.
 // Currently supported are AWS, Azure and GCP.
-func (f *framework) DeleteAnInstanceFromCloudProvider() error {
+func (f *framework) DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Machine) error {
 	ctx := f.GetContext()
 	client := f.client
 
@@ -342,11 +341,11 @@ func (f *framework) DeleteAnInstanceFromCloudProvider() error {
 
 	switch f.GetPlatformType() {
 	case configv1.AWSPlatformType:
-		return deleteAWSInstance(ctx, client)
+		return deleteAWSInstance(ctx, client, machine)
 	case configv1.AzurePlatformType:
-		return deleteAzureInstance(ctx, client)
+		return deleteAzureInstance(ctx, client, machine)
 	case configv1.GCPPlatformType:
-		return deleteGCPInstance(ctx, client, f.logger)
+		return deleteGCPInstance(ctx, client, f.logger, machine)
 	}
 
 	return nil
@@ -995,26 +994,24 @@ func sharedCredentialsFileFromSecret(credentialsSecret *corev1.Secret) (string, 
 }
 
 // deleteAWSInstance deletes an instance from the AWS cloud provider.
-func deleteAWSInstance(ctx context.Context, client runtimeclient.Client) error {
+func deleteAWSInstance(ctx context.Context, client runtimeclient.Client, machine *machinev1beta1.Machine) error {
 	var credentialsSecret corev1.Secret
-	Expect(client.Get(ctx, runtimeclient.ObjectKey{
+	if err := client.Get(ctx, runtimeclient.ObjectKey{
 		Namespace: namespaceSecret,
 		Name:      awsCredentialsSecretName,
-	}, &credentialsSecret)).To(Succeed(), "should be able to retrieve the cloud credentials secret for AWS")
-
-	machineSelector := runtimeclient.MatchingLabels(ControlPlaneMachineSetSelectorLabels())
-	machineList := &machinev1beta1.MachineList{}
-	client.List(ctx, machineList, machineSelector)
+	}, &credentialsSecret); err != nil {
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for AWS")
+	}
 
 	providerStatus := &machinev1beta1.AWSMachineProviderStatus{}
-	providerStatusRaw := machineList.Items[0].Status.ProviderStatus
+	providerStatusRaw := machine.Status.ProviderStatus
 
 	if err := json.Unmarshal(providerStatusRaw.Raw, providerStatus); err != nil {
 		return fmt.Errorf("failed to unmarshal provider status: %w", err)
 	}
 
 	instanceId := providerStatus.InstanceID
-	region := machineList.Items[0].Labels["machine.openshift.io/region"]
+	region := machine.Labels["machine.openshift.io/region"]
 
 	sessionOptions := session.Options{
 		Config: aws.Config{
@@ -1050,56 +1047,79 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client) error {
 	return nil
 }
 
-// deleteAzureInstance deletes an instance from the Azure cloud provider.
-func deleteAzureInstance(ctx context.Context, client runtimeclient.Client) error {
-	machineSelector := runtimeclient.MatchingLabels(ControlPlaneMachineSetSelectorLabels())
-	machineList := &machinev1beta1.MachineList{}
-	client.List(ctx, machineList, machineSelector)
+// azureCredentialsData contains values from the cloud credentials secret on Azure.
+type azureCredentialsData struct {
+	subscriptionID string
+	resourceGroup  string
+	clientID       string
+	clientSecret   string
+	tenantID       string
+}
 
-	var credentialsSecret corev1.Secret
-	Expect(client.Get(ctx, runtimeclient.ObjectKey{
-		Namespace: namespaceSecret,
-		Name:      azureCredentialsSecretName,
-	}, &credentialsSecret)).To(Succeed(), "should be able to retrieve the cloud credentials secret for GCP")
-
+// getAzureCredentialsData gets values from cloud credentials secret.
+func getAzureCredentialsData(credentialsSecret *corev1.Secret) (*azureCredentialsData, error) {
 	subscriptionID, ok := credentialsSecret.Data["azure_subscription_id"]
 	if !ok {
-		return fmt.Errorf("could not get subscriptionID from Azure credentials secret")
+		return nil, fmt.Errorf("could not get subscriptionID from Azure credentials secret")
 	}
 
 	resourceGroup, ok := credentialsSecret.Data["azure_resourcegroup"]
 	if !ok {
-		return fmt.Errorf("could not get resourceGroup from Azure credentials secret")
+		return nil, fmt.Errorf("could not get resourceGroup from Azure credentials secret")
 	}
 
 	clientID, ok := credentialsSecret.Data["azure_client_id"]
 	if !ok {
-		return fmt.Errorf("could not get clientID from Azure credentials secret")
+		return nil, fmt.Errorf("could not get clientID from Azure credentials secret")
 	}
 
 	clientSecret, ok := credentialsSecret.Data["azure_client_secret"]
 	if !ok {
-		return fmt.Errorf("could not get clientSecret from Azure credentials secret")
+		return nil, fmt.Errorf("could not get clientSecret from Azure credentials secret")
 	}
 
 	tenantID, ok := credentialsSecret.Data["azure_tenant_id"]
 	if !ok {
-		return fmt.Errorf("could not get tenantID from Azure credentials secret")
+		return nil, fmt.Errorf("could not get tenantID from Azure credentials secret")
 	}
 
-	vmName := machineList.Items[0].Status.NodeRef.Name
+	return &azureCredentialsData{
+		subscriptionID: string(subscriptionID),
+		resourceGroup:  string(resourceGroup),
+		clientID:       string(clientID),
+		clientSecret:   string(clientSecret),
+		tenantID:       string(tenantID),
+	}, nil
+}
 
-	authorizer, err := azureauth.NewClientCredentialsConfig(string(clientID), string(clientSecret), string(tenantID)).Authorizer()
+// deleteAzureInstance deletes an instance from the Azure cloud provider.
+func deleteAzureInstance(ctx context.Context, client runtimeclient.Client, machine *machinev1beta1.Machine) error {
+	var credentialsSecret corev1.Secret
+	if err := client.Get(ctx, runtimeclient.ObjectKey{
+		Namespace: namespaceSecret,
+		Name:      azureCredentialsSecretName,
+	}, &credentialsSecret); err != nil {
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for Azure")
+	}
+
+	secretData, err := getAzureCredentialsData(&credentialsSecret)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve data from credentials secret: %w", err)
+	}
+
+	vmName := machine.Status.NodeRef.Name
+
+	authorizer, err := azureauth.NewClientCredentialsConfig(secretData.clientID, secretData.clientSecret, secretData.tenantID).Authorizer()
 	if err != nil {
 		return fmt.Errorf("failed to authenticate with Azure: %w", err)
 	}
 
-	vmClient := azurecompute.NewVirtualMachinesClient(string(subscriptionID))
+	vmClient := azurecompute.NewVirtualMachinesClient(secretData.subscriptionID)
 	vmClient.Authorizer = authorizer
 
 	forceDeletion := false
 
-	_, err = vmClient.Delete(context.Background(), string(resourceGroup), vmName, &forceDeletion)
+	_, err = vmClient.Delete(context.Background(), secretData.resourceGroup, vmName, &forceDeletion)
 	if err != nil {
 		return fmt.Errorf("should be able to delete an Azure instance: %w", err)
 	}
@@ -1108,12 +1128,14 @@ func deleteAzureInstance(ctx context.Context, client runtimeclient.Client) error
 }
 
 // deleteGCPInstance deletes an instance from the GCP cloud provider.
-func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger logr.Logger) error {
+func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger logr.Logger, machine *machinev1beta1.Machine) error {
 	var credentialsSecret corev1.Secret
-	Expect(client.Get(ctx, runtimeclient.ObjectKey{
+	if err := client.Get(ctx, runtimeclient.ObjectKey{
 		Namespace: namespaceSecret,
 		Name:      gcpCredentialsSecretName,
-	}, &credentialsSecret)).To(Succeed(), "should be able to retrieve the cloud credentials secret for GCP")
+	}, &credentialsSecret); err != nil {
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for GCP")
+	}
 
 	serviceAccountJSON, ok := credentialsSecret.Data[gcpCredentialsSecretKey]
 	if !ok {
@@ -1130,13 +1152,9 @@ func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger 
 		return err
 	}
 
-	machineSelector := runtimeclient.MatchingLabels(ControlPlaneMachineSetSelectorLabels())
-	machineList := &machinev1beta1.MachineList{}
-	Expect(client.List(ctx, machineList, machineSelector)).To(Succeed(), "should be able to get a list of control plane machines")
-
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machinev1beta1.MachineSpec{
 		ProviderSpec: machinev1beta1.ProviderSpec{
-			Value: machineList.Items[0].Spec.ProviderSpec.Value,
+			Value: machine.Spec.ProviderSpec.Value,
 		},
 	})
 	if err != nil {
@@ -1147,7 +1165,7 @@ func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger 
 
 	projectID := gcpProviderSpec.ProjectID
 	zone := gcpProviderSpec.Zone
-	instanceName := machineList.Items[0].Status.NodeRef.Name
+	instanceName := machine.Status.NodeRef.Name
 
 	_, err = computeService.Instances.Delete(projectID, zone, instanceName).Context(ctx).Do()
 	if err != nil {

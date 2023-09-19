@@ -243,11 +243,9 @@ func ItShouldReplaceTheOutDatedMachineInDeleting(testFramework framework.Framewo
 			HaveField("Status.Phase", HaveValue(Equal("Deleting"))),
 		)
 
-		// Make sure the CPMS exists before we delete the Machine, just in case.
 		cpms := &machinev1.ControlPlaneMachineSet{}
 		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-		// Deleting the Machine triggers a rollout, give the rollout 30 minutes to complete.
 		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
 		defer cancel()
 
