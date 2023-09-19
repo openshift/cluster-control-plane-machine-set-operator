@@ -500,12 +500,8 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 		return fmt.Errorf("could not generate machine name: %w", err)
 	}
 
-	cpms := &machinev1.ControlPlaneMachineSet{}
-	if err := m.client.Get(ctx, types.NamespacedName{
-		Namespace: m.namespace,
-		Name:      m.ownerMetadata.Name,
-	}, cpms); err != nil {
-		return fmt.Errorf("could not get control plane machine set object: %w", err)
+	cpms := &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: m.ownerMetadata,
 	}
 
 	machine := &machinev1beta1.Machine{
@@ -553,7 +549,7 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 		"failureDomain", providerConfig.ExtractFailureDomain().String(),
 	)
 
-	m.recorder.Eventf(cpms, "MachineCreatedSuccessfully", "created machine", machine.Name)
+	m.recorder.Eventf(cpms, corev1.EventTypeNormal, "Created", "created machine: %s", machine.Name)
 
 	return nil
 }
@@ -603,16 +599,8 @@ func (m *openshiftMachineProvider) DeleteMachine(ctx context.Context, logger log
 		return fmt.Errorf("%w: expected %s, got %s", errUnknownGroupVersionResource, machinesGVR.String(), machineRef.GroupVersionResource.String())
 	}
 
-	// cpms := &machinev1.ControlPlaneMachineSet{
-	// 	ObjectMeta: m.ownerMetadata,
-	// }
-
-	cpms := &machinev1.ControlPlaneMachineSet{}
-	if err := m.client.Get(ctx, types.NamespacedName{
-		Namespace: m.namespace,
-		Name:      m.ownerMetadata.Name,
-	}, cpms); err != nil {
-		return fmt.Errorf("could not get control plane machine set object: %w", err)
+	cpms := &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: m.ownerMetadata,
 	}
 
 	machine := machinev1beta1.Machine{
@@ -651,7 +639,7 @@ func (m *openshiftMachineProvider) DeleteMachine(ctx context.Context, logger log
 		"version", machinev1beta1.GroupVersion.Version,
 	)
 
-	m.recorder.Eventf(cpms, "MachineDeletedSuccessfully", "deleted machine", machine.Name)
+	m.recorder.Eventf(cpms, corev1.EventTypeNormal, "Deleted", "deleted machine: %s", machine.Name)
 
 	return nil
 }

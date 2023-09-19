@@ -1582,8 +1582,8 @@ var _ = Describe("MachineProvider", func() {
 					Expect(provider.CreateMachine(ctx, logger.Logger(), index)).To(Succeed())
 				})
 
-				It("should recieve an event", func() {
-					Expect(recorder.Events).Should(Receive(ContainSubstring("MachineCreatedSuccessfully")))
+				It("should receive an event", func() {
+					Expect(recorder.Events).Should(Receive(ContainSubstring("Created")))
 				})
 
 				Context("should create a machine", func() {
@@ -1838,7 +1838,7 @@ var _ = Describe("MachineProvider", func() {
 
 					Eventually(komega.Get(machine)).Should(MatchError(notFoundErr))
 
-					Expect(recorder.Events).Should(Receive(ContainSubstring("MachineDeletedSuccessfully")))
+					Expect(recorder.Events).Should(Receive(ContainSubstring("Deleted")))
 				})
 
 				It("does not error", func() {

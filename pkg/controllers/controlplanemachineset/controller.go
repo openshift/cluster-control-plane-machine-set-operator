@@ -145,6 +145,7 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 	}
 
 	// Set up API helpers from the manager.
+	r.Client = mgr.GetClient()
 	r.Scheme = mgr.GetScheme()
 	r.Recorder = mgr.GetEventRecorderFor("control-plane-machine-set-controller")
 	r.RESTMapper = mgr.GetRESTMapper()
