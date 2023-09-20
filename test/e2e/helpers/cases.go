@@ -239,7 +239,7 @@ func ItShouldReplaceTheOutDatedMachineInDeleting(testFramework framework.Framewo
 		Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
 
 		By(fmt.Sprintf("The machine at index %d should be deleting phase", index))
-		Eventually(komega.Object(machine), 10*time.Second).Should(
+		Eventually(komega.Object(machine), 3*time.Minute).Should(
 			HaveField("Status.Phase", HaveValue(Equal("Deleting"))),
 		)
 

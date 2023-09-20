@@ -31,11 +31,14 @@ import (
 	"github.com/google/uuid"
 	configv1 "github.com/openshift/api/config/v1"
 
+	batchv1 "k8s.io/api/batch/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/klogr"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	azurecompute "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
@@ -116,6 +119,9 @@ type Framework interface {
 
 	// DeleteAnInstanceFromCloudProvider deletes an instance from the cloud provider.
 	DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Machine) error
+
+	// TerminateKubelet terminates kubelet on a node that is being referenced by the input machine.
+	TerminateKubelet(node *corev1.Node, delObjects map[string]runtimeclient.Object) error
 }
 
 // PlatformSupportLevel is used to identify which tests should run
@@ -349,6 +355,167 @@ func (f *framework) DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Ma
 	}
 
 	return nil
+}
+
+func (f *framework) TerminateKubelet(node *corev1.Node, delObjects map[string]runtimeclient.Object) error {
+	client := f.GetClient()
+	ctx := f.GetContext()
+
+	serviceAccount, err := createServiceAccount(ctx, client)
+	if err != nil {
+		return err
+	}
+	delObjects[serviceAccount.Name] = serviceAccount
+
+	role, err := createRole(ctx, client)
+	if err != nil {
+		return err
+	}
+	delObjects[role.Name] = role
+
+	roleBinding, err := createRoleBinding(ctx, client)
+	if err != nil {
+		return err
+	}
+	delObjects[roleBinding.Name] = roleBinding
+
+	job, err := createJob(ctx, client, node.Name, serviceAccount.Name)
+	if err != nil {
+		return err
+	}
+	delObjects[job.Name] = job
+
+	return nil
+}
+
+func createServiceAccount(ctx context.Context, client runtimeclient.Client) (*corev1.ServiceAccount, error) {
+	serviceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-service-account",
+			Namespace: MachineAPINamespace,
+		},
+	}
+
+	if err := client.Create(ctx, serviceAccount); err != nil {
+		return nil, fmt.Errorf("failed to create ServiceAccount: %w", err)
+	}
+
+	return serviceAccount, nil
+}
+
+func createRole(ctx context.Context, client runtimeclient.Client) (*rbacv1.Role, error) {
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-role",
+			Namespace: MachineAPINamespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				ResourceNames: []string{"privileged"},
+				Resources:     []string{"securitycontextconstraints"},
+				Verbs:         []string{"use"},
+			},
+		},
+	}
+
+	if err := client.Create(ctx, role); err != nil {
+		return nil, fmt.Errorf("failed to create Role: %w", err)
+	}
+
+	return role, nil
+}
+
+func createRoleBinding(ctx context.Context, client runtimeclient.Client) (*rbacv1.RoleBinding, error) {
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-role-binding",
+			Namespace: MachineAPINamespace,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "termination-role",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "termination-service-account",
+				Namespace: MachineAPINamespace,
+			},
+		},
+	}
+
+	if err := client.Create(ctx, roleBinding); err != nil {
+		return nil, fmt.Errorf("failed to create RoleBinding: %w", err)
+	}
+
+	return roleBinding, nil
+}
+
+func createJob(ctx context.Context, client runtimeclient.Client, nodeName, serviceAccountName string) (*batchv1.Job, error) {
+	script := `apk update && apk add util-linux && chroot /host /bin/bash -c "systemctl stop kubelet";`
+	hostPathDir := corev1.HostPathDirectory
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-job",
+			Namespace: MachineAPINamespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "termination-kubelet",
+							Image:   "alpine:3.12",
+							Command: []string{"/bin/sh", "-c"},
+							Args:    []string{script},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "NAMESPACE",
+									Value: MachineAPINamespace,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.Bool(true),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "host",
+									MountPath: "/host",
+								},
+							},
+						},
+					},
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					NodeName:           nodeName,
+					DNSPolicy:          corev1.DNSClusterFirstWithHostNet,
+					ServiceAccountName: serviceAccountName,
+					HostNetwork:        true,
+					HostPID:            true,
+					HostIPC:            true,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/",
+									Type: &hostPathDir,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := client.Create(ctx, job); err != nil {
+		return nil, fmt.Errorf("failed to create job: %w", err)
+	}
+
+	return job, nil
 }
 
 // updateCredentialsSecretNameAzure updates the credentialSecret field from the ControlPlaneMachineSet.
