@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/tools/record"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -146,6 +147,7 @@ var _ = Describe("MachineProviders", func() {
 		var cpmsBuilder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 		var logger testutils.TestLogger
 		var namespaceName string
+		var recorder *record.FakeRecorder
 
 		const invalidCPMSType = machinev1.ControlPlaneMachineSetMachineType("invalid")
 
@@ -158,6 +160,8 @@ var _ = Describe("MachineProviders", func() {
 			cpmsBuilder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName)
 
 			logger = testutils.NewTestLogger()
+
+			recorder = record.NewFakeRecorder(100)
 		})
 
 		AfterEach(func() {
@@ -174,7 +178,7 @@ var _ = Describe("MachineProviders", func() {
 				cpms := cpmsBuilder.Build()
 				cpms.Spec.Template.MachineType = invalidCPMSType
 
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpms)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 			})
 
 			It("returns an error", func() {
@@ -222,7 +226,7 @@ var _ = Describe("MachineProviders", func() {
 				var err error
 
 				BeforeEach(func() {
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpmsBuilder.Build())
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build())
 				})
 
 				It("does not error", func() {
@@ -284,7 +288,7 @@ var _ = Describe("MachineProviders", func() {
 
 				BeforeEach(func() {
 
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpmsBuilder.Build())
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build())
 				})
 
 				It("does not error", func() {
@@ -321,7 +325,7 @@ var _ = Describe("MachineProviders", func() {
 					cpms := cpmsBuilder.Build()
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine = nil
 
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpms)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 				})
 
 				It("returns an error", func() {

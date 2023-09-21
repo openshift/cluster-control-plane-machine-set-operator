@@ -140,9 +140,7 @@ func main() { //nolint:funlen,cyclop
 	}
 
 	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
-		Client:         mgr.GetClient(),
 		UncachedClient: client.NewNamespacedClient(uncachedClient, managedNamespace),
-		Scheme:         mgr.GetScheme(),
 		Namespace:      managedNamespace,
 		OperatorName:   "control-plane-machine-set",
 		ReleaseVersion: getReleaseVersion(setupLog),

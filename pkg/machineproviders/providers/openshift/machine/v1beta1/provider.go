@@ -33,6 +33,7 @@ import (
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
@@ -92,7 +93,7 @@ var (
 )
 
 // NewMachineProvider creates a new OpenShift Machine v1beta1 machine provider implementation.
-func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
+func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, recorder record.EventRecorder, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
 	if cpms.Spec.Template.MachineType != machinev1.OpenShiftMachineV1Beta1MachineType {
 		return nil, fmt.Errorf("%w: %s", errUnexpectedMachineType, cpms.Spec.Template.MachineType)
 	}
@@ -137,6 +138,7 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		replicas:         replicas,
 		namespace:        cpms.Namespace,
 		machineAPIScheme: machineAPIScheme,
+		recorder:         recorder,
 	}
 
 	if err := o.updateMachineCache(ctx, logger); err != nil {
@@ -189,6 +191,9 @@ type openshiftMachineProvider struct {
 
 	// machineAPIScheme contains scheme for Machine API v1 and v1beta1.
 	machineAPIScheme *apimachineryruntime.Scheme
+
+	// recorder is used to emit events.
+	recorder record.EventRecorder
 }
 
 // updateMachineCache fetches the current list of Machines and calculates from these the appropriate index
@@ -544,6 +549,8 @@ func (m *openshiftMachineProvider) CreateMachine(ctx context.Context, logger log
 		"failureDomain", providerConfig.ExtractFailureDomain().String(),
 	)
 
+	m.recorder.Eventf(cpms, corev1.EventTypeNormal, "Created", "created machine: %s", machine.Name)
+
 	return nil
 }
 
@@ -592,6 +599,10 @@ func (m *openshiftMachineProvider) DeleteMachine(ctx context.Context, logger log
 		return fmt.Errorf("%w: expected %s, got %s", errUnknownGroupVersionResource, machinesGVR.String(), machineRef.GroupVersionResource.String())
 	}
 
+	cpms := &machinev1.ControlPlaneMachineSet{
+		ObjectMeta: m.ownerMetadata,
+	}
+
 	machine := machinev1beta1.Machine{
 		ObjectMeta: machineRef.ObjectMeta,
 	}
@@ -627,6 +638,8 @@ func (m *openshiftMachineProvider) DeleteMachine(ctx context.Context, logger log
 		"group", machinev1beta1.GroupVersion.Group,
 		"version", machinev1beta1.GroupVersion.Version,
 	)
+
+	m.recorder.Eventf(cpms, corev1.EventTypeNormal, "Deleted", "deleted machine: %s", machine.Name)
 
 	return nil
 }

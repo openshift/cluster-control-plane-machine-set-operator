@@ -38,6 +38,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -209,8 +210,10 @@ var _ = Describe("MachineProvider", func() {
 			})
 
 			It("should build a provider from data in the cluster", func() {
+				recorder := record.NewFakeRecorder(10)
+
 				var err error
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, cpms)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(provider).ToNot(BeNil())
 
@@ -375,6 +378,8 @@ var _ = Describe("MachineProvider", func() {
 			selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
 			Expect(err).ToNot(HaveOccurred())
 
+			recorder := record.NewFakeRecorder(100)
+
 			provider := &openshiftMachineProvider{
 				client:               k8sClient,
 				indexToFailureDomain: in.failureDomains,
@@ -383,6 +388,7 @@ var _ = Describe("MachineProvider", func() {
 				machineTemplate:      *template,
 				providerConfig:       providerConfig,
 				namespace:            namespaceName,
+				recorder:             recorder,
 			}
 
 			machineInfos, err := provider.GetMachineInfos(ctx, logger.Logger())
@@ -1560,6 +1566,7 @@ var _ = Describe("MachineProvider", func() {
 	Context("CreateMachine", func() {
 		var provider machineproviders.MachineProvider
 		var template machinev1.ControlPlaneMachineSetTemplate
+		var recorder *record.FakeRecorder
 
 		assertCreatesMachine := func(index int32, expectedProviderConfig resourcebuilder.RawExtensionBuilder, clusterID, failureDomain string) {
 			Context(fmt.Sprintf("creating a machine in index %d", index), Ordered, func() {
@@ -1569,15 +1576,14 @@ var _ = Describe("MachineProvider", func() {
 				// We use this so that we can break up individual assertions
 				// on the Machine state into separate containers.
 
-				var err error
 				var machine machinev1beta1.Machine
 
 				BeforeAll(func() {
-					err = provider.CreateMachine(ctx, logger.Logger(), index)
+					Expect(provider.CreateMachine(ctx, logger.Logger(), index)).To(Succeed())
 				})
 
-				It("should not error", func() {
-					Expect(err).ToNot(HaveOccurred())
+				It("should receive an event", func() {
+					Expect(recorder.Events).Should(Receive(ContainSubstring("Created")))
 				})
 
 				Context("should create a machine", func() {
@@ -1665,6 +1671,8 @@ var _ = Describe("MachineProvider", func() {
 				selector, err := metav1.LabelSelectorAsSelector(&machinev1resourcebuilder.ControlPlaneMachineSet().Build().Spec.Selector)
 				Expect(err).ToNot(HaveOccurred())
 
+				recorder = record.NewFakeRecorder(100)
+
 				provider = &openshiftMachineProvider{
 					client: k8sClient,
 					indexToFailureDomain: map[int32]failuredomain.FailureDomain{
@@ -1681,6 +1689,7 @@ var _ = Describe("MachineProvider", func() {
 					providerConfig:   providerConfig,
 					namespace:        namespaceName,
 					machineAPIScheme: testScheme,
+					recorder:         recorder,
 				}
 			})
 
@@ -1761,6 +1770,7 @@ var _ = Describe("MachineProvider", func() {
 		var machineName string
 		var machineRef *machineproviders.ObjectRef
 		var machineProvider machineproviders.MachineProvider
+		var recorder *record.FakeRecorder
 
 		BeforeEach(func() {
 			By("Setting up the MachineProvider")
@@ -1777,6 +1787,8 @@ var _ = Describe("MachineProvider", func() {
 			selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
 			Expect(err).ToNot(HaveOccurred())
 
+			recorder = record.NewFakeRecorder(100)
+
 			machineProvider = &openshiftMachineProvider{
 				client:               k8sClient,
 				indexToFailureDomain: map[int32]failuredomain.FailureDomain{},
@@ -1787,6 +1799,7 @@ var _ = Describe("MachineProvider", func() {
 				},
 				providerConfig: providerConfig,
 				namespace:      namespaceName,
+				recorder:       recorder,
 			}
 
 			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().
@@ -1824,6 +1837,8 @@ var _ = Describe("MachineProvider", func() {
 					notFoundErr := apierrors.NewNotFound(machineRef.GroupVersionResource.GroupResource(), machineName)
 
 					Eventually(komega.Get(machine)).Should(MatchError(notFoundErr))
+
+					Expect(recorder.Events).Should(Receive(ContainSubstring("Deleted")))
 				})
 
 				It("does not error", func() {
