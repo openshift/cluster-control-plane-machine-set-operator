@@ -94,7 +94,11 @@ func Succeed() types.GomegaMatcher {
 //
 //	Expect(err).Should(MatchError("an error")) //asserts that err.Error() == "an error"
 //	Expect(err).Should(MatchError(SomeError)) //asserts that err == SomeError (via reflect.DeepEqual)
+<<<<<<< HEAD
 //	Expect(err).Should(MatchError(ContainSubstring("sprocket not found"))) // asserts that err.Error() contains substring "sprocket not found"
+=======
+//	Expect(err).Should(MatchError(ContainSubstring("sprocket not found"))) // asserts that edrr.Error() contains substring "sprocket not found"
+>>>>>>> 47985f1e (Bump golangci-lint package)
 //
 // It is an error for err to be nil or an object that does not implement the
 // Error interface

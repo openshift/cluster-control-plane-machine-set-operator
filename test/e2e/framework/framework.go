@@ -74,6 +74,10 @@ var (
 
 	// errMissingInstanceSize is returned when the instance size is missing.
 	errMissingInstanceSize = errors.New("instance size is missing")
+
+	// errCredentialsSecret is returned when getting data from the cloud provider credentials secret fails or
+	// constructing the secret fails.
+	errCredentialsSecret = errors.New("credentials secret error")
 )
 
 // Framework is an interface for getting clients and information
@@ -143,15 +147,6 @@ const (
 const (
 	// Namespace that contains the cloud credentials secret.
 	namespaceSecret = "openshift-machine-api"
-
-	// Name of the cloud credentials secret for AWS.
-	awsCredentialsSecretName = "aws-cloud-credentials"
-
-	// Name of the cloud credentials secret for Azure.
-	azureCredentialsSecretName = "azure-cloud-credentials"
-
-	// Name of the cloud credentials secret for GCP.
-	gcpCredentialsSecretName = "gcp-cloud-credentials"
 
 	// Name of the field that contains credentials within the cloud credentials secret for GCP.
 	gcpCredentialsSecretKey = "service_account.json"
@@ -357,6 +352,7 @@ func (f *framework) DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Ma
 	return nil
 }
 
+// TerminateKubelet terminates kubelet on a node that is being referenced by the input machine.
 func (f *framework) TerminateKubelet(node *corev1.Node, delObjects map[string]runtimeclient.Object) error {
 	client := f.GetClient()
 	ctx := f.GetContext()
@@ -365,24 +361,28 @@ func (f *framework) TerminateKubelet(node *corev1.Node, delObjects map[string]ru
 	if err != nil {
 		return err
 	}
+
 	delObjects[serviceAccount.Name] = serviceAccount
 
 	role, err := createRole(ctx, client)
 	if err != nil {
 		return err
 	}
+
 	delObjects[role.Name] = role
 
 	roleBinding, err := createRoleBinding(ctx, client)
 	if err != nil {
 		return err
 	}
+
 	delObjects[roleBinding.Name] = roleBinding
 
 	job, err := createJob(ctx, client, node.Name, serviceAccount.Name)
 	if err != nil {
 		return err
 	}
+
 	delObjects[job.Name] = job
 
 	return nil
@@ -453,7 +453,7 @@ func createRoleBinding(ctx context.Context, client runtimeclient.Client) (*rbacv
 	return roleBinding, nil
 }
 
-func createJob(ctx context.Context, client runtimeclient.Client, nodeName, serviceAccountName string) (*batchv1.Job, error) {
+func createJob(ctx context.Context, client runtimeclient.Client, nodeName, serviceAccountName string) (*batchv1.Job, error) { //nolint: funlen
 	script := `apk update && apk add util-linux && chroot /host /bin/bash -c "systemctl stop kubelet";`
 	hostPathDir := corev1.HostPathDirectory
 
@@ -1131,6 +1131,7 @@ func newConfigForStaticCreds(accessKey string, accessSecret string) []byte {
 	fmt.Fprint(buf, "[default]\n")
 	fmt.Fprintf(buf, "aws_access_key_id = %s\n", accessKey)
 	fmt.Fprintf(buf, "aws_secret_access_key = %s\n", accessSecret)
+
 	return buf.Bytes()
 }
 
@@ -1144,17 +1145,22 @@ func sharedCredentialsFileFromSecret(credentialsSecret *corev1.Secret) (string, 
 			string(credentialsSecret.Data["aws_secret_access_key"]),
 		)
 	} else {
-		return "", fmt.Errorf("missing values in AWS credentials secret")
+		return "", fmt.Errorf("missing values in AWS credentials secret: %w", errCredentialsSecret)
 	}
 
 	f, err := os.CreateTemp("", "aws-shared-credentials")
 	if err != nil {
-		return "", fmt.Errorf("failed to create file for shared credentials: %v", err)
+		return "", fmt.Errorf("failed to create file for shared credentials: %w", err)
 	}
-	defer f.Close()
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	if _, err := f.Write(data); err != nil {
-		return "", fmt.Errorf("failed to write credentials to %s: %v", f.Name(), err)
+		return "", fmt.Errorf("failed to write credentials to %s: %w", f.Name(), err)
 	}
 
 	return f.Name(), nil
@@ -1165,9 +1171,9 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client, machine
 	var credentialsSecret corev1.Secret
 	if err := client.Get(ctx, runtimeclient.ObjectKey{
 		Namespace: namespaceSecret,
-		Name:      awsCredentialsSecretName,
+		Name:      "aws-cloud-credentials",
 	}, &credentialsSecret); err != nil {
-		return fmt.Errorf("should be able to retrieve the cloud credentials secret for AWS")
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for AWS: %w", err)
 	}
 
 	providerStatus := &machinev1beta1.AWSMachineProviderStatus{}
@@ -1177,7 +1183,7 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client, machine
 		return fmt.Errorf("failed to unmarshal provider status: %w", err)
 	}
 
-	instanceId := providerStatus.InstanceID
+	instanceID := providerStatus.InstanceID
 	region := machine.Labels["machine.openshift.io/region"]
 
 	sessionOptions := session.Options{
@@ -1188,7 +1194,7 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client, machine
 
 	sharedCredsFile, err := sharedCredentialsFileFromSecret(&credentialsSecret)
 	if err != nil {
-		return fmt.Errorf("could not create a shared credentials file from an AWS credentials secret")
+		return fmt.Errorf("could not create a shared credentials file from an AWS credentials secret: %w", errCredentialsSecret)
 	}
 
 	sessionOptions.SharedConfigState = session.SharedConfigEnable
@@ -1203,7 +1209,7 @@ func deleteAWSInstance(ctx context.Context, client runtimeclient.Client, machine
 
 	input := &ec2.TerminateInstancesInput{
 		DryRun:      aws.Bool(false),
-		InstanceIds: aws.StringSlice([]string{*instanceId}),
+		InstanceIds: aws.StringSlice([]string{*instanceID}),
 	}
 
 	_, err = awsClient.TerminateInstances(input)
@@ -1227,27 +1233,27 @@ type azureCredentialsData struct {
 func getAzureCredentialsData(credentialsSecret *corev1.Secret) (*azureCredentialsData, error) {
 	subscriptionID, ok := credentialsSecret.Data["azure_subscription_id"]
 	if !ok {
-		return nil, fmt.Errorf("could not get subscriptionID from Azure credentials secret")
+		return nil, fmt.Errorf("could not get subscriptionID from Azure credentials secret: %w", errCredentialsSecret)
 	}
 
 	resourceGroup, ok := credentialsSecret.Data["azure_resourcegroup"]
 	if !ok {
-		return nil, fmt.Errorf("could not get resourceGroup from Azure credentials secret")
+		return nil, fmt.Errorf("could not get resourceGroup from Azure credentials secret: %w", errCredentialsSecret)
 	}
 
 	clientID, ok := credentialsSecret.Data["azure_client_id"]
 	if !ok {
-		return nil, fmt.Errorf("could not get clientID from Azure credentials secret")
+		return nil, fmt.Errorf("could not get clientID from Azure credentials secret: %w", errCredentialsSecret)
 	}
 
 	clientSecret, ok := credentialsSecret.Data["azure_client_secret"]
 	if !ok {
-		return nil, fmt.Errorf("could not get clientSecret from Azure credentials secret")
+		return nil, fmt.Errorf("could not get clientSecret from Azure credentials secret: %w", errCredentialsSecret)
 	}
 
 	tenantID, ok := credentialsSecret.Data["azure_tenant_id"]
 	if !ok {
-		return nil, fmt.Errorf("could not get tenantID from Azure credentials secret")
+		return nil, fmt.Errorf("could not get tenantID from Azure credentials secret: %w", errCredentialsSecret)
 	}
 
 	return &azureCredentialsData{
@@ -1264,9 +1270,9 @@ func deleteAzureInstance(ctx context.Context, client runtimeclient.Client, machi
 	var credentialsSecret corev1.Secret
 	if err := client.Get(ctx, runtimeclient.ObjectKey{
 		Namespace: namespaceSecret,
-		Name:      azureCredentialsSecretName,
+		Name:      "azure-cloud-credentials",
 	}, &credentialsSecret); err != nil {
-		return fmt.Errorf("should be able to retrieve the cloud credentials secret for Azure")
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for Azure: %w", err)
 	}
 
 	secretData, err := getAzureCredentialsData(&credentialsSecret)
@@ -1286,7 +1292,7 @@ func deleteAzureInstance(ctx context.Context, client runtimeclient.Client, machi
 
 	forceDeletion := false
 
-	_, err = vmClient.Delete(context.Background(), secretData.resourceGroup, vmName, &forceDeletion)
+	_, err = vmClient.Delete(ctx, secretData.resourceGroup, vmName, &forceDeletion)
 	if err != nil {
 		return fmt.Errorf("should be able to delete an Azure instance: %w", err)
 	}
@@ -1299,24 +1305,24 @@ func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger 
 	var credentialsSecret corev1.Secret
 	if err := client.Get(ctx, runtimeclient.ObjectKey{
 		Namespace: namespaceSecret,
-		Name:      gcpCredentialsSecretName,
+		Name:      "gcp-cloud-credentials",
 	}, &credentialsSecret); err != nil {
-		return fmt.Errorf("should be able to retrieve the cloud credentials secret for GCP")
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for GCP: %w", errCredentialsSecret)
 	}
 
 	serviceAccountJSON, ok := credentialsSecret.Data[gcpCredentialsSecretKey]
 	if !ok {
-		return fmt.Errorf("credentials secret does not have field %s set", gcpCredentialsSecretKey)
+		return fmt.Errorf("credentials secret does not have field %s set: %w", gcpCredentialsSecretKey, errCredentialsSecret)
 	}
 
 	creds, err := google.CredentialsFromJSON(ctx, serviceAccountJSON, compute.CloudPlatformScope)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get GCP credentials from JSON: %w", err)
 	}
 
 	computeService, err := compute.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create new compute service: %w", err)
 	}
 
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machinev1beta1.MachineSpec{

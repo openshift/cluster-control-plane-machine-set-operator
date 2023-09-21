@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## 2.12.1
 
 ### Fixes
@@ -21,6 +22,8 @@
 
 Various chores/dependency bumps.
 
+=======
+>>>>>>> 47985f1e (Bump golangci-lint package)
 ## 2.11.0
 
 In prior versions of Ginkgo specs the CLI filter flags (e.g. `--focus`, `--label-filter`) would _override_ any programmatic focus.  This behavior has proved surprising and confusing in at least the following ways:

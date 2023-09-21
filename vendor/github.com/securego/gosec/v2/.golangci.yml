@@ -3,9 +3,12 @@ linters:
     - asciicheck
     - bodyclose
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
     - depguard
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+>>>>>>> 47985f1e (Bump golangci-lint package)
     - dogsled
     - durationcheck
     - errcheck

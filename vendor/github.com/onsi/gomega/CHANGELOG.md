@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## 1.28.0
 
 ### Features
@@ -13,6 +14,8 @@
 - chore: update test matrix for Go 1.21 (#689) [5069017]
 - Bump golang.org/x/net from 0.12.0 to 0.14.0 (#688) [babe25f]
 
+=======
+>>>>>>> 47985f1e (Bump golangci-lint package)
 ## 1.27.10
 
 ### Fixes

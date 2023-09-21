@@ -191,6 +191,28 @@ func (s *sqlStrConcat) checkQuery(call *ast.CallExpr, ctx *gosec.Context) (*issu
 		}
 	}
 
+	// Handle the case where an injection occurs as an infixed string concatenation, ie "SELECT * FROM foo WHERE name = '" + os.Args[0] + "' AND 1=1"
+	if id, ok := query.(*ast.Ident); ok {
+		var match bool
+		for _, str := range gosec.GetIdentStringValuesRecursive(id) {
+			if s.MatchPatterns(str) {
+				match = true
+				break
+			}
+		}
+
+		if !match {
+			return nil, nil
+		}
+
+		switch decl := id.Obj.Decl.(type) {
+		case *ast.AssignStmt:
+			if injection := s.findInjectionInBranch(ctx, decl.Rhs); injection != nil {
+				return ctx.NewIssue(injection, s.ID(), s.What, s.Severity, s.Confidence), nil
+			}
+		}
+	}
+
 	return nil, nil
 }
 

@@ -97,7 +97,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				}, node)).To(Succeed())
 
 				By("Shutting down the kubelet on a node")
-				testFramework.TerminateKubelet(node, delObjects)
+				Expect(testFramework.TerminateKubelet(node, delObjects)).To(Succeed())
 
 				By("Waiting for the node to get into NotReady phase")
 				Eventually(komega.Object(node), 10*time.Minute).Should(
@@ -106,6 +106,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 						for _, condition := range node.Status.Conditions {
 							statuses = append(statuses, condition.Status)
 						}
+
 						return statuses
 					}, ContainElements(corev1.ConditionUnknown, corev1.ConditionFalse)))
 

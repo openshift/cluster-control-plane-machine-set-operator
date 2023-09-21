@@ -47,10 +47,14 @@ func runSSRF(pass *analysis.Pass) (interface{}, error) {
 						ssaResult.Logger.Printf("callee: %s\n", callee)
 						return newIssue(pass.Analyzer.Name,
 <<<<<<< HEAD
+<<<<<<< HEAD
 							"not implemented",
 =======
 							"not implemeted",
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+							"not implemented",
+>>>>>>> 47985f1e (Bump golangci-lint package)
 							pass.Fset, instr.Call.Pos(), issue.Low, issue.High), nil
 					}
 				}

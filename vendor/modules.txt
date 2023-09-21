@@ -15,7 +15,13 @@ cloud.google.com/go/compute/internal
 # cloud.google.com/go/compute/metadata v0.2.3
 ## explicit; go 1.19
 cloud.google.com/go/compute/metadata
+<<<<<<< HEAD
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+# github.com/4meepo/tagalign v1.3.2
+## explicit; go 1.19
+github.com/4meepo/tagalign
+>>>>>>> 47985f1e (Bump golangci-lint package)
 # github.com/Abirdcfly/dupword v0.0.12
 ## explicit; go 1.20
 github.com/Abirdcfly/dupword
@@ -165,6 +171,9 @@ github.com/butuzov/ireturn/analyzer
 github.com/butuzov/ireturn/analyzer/internal/config
 github.com/butuzov/ireturn/analyzer/internal/types
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 47985f1e (Bump golangci-lint package)
 # github.com/butuzov/mirror v1.1.0
 ## explicit; go 1.19
 github.com/butuzov/mirror
@@ -180,8 +189,11 @@ github.com/ccojocar/zxcvbn-go/match
 github.com/ccojocar/zxcvbn-go/matching
 github.com/ccojocar/zxcvbn-go/scoring
 github.com/ccojocar/zxcvbn-go/utils/math
+<<<<<<< HEAD
 =======
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+>>>>>>> 47985f1e (Bump golangci-lint package)
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -665,6 +677,7 @@ github.com/munnerz/goautoneg
 ## explicit; go 1.15
 github.com/nakabonne/nestif
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 # github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
 ## explicit; go 1.14
@@ -678,6 +691,8 @@ github.com/nbutton23/zxcvbn-go/matching
 github.com/nbutton23/zxcvbn-go/scoring
 github.com/nbutton23/zxcvbn-go/utils/math
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+>>>>>>> 47985f1e (Bump golangci-lint package)
 # github.com/nishanths/exhaustive v0.11.0
 ## explicit; go 1.18
 github.com/nishanths/exhaustive
@@ -695,7 +710,11 @@ github.com/nunnatsa/ginkgolinter/version
 # github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
+<<<<<<< HEAD
 # github.com/onsi/ginkgo/v2 v2.12.1
+=======
+# github.com/onsi/ginkgo/v2 v2.11.0
+>>>>>>> 47985f1e (Bump golangci-lint package)
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -717,7 +736,11 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
+<<<<<<< HEAD
 # github.com/onsi/gomega v1.28.0
+=======
+# github.com/onsi/gomega v1.27.10
+>>>>>>> 47985f1e (Bump golangci-lint package)
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -842,8 +865,8 @@ github.com/rivo/uniseg
 # github.com/ryancurrah/gomodguard v1.3.0
 ## explicit; go 1.19
 github.com/ryancurrah/gomodguard
-# github.com/ryanrolds/sqlclosecheck v0.5.0
-## explicit; go 1.21
+# github.com/ryanrolds/sqlclosecheck v0.4.0
+## explicit; go 1.19
 github.com/ryanrolds/sqlclosecheck/pkg/analyzer
 # github.com/sanposhiho/wastedassign/v2 v2.0.7
 ## explicit; go 1.14
@@ -856,12 +879,17 @@ github.com/sashamelentyev/interfacebloat/pkg/analyzer
 github.com/sashamelentyev/usestdlibvars/pkg/analyzer
 github.com/sashamelentyev/usestdlibvars/pkg/analyzer/internal/mapping
 <<<<<<< HEAD
+<<<<<<< HEAD
 # github.com/securego/gosec/v2 v2.17.0
 ## explicit; go 1.20
 =======
 # github.com/securego/gosec/v2 v2.16.0
 ## explicit; go 1.19
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+# github.com/securego/gosec/v2 v2.17.0
+## explicit; go 1.20
+>>>>>>> 47985f1e (Bump golangci-lint package)
 github.com/securego/gosec/v2
 github.com/securego/gosec/v2/analyzers
 github.com/securego/gosec/v2/cwe
@@ -1001,6 +1029,7 @@ github.com/yagipy/maintidx/pkg/halstvol
 ## explicit; go 1.16
 github.com/yeya24/promlinter
 <<<<<<< HEAD
+<<<<<<< HEAD
 # github.com/ykadowak/zerologlint v0.1.3
 ## explicit; go 1.19
 github.com/ykadowak/zerologlint
@@ -1011,6 +1040,11 @@ gitlab.com/bosi/decorder
 ## explicit; go 1.19
 go.tmz.dev/musttag
 =======
+=======
+# github.com/ykadowak/zerologlint v0.1.3
+## explicit; go 1.19
+github.com/ykadowak/zerologlint
+>>>>>>> 47985f1e (Bump golangci-lint package)
 # gitlab.com/bosi/decorder v0.4.1
 ## explicit; go 1.20
 gitlab.com/bosi/decorder
@@ -1032,7 +1066,13 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
+<<<<<<< HEAD
 >>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
+=======
+# go.tmz.dev/musttag v0.7.2
+## explicit; go 1.19
+go.tmz.dev/musttag
+>>>>>>> 47985f1e (Bump golangci-lint package)
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
