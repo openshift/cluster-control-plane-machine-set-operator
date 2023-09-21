@@ -1881,6 +1881,10 @@ var _ = Describe("MachineProvider", func() {
 					Consistently(komega.Get(machine)).Should(Succeed())
 				})
 
+				It("should not receive an event", func() {
+					Expect(recorder.Events).Should(Not(Receive()))
+				})
+
 				It("does not error", func() {
 					Expect(err).ToNot(HaveOccurred())
 				})
@@ -1914,6 +1918,10 @@ var _ = Describe("MachineProvider", func() {
 				}
 
 				err = machineProvider.DeleteMachine(ctx, logger.Logger(), machineRef)
+			})
+
+			It("should not receive an event", func() {
+				Expect(recorder.Events).Should(Not(Receive()))
 			})
 
 			It("returns an error", func() {
