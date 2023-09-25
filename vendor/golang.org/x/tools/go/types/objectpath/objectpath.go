@@ -32,10 +32,7 @@ import (
 	_ "unsafe"
 
 	"golang.org/x/tools/internal/typeparams"
-<<<<<<< HEAD
-=======
 	"golang.org/x/tools/internal/typesinternal"
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 )
 
 // A Path is an opaque name that identifies a types.Object
@@ -131,14 +128,6 @@ type Encoder struct {
 	skipMethodSorting bool
 }
 
-<<<<<<< HEAD
-// Exposed to gopls via golang.org/x/tools/internal/typesinternal
-// TODO(golang/go#61443): eliminate this parameter one way or the other.
-//
-//go:linkname skipMethodSorting
-func skipMethodSorting(enc *Encoder) {
-	enc.skipMethodSorting = true
-=======
 // Expose back doors so that gopls can avoid method sorting, which can dominate
 // analysis on certain repositories.
 //
@@ -148,7 +137,6 @@ func init() {
 		enc.(*Encoder).skipMethodSorting = true
 	}
 	typesinternal.ObjectpathObject = object
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 }
 
 // For returns the path to an object relative to its package,
@@ -588,22 +576,13 @@ func findTypeParam(obj types.Object, list *typeparams.TypeParamList, path []byte
 
 // Object returns the object denoted by path p within the package pkg.
 func Object(pkg *types.Package, p Path) (types.Object, error) {
-<<<<<<< HEAD
-	return object(pkg, p, false)
-=======
 	return object(pkg, string(p), false)
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 }
 
 // Note: the skipMethodSorting parameter must match the value of
 // Encoder.skipMethodSorting used during encoding.
-<<<<<<< HEAD
-func object(pkg *types.Package, p Path, skipMethodSorting bool) (types.Object, error) {
-	if p == "" {
-=======
 func object(pkg *types.Package, pathstr string, skipMethodSorting bool) (types.Object, error) {
 	if pathstr == "" {
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 		return nil, fmt.Errorf("empty path")
 	}
 

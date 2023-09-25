@@ -38,7 +38,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/klogr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	azurecompute "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
@@ -359,28 +359,28 @@ func (f *framework) TerminateKubelet(node *corev1.Node, delObjects map[string]ru
 
 	serviceAccount, err := createServiceAccount(ctx, client)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create a service account: %w", err)
 	}
 
 	delObjects[serviceAccount.Name] = serviceAccount
 
 	role, err := createRole(ctx, client)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create a role: %w", err)
 	}
 
 	delObjects[role.Name] = role
 
 	roleBinding, err := createRoleBinding(ctx, client)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create a role binding: %w", err)
 	}
 
 	delObjects[roleBinding.Name] = roleBinding
 
 	job, err := createJob(ctx, client, node.Name, serviceAccount.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create a job: %w", err)
 	}
 
 	delObjects[job.Name] = job
@@ -478,7 +478,7 @@ func createJob(ctx context.Context, client runtimeclient.Client, nodeName, servi
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To[bool](true),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -1329,7 +1329,7 @@ func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger 
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: machine.Spec.ProviderSpec.Value,
 		},
-	})
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get provider config: %w", err)
 	}

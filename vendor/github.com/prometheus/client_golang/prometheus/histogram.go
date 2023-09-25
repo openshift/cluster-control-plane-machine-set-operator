@@ -433,13 +433,8 @@ type HistogramOpts struct {
 	// For best results, this should be close to a bucket boundary. This is
 	// usually the case if picking a power of two. If
 	// NativeHistogramZeroThreshold is left at zero,
-<<<<<<< HEAD
 	// DefNativeHistogramZeroThreshold is used as the threshold. To
 	// configure a zero bucket with an actual threshold of zero (i.e. only
-=======
-	// DefNativeHistogramZeroThreshold is used as the threshold. To configure
-	// a zero bucket with an actual threshold of zero (i.e. only
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	// observations of precisely zero will go into the zero bucket), set
 	// NativeHistogramZeroThreshold to the NativeHistogramZeroThresholdZero
 	// constant (or any negative float value).

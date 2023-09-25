@@ -753,11 +753,7 @@ func (d *decoder) unmarshalInlineTable(itable *unstable.Node, v reflect.Value) e
 		}
 		return d.unmarshalInlineTable(itable, elem)
 	default:
-<<<<<<< HEAD
-		return unstable.NewParserError(itable.Data, "cannot store inline table in Go type %s", v.Kind())
-=======
 		return unstable.NewParserError(d.p.Raw(itable.Raw), "cannot store inline table in Go type %s", v.Kind())
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	}
 
 	it := itable.Children()
@@ -898,14 +894,11 @@ func init() {
 }
 
 func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error {
-<<<<<<< HEAD
-=======
 	kind := v.Kind()
 	if kind == reflect.Float32 || kind == reflect.Float64 {
 		return d.unmarshalFloat(value, v)
 	}
 
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	i, err := parseInteger(value.Data)
 	if err != nil {
 		return err
@@ -993,11 +986,7 @@ func (d *decoder) unmarshalString(value *unstable.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
-<<<<<<< HEAD
-		return unstable.NewParserError(d.p.Raw(value.Raw), "cannot store TOML string into a Go %s", v.Kind())
-=======
 		return unstable.NewParserError(d.p.Raw(value.Raw), d.typeMismatchString("string", v.Type()))
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	}
 
 	return nil
@@ -1027,8 +1016,6 @@ func (d *decoder) handleKeyValueInner(key unstable.Iterator, value *unstable.Nod
 	return reflect.Value{}, d.handleValue(value, v)
 }
 
-<<<<<<< HEAD
-=======
 func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value, error) {
 	switch {
 	case stringType.AssignableTo(keyType):
@@ -1054,7 +1041,6 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 	return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", stringType, keyType)
 }
 
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node, v reflect.Value) (reflect.Value, error) {
 	// contains the replacement for v
 	var rv reflect.Value

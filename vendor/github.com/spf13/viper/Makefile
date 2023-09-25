@@ -15,13 +15,8 @@ TEST_FORMAT = short-verbose
 endif
 
 # Dependency versions
-<<<<<<< HEAD
-GOTESTSUM_VERSION = 1.8.0
-GOLANGCI_VERSION = 1.50.1
-=======
 GOTESTSUM_VERSION = 1.9.0
 GOLANGCI_VERSION = 1.52.2
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 # Add the ability to override some variables
 # Use with care

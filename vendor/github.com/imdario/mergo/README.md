@@ -7,16 +7,11 @@
 [![OpenSSF Best Practices][19]][20]
 [![Coverage status][9]][10]
 [![Sourcegraph][11]][12]
-<<<<<<< HEAD
-[![FOSSA Status][13]][14]
-[![Become my sponsor][15]][16]
-=======
 [![FOSSA status][13]][14]
 
 [![GoDoc][3]][4]
 [![Become my sponsor][15]][16]
 [![Tidelift][17]][18]
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 [1]: https://github.com/imdario/mergo/workflows/tests/badge.svg?branch=master
 [2]: https://github.com/imdario/mergo/actions/workflows/tests.yml
@@ -34,15 +29,12 @@
 [14]: https://app.fossa.io/projects/git%2Bgithub.com%2Fimdario%2Fmergo?ref=badge_shield
 [15]: https://img.shields.io/github/sponsors/imdario
 [16]: https://github.com/sponsors/imdario
-<<<<<<< HEAD
-=======
 [17]: https://tidelift.com/badges/package/go/github.com%2Fimdario%2Fmergo
 [18]: https://tidelift.com/subscription/pkg/go-github.com-imdario-mergo
 [19]: https://bestpractices.coreinfrastructure.org/projects/7177/badge
 [20]: https://bestpractices.coreinfrastructure.org/projects/7177
 [21]: https://api.securityscorecards.dev/projects/github.com/imdario/mergo/badge
 [22]: https://api.securityscorecards.dev/projects/github.com/imdario/mergo
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 A helper to merge structs and maps in Golang. Useful for configuration default values, avoiding messy if-statements.
 
@@ -72,7 +64,6 @@ If Mergo is useful to you, consider buying me a coffee, a beer, or making a mont
 
 ### Mergo in the wild
 
-- [cli/cli](https://github.com/cli/cli)
 - [moby/moby](https://github.com/moby/moby)
 - [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
 - [vmware/dispatch](https://github.com/vmware/dispatch)

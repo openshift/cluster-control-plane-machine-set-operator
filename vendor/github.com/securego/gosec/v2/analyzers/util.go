@@ -28,15 +28,7 @@ import (
 )
 
 // SSAAnalyzerResult contains various information returned by the
-<<<<<<< HEAD
-<<<<<<< HEAD
 // SSA analysis along with some configuration
-=======
-// SSA analysis along with some configuraion
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
-=======
-// SSA analysis along with some configuration
->>>>>>> 47985f1e (Bump golangci-lint package)
 type SSAAnalyzerResult struct {
 	Config map[string]interface{}
 	Logger *log.Logger
@@ -50,15 +42,7 @@ func BuildDefaultAnalyzers() []*analysis.Analyzer {
 	}
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 // getSSAResult retrieves the SSA result from analysis pass
-=======
-// getSSAResult retrives the SSA result from analysis pass
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
-=======
-// getSSAResult retrieves the SSA result from analysis pass
->>>>>>> 47985f1e (Bump golangci-lint package)
 func getSSAResult(pass *analysis.Pass) (*SSAAnalyzerResult, error) {
 	result, ok := pass.ResultOf[buildssa.Analyzer]
 	if !ok {

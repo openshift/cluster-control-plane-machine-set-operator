@@ -20,24 +20,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-var labelsPool = &sync.Pool{
-	New: func() interface{} {
-		return make(Labels)
-	},
-}
-
-func getLabelsFromPool() Labels {
-	return labelsPool.Get().(Labels)
-}
-
-func putLabelsToPool(labels Labels) {
-	for k := range labels {
-		delete(labels, k)
-	}
-
-	labelsPool.Put(labels)
-}
-
 // MetricVec is a Collector to bundle metrics of the same name that differ in
 // their label values. MetricVec is not used directly but as a building block
 // for implementations of vectors of a given metric type, like GaugeVec,
@@ -111,13 +93,8 @@ func (m *MetricVec) DeleteLabelValues(lvs ...string) bool {
 // This method is used for the same purpose as DeleteLabelValues(...string). See
 // there for pros and cons of the two methods.
 func (m *MetricVec) Delete(labels Labels) bool {
-<<<<<<< HEAD
 	labels, closer := constrainLabels(m.desc, labels)
 	defer closer()
-=======
-	labels = constrainLabels(m.desc, labels)
-	defer putLabelsToPool(labels)
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	h, err := m.hashLabels(labels)
 	if err != nil {
@@ -134,13 +111,8 @@ func (m *MetricVec) Delete(labels Labels) bool {
 // Note that curried labels will never be matched if deleting from the curried vector.
 // To match curried labels with DeletePartialMatch, it must be called on the base vector.
 func (m *MetricVec) DeletePartialMatch(labels Labels) int {
-<<<<<<< HEAD
 	labels, closer := constrainLabels(m.desc, labels)
 	defer closer()
-=======
-	labels = constrainLabels(m.desc, labels)
-	defer putLabelsToPool(labels)
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	return m.metricMap.deleteByLabels(labels, m.curry)
 }
@@ -264,13 +236,8 @@ func (m *MetricVec) GetMetricWithLabelValues(lvs ...string) (Metric, error) {
 // around MetricVec, implementing a vector for a specific Metric implementation,
 // for example GaugeVec.
 func (m *MetricVec) GetMetricWith(labels Labels) (Metric, error) {
-<<<<<<< HEAD
 	labels, closer := constrainLabels(m.desc, labels)
 	defer closer()
-=======
-	labels = constrainLabels(m.desc, labels)
-	defer putLabelsToPool(labels)
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	h, err := m.hashLabels(labels)
 	if err != nil {
@@ -689,7 +656,6 @@ func inlineLabelValues(lvs []string, curry []curriedLabelValue) []string {
 	return labelValues
 }
 
-<<<<<<< HEAD
 var labelsPool = &sync.Pool{
 	New: func() interface{} {
 		return make(Labels)
@@ -713,19 +679,6 @@ func constrainLabels(desc *Desc, labels Labels) (Labels, func()) {
 		}
 		labelsPool.Put(constrainedLabels)
 	}
-=======
-func constrainLabels(desc *Desc, labels Labels) Labels {
-	constrainedLabels := getLabelsFromPool()
-	for l, v := range labels {
-		if i, ok := indexOf(l, desc.variableLabels.labelNames()); ok {
-			v = desc.variableLabels[i].Constrain(v)
-		}
-
-		constrainedLabels[l] = v
-	}
-
-	return constrainedLabels
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 }
 
 func constrainLabelValues(desc *Desc, lvs []string, curry []curriedLabelValue) []string {

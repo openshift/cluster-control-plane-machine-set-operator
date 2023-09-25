@@ -49,11 +49,6 @@ func NewParserError(highlight []byte, format string, args ...interface{}) error 
 // For performance reasons, go-toml doesn't make a copy of the input bytes to
 // the parser. Make sure to copy all the bytes you need to outlive the slice
 // given to the parser.
-<<<<<<< HEAD
-//
-// The parser doesn't provide nodes for comments yet, nor for whitespace.
-=======
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 type Parser struct {
 	data    []byte
 	builder builder
@@ -137,26 +132,16 @@ func (p *Parser) NextExpression() bool {
 }
 
 // Expression returns a pointer to the node representing the last successfully
-<<<<<<< HEAD
-// parsed expresion.
-=======
 // parsed expression.
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func (p *Parser) Expression() *Node {
 	return p.builder.NodeAt(p.ref)
 }
 
-<<<<<<< HEAD
-// Error returns any error that has occured during parsing.
-=======
 // Error returns any error that has occurred during parsing.
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func (p *Parser) Error() error {
 	return p.err
 }
 
-<<<<<<< HEAD
-=======
 // Position describes a position in the input.
 type Position struct {
 	// Number of bytes from the beginning of the input.
@@ -195,7 +180,6 @@ func (p *Parser) Shape(r Range) Shape {
 	}
 }
 
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func (p *Parser) parseNewline(b []byte) ([]byte, error) {
 	if b[0] == '\n' {
 		return b[1:], nil
@@ -209,8 +193,6 @@ func (p *Parser) parseNewline(b []byte) ([]byte, error) {
 	return nil, NewParserError(b[0:1], "expected newline but got %#U", b[0])
 }
 
-<<<<<<< HEAD
-=======
 func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
 	ref := invalidReference
 	data, rest, err := scanComment(b)
@@ -224,7 +206,6 @@ func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
 	return ref, rest, err
 }
 
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
@@ -475,10 +456,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 	parent := p.builder.Push(Node{
 		Kind: InlineTable,
-<<<<<<< HEAD
-=======
 		Raw:  p.Range(b[:1]),
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	})
 
 	first := true
@@ -551,9 +529,6 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	// (non-comment) of the array.
 	first := true
 
-<<<<<<< HEAD
-	var lastChild reference
-=======
 	lastChild := invalidReference
 
 	addChild := func(valueRef reference) {
@@ -564,7 +539,6 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		}
 		lastChild = valueRef
 	}
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	var err error
 	for len(b) > 0 {
@@ -632,9 +606,6 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-<<<<<<< HEAD
-func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error) {
-=======
 func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []byte, error) {
 	rootCommentRef := invalidReference
 	latestCommentRef := invalidReference
@@ -651,7 +622,6 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []b
 		}
 	}
 
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 	for len(b) > 0 {
 		var err error
 		b = p.parseWhitespace(b)

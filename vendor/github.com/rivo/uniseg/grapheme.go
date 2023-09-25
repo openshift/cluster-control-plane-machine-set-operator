@@ -163,8 +163,6 @@ func GraphemeClusterCount(s string) (n int) {
 	return
 }
 
-<<<<<<< HEAD
-=======
 // ReverseString reverses the given string while observing grapheme cluster
 // boundaries.
 func ReverseString(s string) string {
@@ -184,19 +182,13 @@ func ReverseString(s string) string {
 	return string(reversed)
 }
 
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 // The number of bits the grapheme property must be shifted to make place for
 // grapheme states.
 const shiftGraphemePropState = 4
 
 // FirstGraphemeCluster returns the first grapheme cluster found in the given
-<<<<<<< HEAD
-// byte slice according to the rules of Unicode Standard Annex #29, Grapheme
-// Cluster Boundaries. This function can be called continuously to extract all
-=======
 // byte slice according to the rules of [Unicode Standard Annex #29, Grapheme
 // Cluster Boundaries]. This function can be called continuously to extract all
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 // grapheme clusters from a byte slice, as illustrated in the example below.
 //
 // If you don't know the current state, for example when calling the function
@@ -217,11 +209,8 @@ const shiftGraphemePropState = 4
 // While slightly less convenient than using the Graphemes class, this function
 // has much better performance and makes no allocations. It lends itself well to
 // large byte slices.
-<<<<<<< HEAD
-=======
 //
 // [Unicode Standard Annex #29, Grapheme Cluster Boundaries]: http://unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 func FirstGraphemeCluster(b []byte, state int) (cluster, rest []byte, width, newState int) {
 	// An empty byte slice returns nothing.
 	if len(b) == 0 {

@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/token"
 	"strings"
-	"sync"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -66,10 +65,6 @@ var (
 		token.CONST: false,
 		token.VAR:   false,
 	}
-<<<<<<< HEAD
-=======
-	decLock sync.Mutex
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 )
 
 //nolint:lll
@@ -82,27 +77,12 @@ func init() {
 	Analyzer.Flags.BoolVar(&opts.disableVarDecNumCheck, FlagDvdnc, false, "option to disable check for number of var declarations inside file")
 	Analyzer.Flags.BoolVar(&opts.disableDecOrderCheck, FlagDdoc, false, "option to disable check for order of declarations inside file")
 	Analyzer.Flags.BoolVar(&opts.disableInitFuncFirstCheck, FlagDiffc, false, "option to disable check that init function is always first function in file")
-<<<<<<< HEAD
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	decNumConf[token.TYPE] = opts.disableTypeDecNumCheck
 	decNumConf[token.CONST] = opts.disableConstDecNumCheck
 	decNumConf[token.VAR] = opts.disableVarDecNumCheck
-=======
-}
-
-func initDec() {
-	decLock.Lock()
-	decNumConf[token.TYPE] = opts.disableTypeDecNumCheck
-	decNumConf[token.CONST] = opts.disableConstDecNumCheck
-	decNumConf[token.VAR] = opts.disableVarDecNumCheck
-	decLock.Unlock()
-}
-
-func run(pass *analysis.Pass) (interface{}, error) {
-	initDec()
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	for _, f := range pass.Files {
 		ast.Inspect(f, runDeclNumAndDecOrderCheck(pass))

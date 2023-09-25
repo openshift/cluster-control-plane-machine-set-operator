@@ -210,11 +210,6 @@ func splitLines(data []byte, atEOF bool) (advance int, token []byte, err error) 
 
 func strictParse(r io.Reader, override bool) (Env, error) {
 	env := make(Env)
-<<<<<<< HEAD
-	scanner := bufio.NewScanner(r)
-	scanner.Split(splitLines)
-=======
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 
 	buf := new(bytes.Buffer)
 	tee := io.TeeReader(r, buf)

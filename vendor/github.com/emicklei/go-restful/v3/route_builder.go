@@ -358,10 +358,6 @@ func (b *RouteBuilder) Build() Route {
 	return route
 }
 
-<<<<<<< HEAD
-func concatPath(path1, path2 string) string {
-	return path.Join(path1, path2)
-=======
 // merge two paths using the current (package global) merge path strategy.
 func concatPath(rootPath, routePath string) string {
 
@@ -370,7 +366,6 @@ func concatPath(rootPath, routePath string) string {
 	} else {
 		return path.Join(rootPath, routePath)
 	}
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 }
 
 var anonymousFuncCount int32

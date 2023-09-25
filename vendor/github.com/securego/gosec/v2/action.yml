@@ -10,15 +10,7 @@ inputs:
 
 runs:
     using: 'docker'
-<<<<<<< HEAD
-<<<<<<< HEAD
     image: 'docker://securego/gosec:2.16.0'
-=======
-    image: 'docker://securego/gosec:2.15.0'
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
-=======
-    image: 'docker://securego/gosec:2.16.0'
->>>>>>> 47985f1e (Bump golangci-lint package)
     args:
       - ${{ inputs.args }}
 

@@ -49,8 +49,6 @@ go get github.com/rivo/uniseg
 n := uniseg.GraphemeClusterCount("🇩🇪🏳️‍🌈")
 fmt.Println(n)
 // 2
-<<<<<<< HEAD
-=======
 ```
 
 ### Calculating the Monospace String Width
@@ -140,90 +138,7 @@ Finally, if you need to reverse a string while preserving grapheme clusters, use
 ```go
 fmt.Println(uniseg.ReverseString("🇩🇪🏳️‍🌈"))
 // 🏳️‍🌈🇩🇪
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 ```
-
-### Calculating the Monospace String Width
-
-```go
-width := uniseg.StringWidth("🇩🇪🏳️‍🌈!")
-fmt.Println(width)
-// 5
-```
-
-### Using the [`Graphemes`](https://pkg.go.dev/github.com/rivo/uniseg#Graphemes) Class
-
-This is the most convenient method of iterating over grapheme clusters:
-
-```go
-gr := uniseg.NewGraphemes("👍🏼!")
-for gr.Next() {
-	fmt.Printf("%x ", gr.Runes())
-}
-// [1f44d 1f3fc] [21]
-```
-
-### Using the [`Step`](https://pkg.go.dev/github.com/rivo/uniseg#Step) or [`StepString`](https://pkg.go.dev/github.com/rivo/uniseg#StepString) Function
-
-This is orders of magnitude faster than the `Graphemes` class, but it requires the handling of states and boundaries:
-
-```go
-str := "🇩🇪🏳️‍🌈"
-state := -1
-var c string
-for len(str) > 0 {
-	c, str, _, state = uniseg.StepString(str, state)
-	fmt.Printf("%x ", []rune(c))
-}
-// [1f1e9 1f1ea] [1f3f3 fe0f 200d 1f308]
-```
-
-### Advanced Examples
-
-Breaking into grapheme clusters and evaluating line breaks:
-
-```go
-str := "First line.\nSecond line."
-state := -1
-var (
-	c          string
-	boundaries int
-)
-for len(str) > 0 {
-	c, str, boundaries, state = uniseg.StepString(str, state)
-	fmt.Print(c)
-	if boundaries&uniseg.MaskLine == uniseg.LineCanBreak {
-		fmt.Print("|")
-	} else if boundaries&uniseg.MaskLine == uniseg.LineMustBreak {
-		fmt.Print("‖")
-	}
-}
-// First |line.
-// ‖Second |line.‖
-```
-
-If you're only interested in word segmentation, use [`FirstWord`](https://pkg.go.dev/github.com/rivo/uniseg#FirstWord) or [`FirstWordInString`](https://pkg.go.dev/github.com/rivo/uniseg#FirstWordInString):
-
-```go
-str := "Hello, world!"
-state := -1
-var c string
-for len(str) > 0 {
-	c, str, state = uniseg.FirstWordInString(str, state)
-	fmt.Printf("(%s)\n", c)
-}
-// (Hello)
-// (,)
-// ( )
-// (world)
-// (!)
-```
-
-Similarly, use
-
-- [`FirstGraphemeCluster`](https://pkg.go.dev/github.com/rivo/uniseg#FirstGraphemeCluster) or [`FirstGraphemeClusterInString`](https://pkg.go.dev/github.com/rivo/uniseg#FirstGraphemeClusterInString) for grapheme cluster determination only,
-- [`FirstSentence`](https://pkg.go.dev/github.com/rivo/uniseg#FirstSentence) or [`FirstSentenceInString`](https://pkg.go.dev/github.com/rivo/uniseg#FirstSentenceInString) for sentence segmentation only, and
-- [`FirstLineSegment`](https://pkg.go.dev/github.com/rivo/uniseg#FirstLineSegment) or [`FirstLineSegmentInString`](https://pkg.go.dev/github.com/rivo/uniseg#FirstLineSegmentInString) for line breaking / word wrapping (although using [`Step`](https://pkg.go.dev/github.com/rivo/uniseg#Step) or [`StepString`](https://pkg.go.dev/github.com/rivo/uniseg#StepString) is preferred as it will observe grapheme cluster boundaries).
 
 ## Documentation
 

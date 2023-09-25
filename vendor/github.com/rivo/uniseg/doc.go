@@ -70,17 +70,10 @@ broken.
 Monospace width, as referred to in this package, is the width of a string in a
 monospace font. This is commonly used in terminal user interfaces or text
 displays or editors that don't support proportional fonts. A width of 1
-<<<<<<< HEAD
-corresponds to a single character cell. The C function [wcwidth()] and its
-implementation in other programming languages is in widespread use for the same
-purpose. However, there is no standard for the calculation of such widths, and
-this package differs from wcwidth() in a number of ways, presumably to generate
-=======
 corresponds to a single character cell. The C function [wcswidth()] and its
 implementation in other programming languages is in widespread use for the same
 purpose. However, there is no standard for the calculation of such widths, and
 this package differs from wcswidth() in a number of ways, presumably to generate
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 more visually pleasing results.
 
 To start, we assume that every code point has a width of 1, with the following
@@ -110,10 +103,6 @@ Note that whether these widths appear correct depends on your application's
 render engine, to which extent it conforms to the Unicode Standard, and its
 choice of font.
 
-<<<<<<< HEAD
-[wcwidth()]: https://man7.org/linux/man-pages/man3/wcwidth.3.html
-=======
 [wcswidth()]: https://man7.org/linux/man-pages/man3/wcswidth.3.html
->>>>>>> 2256be19 (Delete instance from cloud provider for an e2e periodics test for AWS)
 */
 package uniseg
