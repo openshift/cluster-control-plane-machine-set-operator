@@ -48,6 +48,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var _ = Describe("With a running controller", func() {
@@ -164,11 +166,15 @@ var _ = Describe("With a running controller", func() {
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 

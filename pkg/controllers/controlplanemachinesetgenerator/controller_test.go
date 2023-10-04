@@ -37,10 +37,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 )
@@ -359,11 +361,15 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -933,11 +939,15 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -1504,11 +1514,15 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -1888,15 +1902,15 @@ func (n nutanixMachineProviderSpecBuilder) BuildRawExtension() *runtime.RawExten
 		CredentialsSecret: &corev1.LocalObjectReference{Name: "nutanix-credentials"},
 		Image: machinev1.NutanixResourceIdentifier{
 			Type: machinev1.NutanixIdentifierName,
-			Name: pointer.String("rhcos"),
+			Name: ptr.To[string]("rhcos"),
 		},
-		Subnets:        []machinev1.NutanixResourceIdentifier{{Type: machinev1.NutanixIdentifierName, Name: pointer.String("default-net")}},
+		Subnets:        []machinev1.NutanixResourceIdentifier{{Type: machinev1.NutanixIdentifierName, Name: ptr.To[string]("default-net")}},
 		VCPUsPerSocket: int32(1),
 		VCPUSockets:    int32(4),
 		MemorySize:     resource.MustParse(fmt.Sprintf("%dMi", 8096)),
 		Cluster: machinev1.NutanixResourceIdentifier{
 			Type: machinev1.NutanixIdentifierUUID,
-			UUID: pointer.String("7244448a-7fde-400d-bf2e-bd8521459859"),
+			UUID: ptr.To[string]("7244448a-7fde-400d-bf2e-bd8521459859"),
 		},
 		SystemDiskSize: resource.MustParse(fmt.Sprintf("%dGi", 120)),
 	}
@@ -2006,11 +2020,15 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -2466,11 +2484,15 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{

@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
@@ -112,7 +112,7 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, fmt.Errorf("error constructing failure domain config: %w", err)
 	}
 
-	replicas := pointer.Int32Deref(cpms.Spec.Replicas, 0)
+	replicas := ptr.Deref(cpms.Spec.Replicas, 0)
 
 	selector, err := metav1.LabelSelectorAsSelector(&cpms.Spec.Selector)
 	if err != nil {
@@ -331,7 +331,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 		NeedsUpdate:  !configsEqual,
 		Diff:         diff,
 		Index:        machineIndex,
-		ErrorMessage: pointer.StringDeref(machine.Status.ErrorMessage, ""),
+		ErrorMessage: ptr.Deref(machine.Status.ErrorMessage, ""),
 	}, nil
 }
 
@@ -428,12 +428,12 @@ func (m *openshiftMachineProvider) isMachineReady(ctx context.Context, machine m
 		return false, fmt.Errorf("failed to get Node %q: %w", nodeName, err)
 	}
 
-	if pointer.StringDeref(machine.Status.Phase, "") == runningPhase && isNodeReady(node) {
+	if ptr.Deref(machine.Status.Phase, "") == runningPhase && isNodeReady(node) {
 		// The machine is running and its node is ready, so everything is working as expected.
 		return true, nil
 	}
 
-	if pointer.StringDeref(machine.Status.Phase, "") == deletingPhase && isNodeReady(node) {
+	if ptr.Deref(machine.Status.Phase, "") == deletingPhase && isNodeReady(node) {
 		// The machine was previously running but is now being deleted.
 		// The machine is still ready until the node is drained and removed from the cluster.
 		return true, nil

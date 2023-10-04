@@ -36,8 +36,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
 	cpmsgeneratorcontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachinesetgenerator"
@@ -108,9 +111,13 @@ func main() { //nolint:funlen,cyclop
 	})
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                        scheme,
-		MetricsBindAddress:            metricsAddr,
-		Port:                          webhookPort,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port: webhookPort,
+		}),
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElectionNamespace:       leaderElectionConfig.ResourceNamespace,
 		LeaderElection:                leaderElectionConfig.LeaderElect,
@@ -119,9 +126,13 @@ func main() { //nolint:funlen,cyclop
 		LeaseDuration:                 &le.LeaseDuration.Duration,
 		RetryPeriod:                   &le.RetryPeriod.Duration,
 		RenewDeadline:                 &le.RenewDeadline.Duration,
-		Namespace:                     managedNamespace,
 		// Do a full resync to catch up in case of missing events.
-		SyncPeriod: &defaultSyncPeriod,
+		Cache: cache.Options{
+			SyncPeriod: &defaultSyncPeriod,
+			DefaultNamespaces: map[string]cache.Config{
+				managedNamespace: {},
+			},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

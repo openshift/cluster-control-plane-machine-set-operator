@@ -34,7 +34,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -66,12 +69,20 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 
 		By("Setting up a manager and controller")
 		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
-			Namespace:          namespaceName,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
+			Cache: cache.Options{
+				DefaultNamespaces: map[string]cache.Config{
+					namespaceName: {},
+				},
+			},
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
