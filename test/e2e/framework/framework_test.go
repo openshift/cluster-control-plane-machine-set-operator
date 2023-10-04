@@ -198,6 +198,29 @@ var _ = Describe("Framwork", func() {
 						expectedNextSize:   "",
 						expectedError:      fmt.Errorf("%w: e2-standard-32", errInstanceTypeNotSupported),
 					}),
+					Entry("when the current Machine size is e2-custom-16", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-16",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-16", errInstanceTypeNotSupported),
+					}),
+					Entry("when the current Machine size is e2-custom-2-256", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-2-256",
+						expectedNextSize:   "e2-custom-3-512",
+					}),
+					Entry("when the current Machine size is e2-custom-micro-2-256", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-micro-2-256",
+						expectedNextSize:   "e2-custom-micro-3-512",
+					}),
+					Entry("when the current Machine size is e2-custom-micro-o-2-256", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-micro-o-2-256",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-micro-o-2-256", errInstanceTypeUnsupportedFormat),
+					}),
+					Entry("when the current Machine size is e2-custom-micro2-2-256", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-micro2-2-256",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-micro2-2-256", errInstanceTypeUnsupportedFormat),
+					}),
 				)
 			})
 		})
