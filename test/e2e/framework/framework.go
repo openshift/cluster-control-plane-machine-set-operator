@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -564,32 +565,61 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 }
 
 // nextGCPVMSize returns the next GCP machine size in the series.
-// The Machine sizes being used are in format <e2|n2|n1>-standard-<number>.
+// The Machine sizes being used are in format <e2|n2|n1>-<subfamily(-subfamilyflavor(optional))>-<number>(-<number>(optional)).
+//
+//nolint:cyclop
 func nextGCPMachineSize(current string) (string, error) {
 	// Regex to match the GCP machine size string.
-	re := regexp.MustCompile(`(?P<family>[0-9a-z]+)-standard-(?P<multiplier>[0-9]+)`)
+	re := regexp.MustCompile(`^(?P<family>[0-9a-z]+)-(?P<subfamily>[0-9a-z]+(-(?P<subfamilyflavor>[a-z]+))?)-(?P<multiplier>[0-9]+)(-(?P<multiplier2>[0-9]+))?`)
 
+	subexpNames := re.SubexpNames()
 	values := re.FindStringSubmatch(current)
-	if len(values) != 3 {
+	result := make(map[string]string)
+
+	// The number of named regex subexpressions must always match the number of submatches.
+	if len(values) != len(subexpNames) {
 		return "", fmt.Errorf("%w: %s", errInstanceTypeUnsupportedFormat, current)
 	}
 
-	multiplier, err := strconv.Atoi(values[2])
+	// Store the submatches into a subexpression name -> value map.
+	for i, name := range subexpNames {
+		if i != 0 && name != "" {
+			result[name] = values[i]
+		}
+	}
+
+	family, okFamily := result["family"]
+	subfamily, okSubfamily := result["subfamily"]
+	_, okMultiplier := result["multiplier"]
+
+	if !(okFamily && okSubfamily && okMultiplier) {
+		return "", fmt.Errorf("%w: %s", errInstanceTypeUnsupportedFormat, current)
+	}
+
+	multiplier, err := strconv.Atoi(result["multiplier"])
 	if err != nil {
 		// This is a panic because the multiplier should always be a number.
 		panic("failed to convert multiplier to int")
 	}
 
-	family := values[1]
+	var multiplier2 int
 
-	return setNextGCPMachineSize(current, family, multiplier)
+	if val, okMultiplier2 := result["multiplier2"]; okMultiplier2 && val != "" {
+		multiplier2, err = strconv.Atoi(val)
+		if err != nil {
+			// This is a panic because the multiplier2 should always be a number.
+			panic("failed to convert multiplier2 to int")
+		}
+	}
+
+	return setNextGCPMachineSize(current, family, subfamily, multiplier, multiplier2)
 }
 
 // setNextGCPMachineSize returns the new GCP machine size in the series
 // according to the family supported (e2, n1, n2).
 //
 //nolint:cyclop
-func setNextGCPMachineSize(current, family string, multiplier int) (string, error) {
+func setNextGCPMachineSize(current, family, subfamily string, multiplier, multiplier2 int) (string, error) {
 	switch {
 	case multiplier >= 32 && family == "e2":
 		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
@@ -605,6 +635,12 @@ func setNextGCPMachineSize(current, family string, multiplier int) (string, erro
 		multiplier = 128
 	case multiplier >= 128:
 		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+	case strings.HasPrefix(subfamily, "custom"):
+		if multiplier == 0 || multiplier2 == 0 {
+			return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+		}
+
+		return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, multiplier+1, multiplier2+256), nil
 	default:
 		multiplier *= 2
 	}
