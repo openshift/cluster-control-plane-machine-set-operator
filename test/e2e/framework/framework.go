@@ -570,7 +570,7 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 //nolint:cyclop
 func nextGCPMachineSize(current string) (string, error) {
 	// Regex to match the GCP machine size string.
-	re := regexp.MustCompile(`^(?P<family>[0-9a-z]+)-(?P<subfamily>[0-9a-z]+(-(?P<subfamilyflavor>[a-z]+))?)-(?P<multiplier>[0-9]+)(-(?P<multiplier2>[0-9]+))?`)
+	re := regexp.MustCompile(`^(?P<family>[0-9a-z]+)-(?P<subfamily>[0-9a-z]+(-(?P<subfamilyflavor>[a-z]+))?)-(?P<multiplier>[0-9\.]+)(-(?P<multiplier2>[0-9]+))?`)
 
 	subexpNames := re.SubexpNames()
 	values := re.FindStringSubmatch(current)
@@ -591,20 +591,23 @@ func nextGCPMachineSize(current string) (string, error) {
 	family, okFamily := result["family"]
 	subfamily, okSubfamily := result["subfamily"]
 	_, okMultiplier := result["multiplier"]
+	subfamilyflavor, okSubfamilyflavor := result["subfamilyflavor"]
 
-	if !(okFamily && okSubfamily && okMultiplier) {
+	if !(okFamily && okSubfamily && okMultiplier && okSubfamilyflavor) {
 		return "", fmt.Errorf("%w: %s", errInstanceTypeUnsupportedFormat, current)
 	}
 
-	multiplier, err := strconv.Atoi(result["multiplier"])
+	multiplier, err := strconv.ParseFloat(result["multiplier"], 64)
 	if err != nil {
 		// This is a panic because the multiplier should always be a number.
-		panic("failed to convert multiplier to int")
+		panic("failed to convert multiplier to float")
 	}
 
 	var multiplier2 int
 
 	if val, okMultiplier2 := result["multiplier2"]; okMultiplier2 && val != "" {
+		var err error
+
 		multiplier2, err = strconv.Atoi(val)
 		if err != nil {
 			// This is a panic because the multiplier2 should always be a number.
@@ -612,15 +615,111 @@ func nextGCPMachineSize(current string) (string, error) {
 		}
 	}
 
-	return setNextGCPMachineSize(current, family, subfamily, multiplier, multiplier2)
+	return setNextGCPMachineSize(current, family, subfamily, subfamilyflavor, multiplier, multiplier2)
 }
 
 // setNextGCPMachineSize returns the new GCP machine size in the series
 // according to the family supported (e2, n1, n2).
 //
-//nolint:cyclop
-func setNextGCPMachineSize(current, family, subfamily string, multiplier, multiplier2 int) (string, error) {
+//nolint:cyclop,funlen,gocognit,gocyclo
+func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, multiplier float64, multiplier2 int) (string, error) {
 	switch {
+	case strings.HasPrefix(subfamily, "custom"):
+		ivCPU := int(multiplier)
+		fvCPU := multiplier
+		mem := multiplier2
+
+		switch {
+		case multiplier == 0 || mem == 0:
+			return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+
+		case family == "n1":
+			// You can create N1 custom machine types with 1 or more vCPUs.
+			// Above 1 vCPU, you must increment the number of vCPUs by 2, up to 96 vCPUs for Intel Skylake platform,
+			// or up to 64 vCPUs for Intel Broadwell, Haswell, or Ivy Bridge CPU platforms.
+			// Note: cap it to 64 as we don't detect CPU.
+			if ivCPU < 64 {
+				ivCPU += 2
+			}
+			// For N1 machine types, select between 1 GB and 6.5 GB per vCPU, inclusive.
+			// Note: use 5GB per vCPU, as that's a comfortable bump.
+			mem = ivCPU * 5 * 1024
+
+		case family == "n2":
+			// For N2 custom machine types, you can create a machine type with 2 to 80 vCPUs and memory between 1 and 864 GB.
+			// For machine types with up to 32 vCPUs, you can select a vCPU count that is a multiple of 2.
+			// For machine types with greater than 32 vCPUs,
+			// you must select a vCPU count that is a multiple of 4 (for example, 36, 40, 56, or 80).
+			if ivCPU < 32 {
+				ivCPU += 2
+			} else if ivCPU <= 76 {
+				ivCPU += 4
+			}
+			// For the N2 machine series, select between 0.5 GB and 8.0 GB per vCPU, inclusive.
+			// Note: the max is 864GB (with 80vCPUs we reach ~410GB).
+			mem = ivCPU * 5 * 1024
+
+		case family == "n2d":
+			// You can create N2D custom machine types with 2, 4, 8, or 16 vCPUs.
+			// After 16, you can increment the number of vCPUs by 16, up to 96 vCPUs.
+			// The minimum acceptable number of vCPUs is 2.
+			switch {
+			case ivCPU == 2:
+				ivCPU = 4
+			case ivCPU == 4:
+				ivCPU = 8
+			case ivCPU == 8:
+				ivCPU = 16
+			case ivCPU == 96:
+				// Keep unchanged.
+			default:
+				ivCPU += 16
+			}
+			// For N2D machine types, select between 0.5 GB and 8.0 GB per vCPU in 0.256 GB increments.
+			mem = ivCPU * 5 * 1024
+
+		case family == "e2" && subfamilyflavor == "micro":
+			// 0.25 vCPU, 1 to 2 GB of memory.
+			if mem >= (2 * 1024) {
+				return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+			}
+
+			mem += 1024
+
+			return fmt.Sprintf("%s-%s-%.2f-%d", family, subfamily, fvCPU, mem), nil
+
+		case family == "e2" && subfamilyflavor == "small":
+			// 0.50 vCPU, 1 to 2 GB of memory.
+			if mem >= (4 * 1024) {
+				return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+			}
+
+			mem += 1024
+
+			return fmt.Sprintf("%s-%s-%.2f-%d", family, subfamily, fvCPU, mem), nil
+
+		case family == "e2" && subfamilyflavor == "medium":
+			// 1 vCPU, 1 to 2 GB of memory.
+			if mem >= (8 * 1024) {
+				return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
+			}
+
+			mem += 1024
+
+			return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, ivCPU, mem), nil
+
+		case family == "e2" && subfamilyflavor == "":
+			// You can create E2 custom machine types with vCPUs in multiples of 2, up to 32 vCPUs.
+			// The minimum acceptable number of vCPUs for a VM is 2.
+			if ivCPU < 32 {
+				ivCPU += 2
+			}
+			// For E2, the ratio of memory per vCPU is 0.5 GB to 8 GB inclusive.
+			mem = ivCPU * 512
+		}
+
+		return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, ivCPU, mem), nil
+
 	case multiplier >= 32 && family == "e2":
 		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
 	case multiplier == 32 && family == "n2":
@@ -635,17 +734,11 @@ func setNextGCPMachineSize(current, family, subfamily string, multiplier, multip
 		multiplier = 128
 	case multiplier >= 128:
 		return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
-	case strings.HasPrefix(subfamily, "custom"):
-		if multiplier == 0 || multiplier2 == 0 {
-			return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
-		}
-
-		return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, multiplier+1, multiplier2+256), nil
 	default:
 		multiplier *= 2
 	}
 
-	return fmt.Sprintf("%s-standard-%d", family, multiplier), nil
+	return fmt.Sprintf("%s-standard-%d", family, int(multiplier)), nil
 }
 
 // setProviderSpecValue sets the value of the provider spec to the value that is passed.
