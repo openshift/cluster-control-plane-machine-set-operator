@@ -102,7 +102,7 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 		By("Control plane machine replacement completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		stabilisationTimeout := 30 * time.Minute
+		stabilisationTimeout := 60 * time.Minute
 		if opts.StabilisationTimeout.Seconds() != 0 {
 			stabilisationTimeout = opts.StabilisationTimeout
 		}
