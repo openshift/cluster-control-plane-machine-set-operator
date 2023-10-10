@@ -200,39 +200,39 @@ var _ = Describe("Framwork", func() {
 					}),
 					Entry("when the current Machine size is n1-custom-16-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n1-custom-16-1024",
-						expectedNextSize:   "n1-custom-18-92160",
+						expectedNextSize:   "n1-custom-18-55296",
 					}),
 					Entry("when the current Machine size is n1-custom-64-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n1-custom-64-1024",
-						expectedNextSize:   "n1-custom-64-327680",
+						expectedNextSize:   "n1-custom-64-196608",
 					}),
 					Entry("when the current Machine size is n2-custom-16-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2-custom-16-1024",
-						expectedNextSize:   "n2-custom-18-92160",
+						expectedNextSize:   "n2-custom-18-55296",
 					}),
 					Entry("when the current Machine size is n2-custom-32-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2-custom-32-1024",
-						expectedNextSize:   "n2-custom-36-184320",
+						expectedNextSize:   "n2-custom-36-110592",
 					}),
 					Entry("when the current Machine size is n2d-custom-2-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2d-custom-2-1024",
-						expectedNextSize:   "n2d-custom-4-20480",
+						expectedNextSize:   "n2d-custom-4-12288",
 					}),
 					Entry("when the current Machine size is n2d-custom-4-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2d-custom-4-1024",
-						expectedNextSize:   "n2d-custom-8-40960",
+						expectedNextSize:   "n2d-custom-8-24576",
 					}),
 					Entry("when the current Machine size is n2d-custom-8-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2d-custom-8-1024",
-						expectedNextSize:   "n2d-custom-16-81920",
+						expectedNextSize:   "n2d-custom-16-49152",
 					}),
 					Entry("when the current Machine size is n2d-custom-16-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2d-custom-16-1024",
-						expectedNextSize:   "n2d-custom-32-163840",
+						expectedNextSize:   "n2d-custom-32-98304",
 					}),
 					Entry("when the current Machine size is n2d-custom-32-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "n2d-custom-32-1024",
-						expectedNextSize:   "n2d-custom-48-245760",
+						expectedNextSize:   "n2d-custom-48-147456",
 					}),
 					Entry("when the current Machine size is e2-custom-16", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-custom-16",
@@ -241,7 +241,7 @@ var _ = Describe("Framwork", func() {
 					}),
 					Entry("when the current Machine size is e2-custom-2-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-custom-2-1024",
-						expectedNextSize:   "e2-custom-4-2048",
+						expectedNextSize:   "e2-custom-4-12288",
 					}),
 					Entry("when the current Machine size is e2-custom-micro-0.25-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-custom-micro-0.25-1024",
