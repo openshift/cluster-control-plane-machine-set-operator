@@ -642,8 +642,8 @@ func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, m
 				ivCPU += 2
 			}
 			// For N1 machine types, select between 1 GB and 6.5 GB per vCPU, inclusive.
-			// Note: use 5GB per vCPU, as that's a comfortable bump.
-			mem = ivCPU * 5 * 1024
+			// Note: use 3GB per vCPU, as that's a comfortable bump.
+			mem = ivCPU * 3 * 1024
 
 		case family == "n2":
 			// For N2 custom machine types, you can create a machine type with 2 to 80 vCPUs and memory between 1 and 864 GB.
@@ -656,8 +656,8 @@ func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, m
 				ivCPU += 4
 			}
 			// For the N2 machine series, select between 0.5 GB and 8.0 GB per vCPU, inclusive.
-			// Note: the max is 864GB (with 80vCPUs we reach ~410GB).
-			mem = ivCPU * 5 * 1024
+			// Note: the max is 864GB.
+			mem = ivCPU * 3 * 1024
 
 		case family == "n2d":
 			// You can create N2D custom machine types with 2, 4, 8, or 16 vCPUs.
@@ -676,7 +676,7 @@ func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, m
 				ivCPU += 16
 			}
 			// For N2D machine types, select between 0.5 GB and 8.0 GB per vCPU in 0.256 GB increments.
-			mem = ivCPU * 5 * 1024
+			mem = ivCPU * 3 * 1024
 
 		case family == "e2" && subfamilyflavor == "micro":
 			// 0.25 vCPU, 1 to 2 GB of memory.
@@ -715,7 +715,7 @@ func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, m
 				ivCPU += 2
 			}
 			// For E2, the ratio of memory per vCPU is 0.5 GB to 8 GB inclusive.
-			mem = ivCPU * 512
+			mem = ivCPU * 3 * 1024
 		}
 
 		return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, ivCPU, mem), nil
