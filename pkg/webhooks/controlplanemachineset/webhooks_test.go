@@ -33,9 +33,11 @@ import (
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // stringPtr returns a pointer to the string value.
@@ -62,11 +64,15 @@ var _ = Describe("Webhooks", func() {
 
 		By("Setting up a manager and webhook")
 		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             testScheme,
-			MetricsBindAddress: "0",
-			Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-			Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-			CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
@@ -282,7 +288,7 @@ var _ = Describe("Webhooks", func() {
 					{
 						Subnet: &machinev1.AWSResourceReference{
 							Type: machinev1.AWSARNReferenceType,
-							ID:   pointer.String("id-123"),
+							ID:   ptr.To[string]("id-123"),
 						},
 					},
 				}
@@ -897,7 +903,7 @@ var _ = Describe("Webhooks", func() {
 						{
 							Subnet: &machinev1.AWSResourceReference{
 								Type: machinev1.AWSARNReferenceType,
-								ID:   pointer.String("id-123"),
+								ID:   ptr.To[string]("id-123"),
 							},
 						},
 					}

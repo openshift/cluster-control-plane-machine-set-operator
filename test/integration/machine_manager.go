@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -120,7 +120,7 @@ func (r *integrationMachineManager) Reconcile(ctx context.Context, req reconcile
 		return ctrl.Result{}, fmt.Errorf("unable to fetch machine: %w", err)
 	}
 
-	machinePhase := pointer.StringDeref(machine.Status.Phase, "")
+	machinePhase := ptr.Deref(machine.Status.Phase, "")
 
 	if machine.DeletionTimestamp != nil {
 		if machinePhase != phaseDeleting {
@@ -199,7 +199,7 @@ func (r *integrationMachineManager) setPhase(ctx context.Context, logger logr.Lo
 	}
 
 	logger.Info("Setting phase", "phase", phase)
-	machine.Status.Phase = pointer.String(phase)
+	machine.Status.Phase = ptr.To[string](phase)
 
 	if err := r.Status().Update(ctx, machine); err != nil {
 		return reconcile.Result{}, fmt.Errorf("could not set machine phase: %w", err)
