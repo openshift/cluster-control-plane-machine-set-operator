@@ -198,6 +198,83 @@ var _ = Describe("Framwork", func() {
 						expectedNextSize:   "",
 						expectedError:      fmt.Errorf("%w: e2-standard-32", errInstanceTypeNotSupported),
 					}),
+					Entry("when the current Machine size is n1-custom-16-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-custom-16-1024",
+						expectedNextSize:   "n1-custom-18-55296",
+					}),
+					Entry("when the current Machine size is n1-custom-64-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n1-custom-64-1024",
+						expectedNextSize:   "n1-custom-64-196608",
+					}),
+					Entry("when the current Machine size is n2-custom-16-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2-custom-16-1024",
+						expectedNextSize:   "n2-custom-18-55296",
+					}),
+					Entry("when the current Machine size is n2-custom-32-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2-custom-32-1024",
+						expectedNextSize:   "n2-custom-36-110592",
+					}),
+					Entry("when the current Machine size is n2d-custom-2-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2d-custom-2-1024",
+						expectedNextSize:   "n2d-custom-4-12288",
+					}),
+					Entry("when the current Machine size is n2d-custom-4-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2d-custom-4-1024",
+						expectedNextSize:   "n2d-custom-8-24576",
+					}),
+					Entry("when the current Machine size is n2d-custom-8-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2d-custom-8-1024",
+						expectedNextSize:   "n2d-custom-16-49152",
+					}),
+					Entry("when the current Machine size is n2d-custom-16-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2d-custom-16-1024",
+						expectedNextSize:   "n2d-custom-32-98304",
+					}),
+					Entry("when the current Machine size is n2d-custom-32-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "n2d-custom-32-1024",
+						expectedNextSize:   "n2d-custom-48-147456",
+					}),
+					Entry("when the current Machine size is e2-custom-16", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-16",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-16", errInstanceTypeNotSupported),
+					}),
+					Entry("when the current Machine size is e2-custom-2-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-2-1024",
+						expectedNextSize:   "e2-custom-4-12288",
+					}),
+					Entry("when the current Machine size is e2-custom-micro-0.25-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-micro-0.25-1024",
+						expectedNextSize:   "e2-custom-micro-0.25-2048",
+					}),
+					Entry("when the current Machine size is e2-custom-micro-o-2-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-micro-o-2-1024",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-micro-o-2-1024", errInstanceTypeUnsupportedFormat),
+					}),
+					Entry("when the current Machine size is e2-custom-micro2-2-1024", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-micro2-2-1024",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-micro2-2-1024", errInstanceTypeUnsupportedFormat),
+					}),
+					Entry("when the current Machine size is e2-custom-small-0.5-2048", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-small-0.50-2048",
+						expectedNextSize:   "e2-custom-small-0.50-3072",
+					}),
+					Entry("when the current Machine size is e2-custom-small-0.50-4096", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-small-0.50-4096",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-small-0.50-4096", errInstanceTypeNotSupported),
+					}),
+					Entry("when the current Machine size is e2-custom-medium-1-4096", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-medium-1-4096",
+						expectedNextSize:   "e2-custom-medium-1-5120",
+					}),
+					Entry("when the current Machine size is e2-custom-medium-1-8192", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-medium-1-8192",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-medium-1-8192", errInstanceTypeNotSupported),
+					}),
 				)
 			})
 		})
