@@ -227,7 +227,7 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: rawProviderSpec,
 		},
-	})
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get provider config: %w", err)
 	}
@@ -254,7 +254,7 @@ func (f *framework) TagInstanceInProviderSpec(rawProviderSpec *runtime.RawExtens
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: rawProviderSpec,
 		},
-	})
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get provider config: %w", err)
 	}
@@ -274,7 +274,7 @@ func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExt
 		ProviderSpec: machinev1beta1.ProviderSpec{
 			Value: rawProviderSpec,
 		},
-	})
+	}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider config: %w", err)
 	}
@@ -358,7 +358,7 @@ func updateCredentialsSecretNameNutanix(providerConfig providerconfig.ProviderCo
 func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error) {
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(f.logger, machinev1beta1.MachineSpec{
 		ProviderSpec: providerSpec,
-	})
+	}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider config: %w", err)
 	}

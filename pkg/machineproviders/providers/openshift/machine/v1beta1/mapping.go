@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -46,14 +47,14 @@ var (
 // to by external code to create new Machines in the same failure domain. It should start with a basic mapping and
 // then use existing Machine information to map failure domains, if possible, so that the Machine names match the
 // index of the failure domain in which they currently reside.
-func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1beta1.Machine, replicas int32, failureDomains []failuredomain.FailureDomain) (map[int32]failuredomain.FailureDomain, error) {
+func mapMachineIndexesToFailureDomains(logger logr.Logger, machines []machinev1beta1.Machine, replicas int32, failureDomains []failuredomain.FailureDomain, infrastructure *configv1.Infrastructure) (map[int32]failuredomain.FailureDomain, error) {
 	if len(failureDomains) == 0 {
 		logger.V(4).Info("No failure domains provided")
 
 		return nil, errNoFailureDomains
 	}
 
-	machineMapping, deletingIndexes, err := createMachineMapping(logger, machines)
+	machineMapping, deletingIndexes, err := createMachineMapping(logger, machines, infrastructure)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct machine mapping: %w", err)
 	}
@@ -123,8 +124,8 @@ func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredoma
 // createMachineMapping inspects the state of the Machines on the cluster, selected by the ControlPlaneMachineSet, and
 // creates a mapping of their indexes (if available) to their failure domain to allow the mapping to be customised
 // to the state of the cluster.
-func createMachineMapping(logger logr.Logger, machines []machinev1beta1.Machine) (map[int32]failuredomain.FailureDomain, sets.Set[int32], error) {
-	mapping, err := mapIndexesToFailureDomainsForMachines(logger, machines)
+func createMachineMapping(logger logr.Logger, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (map[int32]failuredomain.FailureDomain, sets.Set[int32], error) {
+	mapping, err := mapIndexesToFailureDomainsForMachines(logger, machines, infrastructure)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not map indexes to failure domains for machines: %w", err)
 	}
@@ -135,7 +136,7 @@ func createMachineMapping(logger logr.Logger, machines []machinev1beta1.Machine)
 }
 
 // mapIndexesToFailureDomainsForMachines creates an index to failure domain mapping for machine in the list.
-func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machinev1beta1.Machine) (map[int32]failuredomain.FailureDomain, error) {
+func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (map[int32]failuredomain.FailureDomain, error) {
 	out := make(map[int32]failuredomain.FailureDomain)
 
 	// indexToMachine contains a mapping between the machine domain index in the newest machine
@@ -143,7 +144,7 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machin
 	indexToMachine := make(map[int32]machinev1beta1.Machine)
 
 	for _, machine := range machines {
-		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine)
+		failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine, infrastructure)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract failure domain from machine %s: %w", machine.Name, err)
 		}
@@ -166,7 +167,7 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machin
 				continue
 			}
 
-			oldMachineFailureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, oldMachine)
+			oldMachineFailureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, oldMachine, infrastructure)
 			if err != nil {
 				return nil, fmt.Errorf("could not extract failure domain from machine %s: %w", oldMachine.Name, err)
 			}

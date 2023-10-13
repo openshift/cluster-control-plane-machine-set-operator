@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +40,7 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -102,7 +104,12 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		return nil, errEmptyConfig
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger, *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine)
+	infrastructure, err := util.GetInfrastructure(ctx, cl)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve infrastructure resource: %w", err)
+	}
+
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger, *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine, infrastructure)
 	if err != nil {
 		return nil, fmt.Errorf("error building a provider config: %w", err)
 	}
@@ -139,6 +146,7 @@ func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Clien
 		namespace:        cpms.Namespace,
 		machineAPIScheme: machineAPIScheme,
 		recorder:         recorder,
+		infrastructure:   infrastructure,
 	}
 
 	if err := o.updateMachineCache(ctx, logger); err != nil {
@@ -194,6 +202,9 @@ type openshiftMachineProvider struct {
 
 	// recorder is used to emit events.
 	recorder record.EventRecorder
+
+	// infrastructure contains failure domain information for some platforms.
+	infrastructure *v1.Infrastructure
 }
 
 // updateMachineCache fetches the current list of Machines and calculates from these the appropriate index
@@ -206,7 +217,7 @@ func (m *openshiftMachineProvider) updateMachineCache(ctx context.Context, logge
 	}
 
 	// Since the mapping depends on the state of the machines, we must re-map the failure domains if the machines have changed.
-	indexToFailureDomain, err := mapMachineIndexesToFailureDomains(logger, machineList.Items, m.replicas, m.failureDomains)
+	indexToFailureDomain, err := mapMachineIndexesToFailureDomains(logger, machineList.Items, m.replicas, m.failureDomains, m.infrastructure)
 	if err != nil && !errors.Is(err, errNoFailureDomains) {
 		return fmt.Errorf("error mapping machine indexes: %w", err)
 	}
@@ -285,7 +296,7 @@ func (m *openshiftMachineProvider) generateMachineInfo(ctx context.Context, logg
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not determine machine index: %w", err)
 	}
 
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machine.Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machine.Spec, m.infrastructure)
 	if err != nil {
 		return machineproviders.MachineInfo{}, fmt.Errorf("could not compare existing and desired provider configs: %w", err)
 	}
@@ -359,7 +370,7 @@ func (m *openshiftMachineProvider) ensureValidProviderConfig(ctx context.Context
 		return nil, fmt.Errorf("could not dry-run create the machine: %w", err)
 	}
 
-	machineProviderConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, dryRunMachine.Spec)
+	machineProviderConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, dryRunMachine.Spec, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get provider config for machine: %w", err)
 	}
@@ -376,7 +387,7 @@ func (m *openshiftMachineProvider) getMachineIndex(logger logr.Logger, machine m
 
 	// If the Machine name format doesn't match, try to fallback to matching based on the failure domain
 	// with the Machine's provider spec.
-	failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine)
+	failureDomain, err := providerconfig.ExtractFailureDomainFromMachine(logger, machine, m.infrastructure)
 	if err != nil {
 		return 0, fmt.Errorf("cannot extract failure domain from machine: %w", err)
 	}

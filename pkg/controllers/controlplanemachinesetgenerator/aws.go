@@ -41,7 +41,7 @@ const (
 
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
 func generateControlPlaneMachineSetAWSSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines)
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS failure domains: %w", err)
 	}
@@ -67,7 +67,7 @@ func buildControlPlaneMachineSetAWSMachineSpec(logger logr.Logger, machines []ma
 	// This is done so that if there are control plane machines with differing
 	// Provider Specs, we will use the most recent one. This is an attempt to try and inferr
 	// the spec that the user might want to choose among the different ones found in the cluster.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's aws providerSpec: %w", err)
 	}

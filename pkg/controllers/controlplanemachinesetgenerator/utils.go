@@ -96,12 +96,12 @@ func genericControlPlaneMachineSetSpec(replicas int32, clusterID string) machine
 func compareControlPlaneMachineSets(logger logr.Logger, a, b *machinev1.ControlPlaneMachineSet) ([]string, error) {
 	// We need to compare the providerSpecs and the rest of the ControlPlaneMachineSets specs separately,
 	// as the formers are marshalled and need to be unmarshaled to be compared.
-	aProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(logger, a.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+	aProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(logger, a.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to extract providerSpec from MachineSpec: %w", err)
 	}
 
-	bProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(logger, b.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec)
+	bProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(logger, b.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to extract providerSpec from MachineSpec: %w", err)
 	}
@@ -166,16 +166,18 @@ func convertViaJSON(in, out interface{}) error {
 
 // buildFailureDomains builds a flavored FailureDomain for the ControlPlaneMachineSet according to what platform we are on.
 //
-//nolint:cyclop
-func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
+// TO-DO: remove unparam when there are users of the infrastructure parameter
+//
+//nolint:cyclop,unparam
+func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
 	// Fetch failure domains from the machines
-	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines)
+	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines, infrastructure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
 	}
 
 	// Fetch failure domains from the machineSets
-	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets)
+	machineSetFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets, infrastructure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
 	}

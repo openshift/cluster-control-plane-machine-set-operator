@@ -165,6 +165,24 @@ func FilterControlPlaneNodes() predicate.Predicate {
 	}
 }
 
+// FilterInfrastructure filters out responding to any Infrastructure object that is not the one specified.
+func FilterInfrastructure(infraName string) predicate.Predicate {
+	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		infra, ok := obj.(*configv1.Infrastructure)
+		if !ok {
+			panic("expected to get an of object of type configv1.infrastructure")
+		}
+
+		shouldReconcile := infra.GetName() == infraName
+
+		if shouldReconcile {
+			klog.V(2).Info("reconcile triggered by infrastructure change")
+		}
+
+		return shouldReconcile
+	})
+}
+
 // isControlPlaneNode checks whether the provided node is a control plane one.
 func isControlPlaneNode(node *corev1.Node) bool {
 	// Ensuring that this is a master machine by checking required labels.

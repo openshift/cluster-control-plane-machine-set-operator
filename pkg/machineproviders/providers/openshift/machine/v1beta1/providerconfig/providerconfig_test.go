@@ -45,6 +45,7 @@ var _ = Describe("Provider Config", func() {
 			providerSpecBuilder   resourcebuilder.RawExtensionBuilder
 			providerConfigMatcher types.GomegaMatcher
 			expectedPlatformType  configv1.PlatformType
+			infrastructure        *configv1.Infrastructure
 			expectedError         error
 		}
 
@@ -65,7 +66,7 @@ var _ = Describe("Provider Config", func() {
 				in.modifyTemplate(&tmpl)
 			}
 
-			providerConfig, err := NewProviderConfigFromMachineTemplate(logger.Logger(), *tmpl.OpenShiftMachineV1Beta1Machine)
+			providerConfig, err := NewProviderConfigFromMachineTemplate(logger.Logger(), *tmpl.OpenShiftMachineV1Beta1Machine, in.infrastructure)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return
@@ -329,11 +330,13 @@ var _ = Describe("Provider Config", func() {
 			providerSpecBuilder   resourcebuilder.RawExtensionBuilder
 			providerConfigMatcher types.GomegaMatcher
 			expectedPlatformType  configv1.PlatformType
+			infrastructure        configv1.Infrastructure
 			expectedError         error
 		}
 
-		var logger testutils.TestLogger
-
+		var (
+			logger testutils.TestLogger
+		)
 		BeforeEach(func() {
 			logger = testutils.NewTestLogger()
 		})
@@ -345,7 +348,7 @@ var _ = Describe("Provider Config", func() {
 				in.modifyMachine(machine)
 			}
 
-			providerConfig, err := NewProviderConfigFromMachineSpec(logger.Logger(), machine.Spec)
+			providerConfig, err := NewProviderConfigFromMachineSpec(logger.Logger(), machine.Spec, &in.infrastructure)
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
 				return
@@ -412,7 +415,7 @@ var _ = Describe("Provider Config", func() {
 		}
 
 		DescribeTable("should correctly extract the failure domains", func(in extractFailureDomainsFromMachinesTableInput) {
-			failureDomains, err := ExtractFailureDomainsFromMachines(logger.Logger(), in.machines)
+			failureDomains, err := ExtractFailureDomainsFromMachines(logger.Logger(), in.machines, nil)
 
 			if in.expectedError != nil {
 				Expect(err).To(Equal(MatchError(in.expectedError)))
@@ -713,13 +716,13 @@ var _ = Describe("Provider Config", func() {
 			}),
 			Entry("with matching Generic configs", equalTableInput{
 				basePC: &providerConfig{
-					platformType: configv1.VSpherePlatformType,
+					platformType: configv1.ExternalPlatformType,
 					generic: GenericProviderConfig{
 						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				comparePC: &providerConfig{
-					platformType: configv1.VSpherePlatformType,
+					platformType: configv1.ExternalPlatformType,
 					generic: GenericProviderConfig{
 						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
@@ -728,13 +731,13 @@ var _ = Describe("Provider Config", func() {
 			}),
 			Entry("with mis-matched spec using Generic configs", equalTableInput{
 				basePC: &providerConfig{
-					platformType: configv1.VSpherePlatformType,
+					platformType: configv1.ExternalPlatformType,
 					generic: GenericProviderConfig{
 						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension(),
 					},
 				},
 				comparePC: &providerConfig{
-					platformType: configv1.VSpherePlatformType,
+					platformType: configv1.ExternalPlatformType,
 					generic: GenericProviderConfig{
 						providerSpec: machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("different-template").BuildRawExtension(),
 					},
@@ -825,5 +828,4 @@ var _ = Describe("Provider Config", func() {
 			}),
 		)
 	})
-
 })
