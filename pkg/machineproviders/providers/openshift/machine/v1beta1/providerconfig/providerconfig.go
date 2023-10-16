@@ -47,6 +47,9 @@ var (
 
 	// errNilFailureDomain is an error used when when nil value is present and failure domain is expected.
 	errNilFailureDomain = errors.New("failure domain is nil")
+
+	// errFailureDomainNotDefinedInInfrastructure failure domain is not defined in infrastructure.
+	errFailureDomainNotDefinedInInfrastructure = errors.New("failure domain is not defined in the infrastructure resource")
 )
 
 // ProviderConfig is an interface that allows external code to interact
@@ -88,6 +91,9 @@ type ProviderConfig interface {
 	// OpenStack returns the OpenStackProviderConfig if the platform type is OpenStack.
 	OpenStack() OpenStackProviderConfig
 
+	// VSphere returns the VSphereProviderConfig if the platform type is VSphere.
+	VSphere() VSphereProviderConfig
+
 	// Generic returns the GenericProviderConfig if we are on a platform that is using generic provider abstraction.
 	Generic() GenericProviderConfig
 }
@@ -112,9 +118,6 @@ func NewProviderConfigFromMachineSpec(logger logr.Logger, machineSpec machinev1b
 	return newProviderConfigFromProviderSpec(logger, machineSpec.ProviderSpec, platformType, infrastructure)
 }
 
-// TO-DO: remove unparam when there are users of the parameter
-//
-//nolint:unparam
 func newProviderConfigFromProviderSpec(logger logr.Logger, providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType, infrastructure *configv1.Infrastructure) (ProviderConfig, error) {
 	if providerSpec.Value == nil {
 		return nil, errNilProviderSpec
@@ -131,6 +134,8 @@ func newProviderConfigFromProviderSpec(logger logr.Logger, providerSpec machinev
 		return newNutanixProviderConfig(logger, providerSpec.Value)
 	case configv1.OpenStackPlatformType:
 		return newOpenStackProviderConfig(logger, providerSpec.Value)
+	case configv1.VSpherePlatformType:
+		return newVSphereProviderConfig(logger, providerSpec.Value, infrastructure)
 	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, platformType)
 	default:
@@ -147,6 +152,7 @@ type providerConfig struct {
 	nutanix      NutanixProviderConfig
 	generic      GenericProviderConfig
 	openstack    OpenStackProviderConfig
+	vsphere      VSphereProviderConfig
 }
 
 // InjectFailureDomain is used to inject a failure domain into the ProviderConfig.
@@ -168,6 +174,13 @@ func (p providerConfig) InjectFailureDomain(fd failuredomain.FailureDomain) (Pro
 		newConfig.gcp = p.GCP().InjectFailureDomain(fd.GCP())
 	case configv1.OpenStackPlatformType:
 		newConfig.openstack = p.OpenStack().InjectFailureDomain(fd.OpenStack())
+	case configv1.VSpherePlatformType:
+		config, err := p.VSphere().InjectFailureDomain(fd.VSphere())
+		if err != nil {
+			return newConfig, fmt.Errorf("failed to inject failure domain: %w", err)
+		}
+
+		newConfig.vsphere = config
 	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, p.platformType)
 	}
@@ -186,6 +199,8 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 		return failuredomain.NewGCPFailureDomain(p.GCP().ExtractFailureDomain())
 	case configv1.OpenStackPlatformType:
 		return failuredomain.NewOpenStackFailureDomain(p.OpenStack().ExtractFailureDomain())
+	case configv1.VSpherePlatformType:
+		return failuredomain.NewVSphereFailureDomain(p.VSphere().ExtractFailureDomain())
 	case configv1.NonePlatformType:
 		return nil
 	default:
@@ -196,7 +211,7 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 // Diff compares two ProviderConfigs and returns a list of differences,
 // or nil if there are none.
 //
-//nolint:dupl
+//nolint:dupl,cyclop
 func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 	if other == nil {
 		return nil, nil
@@ -217,6 +232,8 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 		return deep.Equal(p.nutanix.providerConfig, other.Nutanix().providerConfig), nil
 	case configv1.OpenStackPlatformType:
 		return deep.Equal(p.openstack.providerConfig, other.OpenStack().providerConfig), nil
+	case configv1.VSpherePlatformType:
+		return deep.Equal(p.vsphere.providerConfig, other.VSphere().providerConfig), nil
 	case configv1.NonePlatformType:
 		return nil, errUnsupportedPlatformType
 	default:
@@ -226,7 +243,7 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 
 // Equal compares two ProviderConfigs to determine whether or not they are equal.
 //
-//nolint:dupl
+//nolint:dupl,cyclop
 func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
 	if other == nil {
 		return false, nil
@@ -247,6 +264,8 @@ func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
 		return reflect.DeepEqual(p.nutanix.providerConfig, other.Nutanix().providerConfig), nil
 	case configv1.OpenStackPlatformType:
 		return reflect.DeepEqual(p.openstack.providerConfig, other.OpenStack().providerConfig), nil
+	case configv1.VSpherePlatformType:
+		return reflect.DeepEqual(p.vsphere.providerConfig, other.VSphere().providerConfig), nil
 	case configv1.NonePlatformType:
 		return false, errUnsupportedPlatformType
 	default:
@@ -272,6 +291,8 @@ func (p providerConfig) RawConfig() ([]byte, error) {
 		rawConfig, err = json.Marshal(p.nutanix.providerConfig)
 	case configv1.OpenStackPlatformType:
 		rawConfig, err = json.Marshal(p.openstack.providerConfig)
+	case configv1.VSpherePlatformType:
+		rawConfig, err = json.Marshal(p.vsphere.providerConfig)
 	case configv1.NonePlatformType:
 		return nil, errUnsupportedPlatformType
 	default:
@@ -315,6 +336,11 @@ func (p providerConfig) OpenStack() OpenStackProviderConfig {
 	return p.openstack
 }
 
+// VSphere returns the VSphereProviderConfig if the platform type is VSphere.
+func (p providerConfig) VSphere() VSphereProviderConfig {
+	return p.vsphere
+}
+
 // Generic returns the GenericProviderConfig if the platform type is generic.
 func (p providerConfig) Generic() GenericProviderConfig {
 	return p.generic
@@ -329,6 +355,7 @@ func getPlatformTypeFromProviderSpecKind(kind string) configv1.PlatformType {
 		"GCPMachineProviderSpec":       configv1.GCPPlatformType,
 		"NutanixMachineProviderConfig": configv1.NutanixPlatformType,
 		"OpenstackProviderSpec":        configv1.OpenStackPlatformType,
+		"VSphereMachineProviderSpec":   configv1.VSpherePlatformType,
 	}
 
 	platformType, ok := providerSpecKindToPlatformType[kind]

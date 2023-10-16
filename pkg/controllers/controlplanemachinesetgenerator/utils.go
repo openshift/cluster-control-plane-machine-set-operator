@@ -204,10 +204,6 @@ func buildPlatformFailureDomains(platformType configv1.PlatformType, failureDoma
 }
 
 // buildFailureDomains builds a flavored FailureDomain for the ControlPlaneMachineSet according to what platform we are on.
-//
-// TO-DO: remove unparam when there are users of the infrastructure parameter
-//
-//nolint:cyclop,unparam
 func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
 	// Fetch failure domains from the machines
 	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines, infrastructure)
@@ -217,7 +213,9 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 
 	var machineSetFailureDomains []failuredomain.FailureDomain
 
-	switch machineFailureDomains[0].Type() {
+	platformType := machineFailureDomains[0].Type()
+
+	switch platformType {
 	case configv1.AzurePlatformType:
 		// On some platforms, failure domains from machineSets are not suitable for control plane machines.
 	default:

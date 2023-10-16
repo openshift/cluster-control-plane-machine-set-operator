@@ -192,6 +192,49 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With VSphere failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.VSphereFailureDomains().BuildFailureDomains()
+
+				failureDomains, err = NewFailureDomains(&config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "VSphereFailureDomain{Name:us-central1-a}"),
+					HaveField("String()", "VSphereFailureDomain{Name:us-central1-b}"),
+					HaveField("String()", "VSphereFailureDomain{Name:us-central1-c}"),
+				))
+			})
+		})
+
+		Context("With invalid VSphere failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.VSphereFailureDomains().BuildFailureDomains()
+				config.VSphere = nil
+
+				failureDomains, err = NewFailureDomains(&config)
+			})
+
+			It("returns an error", func() {
+				Expect(err).To(MatchError("missing failure domain configuration"))
+			})
+
+			It("returns an empty list of failure domains", func() {
+				Expect(failureDomains).To(BeEmpty())
+			})
+		})
+
 		Context("With OpenStack failure domain configuration", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -527,6 +570,23 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With two identical VSphere failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.VSpherePlatformType,
+					vsphere:      machinev1resourcebuilder.VSphereFailureDomain().WithZone("us-central1-a").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.VSpherePlatformType,
+					vsphere:      machinev1resourcebuilder.VSphereFailureDomain().WithZone("us-central1-a").Build(),
+				}
+			})
+
+			It("returns true", func() {
+				Expect(fd1.Equal(fd2)).To(BeTrue())
+			})
+		})
+
 		Context("With two identical OpenStack failure domains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
@@ -544,7 +604,7 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
-		Context("With two different Azure failure domains", func() {
+		Context("With two different GCP failure domains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
 					platformType: configv1.GCPPlatformType,
@@ -561,6 +621,23 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With two different VSphere failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.VSpherePlatformType,
+					vsphere:      machinev1resourcebuilder.VSphereFailureDomain().WithZone("us-central1-a").Build(),
+				}
+				fd2 = failureDomain{
+					platformType: configv1.VSpherePlatformType,
+					vsphere:      machinev1resourcebuilder.VSphereFailureDomain().WithZone("us-central1-b").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(fd2)).To(BeFalse())
+			})
+		})
+
 		Context("With two different OpenStack failure domains", func() {
 			BeforeEach(func() {
 				fd1 = failureDomain{
@@ -568,7 +645,7 @@ var _ = Describe("FailureDomains", func() {
 					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").Build(),
 				}
 				fd2 = failureDomain{
-					platformType: configv1.GCPPlatformType,
+					platformType: configv1.OpenStackPlatformType,
 					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").Build(),
 				}
 			})

@@ -58,6 +58,7 @@ const (
 const (
 	unsupportedNumberOfControlPlaneMachines     = "Unable to generate control plane machine set, unsupported number of control plane machines"
 	unsupportedPlatform                         = "Unable to generate control plane machine set, unsupported platform"
+	notEnabledPlatformVSphere                   = "Unable to generate control plane machine set, vSphere is tech preview. may be enabled with VSphereControlPlaneMachineSet feature gate"
 	controlPlaneMachineSetNotFound              = "Control plane machine set not found"
 	controlPlaneMachineSetUpToDate              = "Control plane machine set is up to date"
 	controlPlaneMachineSetOutdated              = "Control plane machine set is outdated"
