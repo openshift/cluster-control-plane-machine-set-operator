@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 )
 
 const (
@@ -52,6 +53,65 @@ const (
 	// as Infrastructure is a singleton within the cluster.
 	infrastructureName = "cluster"
 )
+
+// Helper method to create the ClusterVersion "version" resource.
+func createClusterVersion() {
+	clusterVersion := &configv1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "version",
+		},
+		Spec: configv1.ClusterVersionSpec{
+			Channel:   "stable-4.14",
+			ClusterID: configv1.ClusterID("086c77e9-ce27-4fa4-8caa-10ebf8237d53"),
+		},
+		Status: configv1.ClusterVersionStatus{
+			Desired: configv1.Release{
+				Image:   "blah",
+				URL:     "blah",
+				Version: "4.14.0",
+			},
+		},
+	}
+	cvStatus := clusterVersion.Status.DeepCopy()
+	Expect(k8sClient.Create(ctx, clusterVersion)).To(Succeed())
+	clusterVersion.Status = *cvStatus
+	Expect(k8sClient.Status().Update(ctx, clusterVersion)).To(Succeed())
+}
+
+// Helper method to crate the FeatureGate "cluster" resource.
+func createFeatureGate() {
+	featureGate := &configv1.FeatureGate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: configv1.FeatureGateSpec{
+			FeatureGateSelection: configv1.FeatureGateSelection{
+				FeatureSet: configv1.FeatureSet("TechPreviewNoUpgrade"),
+			},
+		},
+		Status: configv1.FeatureGateStatus{
+			FeatureGates: []configv1.FeatureGateDetails{
+				{
+					Enabled: []configv1.FeatureGateAttributes{
+						{
+							Name: "foo",
+						},
+					},
+					Disabled: []configv1.FeatureGateAttributes{
+						{
+							Name: "bar",
+						},
+					},
+					Version: "4.14.0",
+				},
+			},
+		},
+	}
+	fgStatus := featureGate.Status.DeepCopy()
+	Expect(k8sClient.Create(ctx, featureGate)).To(Succeed())
+	featureGate.Status = *fgStatus
+	Expect(k8sClient.Status().Update(ctx, featureGate)).To(Succeed())
+}
 
 var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 
@@ -378,9 +438,14 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
+
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
+
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
-			Client:    mgr.GetClient(),
-			Namespace: namespaceName,
+			Client:              mgr.GetClient(),
+			Namespace:           namespaceName,
+			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
@@ -963,9 +1028,14 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
+
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
+
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
-			Client:    mgr.GetClient(),
-			Namespace: namespaceName,
+			Client:              mgr.GetClient(),
+			Namespace:           namespaceName,
+			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
@@ -1554,9 +1624,14 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
+
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
+
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
-			Client:    mgr.GetClient(),
-			Namespace: namespaceName,
+			Client:              mgr.GetClient(),
+			Namespace:           namespaceName,
+			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
@@ -2067,9 +2142,14 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
+
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
+
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
-			Client:    mgr.GetClient(),
-			Namespace: namespaceName,
+			Client:              mgr.GetClient(),
+			Namespace:           namespaceName,
+			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 	})
@@ -2533,9 +2613,14 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 			}),
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
+
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
+
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
-			Client:    mgr.GetClient(),
-			Namespace: namespaceName,
+			Client:              mgr.GetClient(),
+			Namespace:           namespaceName,
+			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 

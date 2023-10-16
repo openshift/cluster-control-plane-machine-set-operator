@@ -17,13 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -43,6 +43,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	configv1client "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	featuregates "github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
+
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
 	cpmsgeneratorcontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachinesetgenerator"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
@@ -58,11 +63,6 @@ import (
 const (
 	// defaultLeaderElectionID is the default name to use for the leader election resource.
 	defaultLeaderElectionID = "control-plane-machine-set-leader"
-)
-
-const (
-	releaseVersionEnvVariableName = "RELEASE_VERSION"
-	unknownVersionValue           = "unknown"
 )
 
 func main() { //nolint:funlen,cyclop
@@ -146,6 +146,35 @@ func main() { //nolint:funlen,cyclop
 		os.Exit(1)
 	}
 
+	desiredVersion := util.GetReleaseVersion()
+	missingVersion := "0.0.1-snapshot"
+
+	configClient, err := configv1client.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		klog.Fatal(err, "unable to create config client")
+		os.Exit(1)
+	}
+
+	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
+
+	// By default, this will exit(0) if the featuregates change
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(),
+		configInformers.Config().V1().FeatureGates(),
+		events.NewLoggingEventRecorder("controlplanemachineset"),
+	)
+	go featureGateAccessor.Run(context.Background())
+	go configInformers.Start(context.Background().Done())
+
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, _ := featureGateAccessor.CurrentFeatureGates()
+		klog.Infof("FeatureGates initialized: %v", featureGates.KnownFeatures())
+	case <-time.After(1 * time.Minute):
+		klog.Fatal("timed out waiting for FeatureGate detection")
+	}
+
 	// Define an uncached client.
 	// More resource intensive than the default client,
 	// is to be used only in situations where we want to avoid the cache.
@@ -161,16 +190,17 @@ func main() { //nolint:funlen,cyclop
 		UncachedClient: client.NewNamespacedClient(uncachedClient, managedNamespace),
 		Namespace:      managedNamespace,
 		OperatorName:   "control-plane-machine-set",
-		ReleaseVersion: getReleaseVersion(setupLog),
+		ReleaseVersion: util.GetReleaseVersion(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
 		os.Exit(1)
 	}
 
 	if err := (&cpmsgeneratorcontroller.ControlPlaneMachineSetGeneratorReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Namespace: managedNamespace,
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		Namespace:           managedNamespace,
+		FeatureGateAccessor: featureGateAccessor,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSetGenerator")
 		os.Exit(1)
@@ -223,14 +253,4 @@ func setupScheme(scheme *runtime.Scheme) error {
 	}
 
 	return nil
-}
-
-func getReleaseVersion(setupLog logr.Logger) string {
-	releaseVersion := os.Getenv(releaseVersionEnvVariableName)
-	if len(releaseVersion) == 0 {
-		releaseVersion = unknownVersionValue
-		setupLog.Info(fmt.Sprintf("%s environment variable is missing, defaulting to %q", releaseVersionEnvVariableName, unknownVersionValue))
-	}
-
-	return releaseVersion
 }

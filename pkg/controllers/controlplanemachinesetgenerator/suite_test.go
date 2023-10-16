@@ -18,8 +18,10 @@ package controlplanemachinesetgenerator
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,7 +67,8 @@ var _ = BeforeSuite(func() {
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
 		},
-		ErrorIfCRDPathMissing: true,
+		ErrorIfCRDPathMissing:   true,
+		ControlPlaneStopTimeout: 2 * time.Minute,
 	}
 
 	var err error
@@ -90,6 +93,12 @@ var _ = BeforeSuite(func() {
 
 	testRESTMapper, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 	Expect(err).NotTo(HaveOccurred())
+
+	// Setting a fake version to allow for feature gate / cluster version resolution.
+	Expect(os.Setenv("RELEASE_VERSION", "4.14.0")).To(Succeed())
+
+	createClusterVersion()
+	createFeatureGate()
 
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
