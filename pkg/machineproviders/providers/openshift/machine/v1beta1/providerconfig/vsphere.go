@@ -138,9 +138,22 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 func (v VSphereProviderConfig) ResetTopologyRelatedFields() ProviderConfig {
 	v.providerConfig.Workspace = &machinev1beta1.Workspace{}
 	v.providerConfig.Template = ""
-	v.providerConfig.Network = machinev1beta1.NetworkSpec{
-		Devices: []machinev1beta1.NetworkDeviceSpec{},
+
+	networkSpec := machinev1beta1.NetworkSpec{}
+	devices := networkSpec.Devices
+
+	// preserve ippools if they are defined
+	for _, network := range v.providerConfig.Network.Devices {
+		if len(network.AddressesFromPools) > 0 {
+			networkDeviceSpec := machinev1beta1.NetworkDeviceSpec{
+				AddressesFromPools: network.AddressesFromPools,
+			}
+			devices = append(devices, networkDeviceSpec)
+		}
 	}
+
+	networkSpec.Devices = devices
+	v.providerConfig.Network = networkSpec
 
 	return providerConfig{
 		platformType: configv1.VSpherePlatformType,
