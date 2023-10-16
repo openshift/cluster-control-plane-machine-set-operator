@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -55,6 +56,8 @@ const (
 	// clusterSingletonName is the OpenShift standard name, "cluster", for singleton
 	// resources. All ControlPlaneMachineSet resources must use this name.
 	clusterSingletonName = "cluster"
+
+	vsphereTemplateValidationPattern = `^/.*?/vm/.*?`
 )
 
 var (
@@ -350,6 +353,8 @@ func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path,
 		return validateOpenShiftGCPProviderConfig(providerSpecPath.Child("value"), providerConfig.GCP())
 	case configv1.OpenStackPlatformType:
 		return validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
+	case configv1.VSpherePlatformType:
+		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere())
 	}
 
 	return []error{}
@@ -385,6 +390,26 @@ func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerCo
 	for _, additionalBlockDevice := range config.AdditionalBlockDevices {
 		if additionalBlockDevice.Name == "etcd" && additionalBlockDevice.SizeGiB < 10 {
 			errs = append(errs, field.Invalid(parentPath.Child("additionalBlockDevices"), additionalBlockDevice.SizeGiB, "etcd block device size must be at least 10 GiB"))
+		}
+	}
+
+	return errs
+}
+
+// validateOpenShiftVSphereProviderConfig runs VSphere specific checks on the provider config on the ControlPlaneMachineSet.
+// This ensure that the ControlPlaneMachineSet can safely replace VSphere control plane machines.
+func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) []error {
+	errs := []error{}
+
+	templatePath := providerConfig.Config().Template
+	if len(templatePath) > 0 {
+		matched, err := regexp.MatchString(vsphereTemplateValidationPattern, templatePath)
+		if err != nil {
+			errs = append(errs, field.InternalError(parentPath.Child("template"), fmt.Errorf("error checking the validity of the template path: %w", err)))
+		}
+
+		if !matched {
+			errs = append(errs, field.Invalid(parentPath.Child("template"), templatePath, "template must be provided as the full path"))
 		}
 	}
 
