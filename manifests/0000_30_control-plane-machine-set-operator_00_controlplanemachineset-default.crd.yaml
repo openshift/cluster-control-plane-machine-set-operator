@@ -6,6 +6,7 @@ metadata:
     api-approved.openshift.io: https://github.com/openshift/api/pull/1112
     exclude.release.openshift.io/internal-openshift-hosted: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    release.openshift.io/feature-set: Default
   creationTimestamp: null
   name: controlplanemachinesets.machine.openshift.io
 spec:
@@ -304,18 +305,6 @@ spec:
                                 - AlibabaCloud
                                 - Nutanix
                                 - External
-                            vsphere:
-                              description: VSphereFailureDomain configures failure domain information for the VSphere platform.
-                              type: array
-                              items:
-                                description: VSphereFailureDomain configures failure domain information for the vSphere platform
-                                type: object
-                                required:
-                                  - name
-                                properties:
-                                  name:
-                                    description: Name is the name of the failure domain in which the vSphere machine provider will create the VM. Failure domains are defined in a cluster's config.openshift.io/Infrastructure resource.
-                                    type: string
                           x-kubernetes-validations:
                             - rule: 'has(self.platform) && self.platform == ''AWS'' ?  has(self.aws) : !has(self.aws)'
                               message: aws configuration is required when platform is AWS, and forbidden otherwise
@@ -325,8 +314,6 @@ spec:
                               message: gcp configuration is required when platform is GCP, and forbidden otherwise
                             - rule: 'has(self.platform) && self.platform == ''OpenStack'' ?  has(self.openstack) : !has(self.openstack)'
                               message: openstack configuration is required when platform is OpenStack, and forbidden otherwise
-                            - rule: 'has(self.platform) && self.platform == ''VSphere'' ?  has(self.vsphere) : !has(self.vsphere)'
-                              message: VSphere configuration is required when platform is VSphere, and forbidden otherwise
                         metadata:
                           description: 'ObjectMeta is the standard object metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata Labels are required to match the ControlPlaneMachineSet selector.'
                           type: object
