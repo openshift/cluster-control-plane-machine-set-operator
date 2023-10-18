@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
@@ -117,6 +118,11 @@ func main() { //nolint:funlen,cyclop
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port: webhookPort,
+			TLSOpts: []func(*tls.Config){
+				func(t *tls.Config) {
+					t.MinVersion = tls.VersionTLS12
+				},
+			},
 		}),
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElectionNamespace:       leaderElectionConfig.ResourceNamespace,
