@@ -24,7 +24,6 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 )
 
 // AzureProviderConfig holds the provider spec of an Azure Machine.
@@ -39,7 +38,7 @@ type AzureProviderConfig struct {
 func (a AzureProviderConfig) InjectFailureDomain(fd machinev1.AzureFailureDomain) AzureProviderConfig {
 	newAzureProviderConfig := a
 
-	newAzureProviderConfig.providerConfig.Zone = &fd.Zone
+	newAzureProviderConfig.providerConfig.Zone = fd.Zone
 
 	return newAzureProviderConfig
 }
@@ -48,7 +47,7 @@ func (a AzureProviderConfig) InjectFailureDomain(fd machinev1.AzureFailureDomain
 // information stored within the AzureProviderConfig.
 func (a AzureProviderConfig) ExtractFailureDomain() machinev1.AzureFailureDomain {
 	return machinev1.AzureFailureDomain{
-		Zone: ptr.Deref(a.providerConfig.Zone, ""),
+		Zone: a.providerConfig.Zone,
 	}
 }
 

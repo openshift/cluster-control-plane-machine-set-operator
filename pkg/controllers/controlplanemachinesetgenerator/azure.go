@@ -62,7 +62,7 @@ func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []
 
 	azureProviderSpec := providerConfig.Azure().Config()
 	// Remove field related to the faliure domain.
-	azureProviderSpec.Zone = nil
+	azureProviderSpec.Zone = ""
 
 	rawBytes, err := json.Marshal(azureProviderSpec)
 	if err != nil {
