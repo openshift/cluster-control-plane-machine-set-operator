@@ -121,6 +121,7 @@ func main() { //nolint:funlen,cyclop
 			TLSOpts: []func(*tls.Config){
 				func(t *tls.Config) {
 					t.MinVersion = tls.VersionTLS12
+					t.CipherSuites = util.GetAllowedTLSCipherSuites()
 				},
 			},
 		}),
