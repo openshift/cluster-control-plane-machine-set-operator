@@ -553,8 +553,8 @@ github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
 github.com/openshift/client-go/machine/applyconfigurations/internal
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1
-# github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20230807182045-90182bd8375e
-## explicit; go 1.19
+# github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231009113757-6dc642e1cfa6
+## explicit; go 1.20
 github.com/openshift/cluster-api-actuator-pkg/testutils
 github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder
 github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1
