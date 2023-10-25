@@ -170,7 +170,7 @@ func convertViaJSON(in, out interface{}) error {
 // buildPlatformFailureDomains returns a failureDomains set for a specific platform.
 //
 //nolint:cyclop
-func buildPlatformFailureDomains(platformType configv1.PlatformType, failureDomains *failuredomain.Set) (*machinev1.FailureDomains, error) {
+func buildPlatformFailureDomains(logger logr.Logger, platformType configv1.PlatformType, failureDomains *failuredomain.Set, infrastructure *configv1.Infrastructure) (*machinev1.FailureDomains, error) {
 	var cpmsFailureDomain machinev1.FailureDomains
 
 	var err error
@@ -196,6 +196,11 @@ func buildPlatformFailureDomains(platformType configv1.PlatformType, failureDoma
 		if cpmsFailureDomain.OpenStack == nil || cpmsFailureDomain.Platform == "" {
 			return nil, errNoFailureDomains
 		}
+	case configv1.NutanixPlatformType:
+		cpmsFailureDomain, err = buildNutanixFailureDomains(logger, failureDomains, infrastructure)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build Nutanix failure domains: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("%w: %sFailureDomain{}", errUnsupportedPlatform, platformType)
 	}
@@ -216,7 +221,7 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 	platformType := machineFailureDomains[0].Type()
 
 	switch platformType {
-	case configv1.AzurePlatformType:
+	case configv1.AzurePlatformType, configv1.NutanixPlatformType:
 		// On some platforms, failure domains from machineSets are not suitable for control plane machines.
 	default:
 		// Fetch failure domains from the machineSets
@@ -232,7 +237,7 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 	// Construction of a union of failure domains of machines and machineSets.
 	failureDomains.Insert(machineSetFailureDomains...)
 
-	cpmsFailureDomain, err := buildPlatformFailureDomains(platformType, failureDomains)
+	cpmsFailureDomain, err := buildPlatformFailureDomains(logger, platformType, failureDomains, infrastructure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build platform specific failure domains: %w", err)
 	}

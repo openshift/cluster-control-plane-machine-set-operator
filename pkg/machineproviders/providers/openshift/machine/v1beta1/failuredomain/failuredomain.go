@@ -72,6 +72,9 @@ type FailureDomain interface {
 	// VSphere returns the VSphereFailureDomain if the platform type is VSphere.
 	VSphere() machinev1.VSphereFailureDomain
 
+	// Nutanix returns the NutanixFailureDomainReference if the platform type is Nutanix.
+	Nutanix() machinev1.NutanixFailureDomainReference
+
 	// Equal compares the underlying failure domain.
 	Equal(other FailureDomain) bool
 
@@ -88,6 +91,7 @@ type failureDomain struct {
 	gcp       machinev1.GCPFailureDomain
 	openstack machinev1.OpenStackFailureDomain
 	vsphere   machinev1.VSphereFailureDomain
+	nutanix   machinev1.NutanixFailureDomainReference
 }
 
 // String returns a string representation of the failure domain.
@@ -103,6 +107,8 @@ func (f failureDomain) String() string {
 		return openstackFailureDomainToString(f.openstack)
 	case configv1.VSpherePlatformType:
 		return vsphereFailureDomainToString(f.vsphere)
+	case configv1.NutanixPlatformType:
+		return nutanixFailureDomainToString(f.nutanix)
 	default:
 		return fmt.Sprintf("%sFailureDomain{}", f.platformType)
 	}
@@ -138,6 +144,11 @@ func (f failureDomain) VSphere() machinev1.VSphereFailureDomain {
 	return f.vsphere
 }
 
+// Nutanix returns the NutanixFailureDomainReference if the platform type is Nutanix.
+func (f failureDomain) Nutanix() machinev1.NutanixFailureDomainReference {
+	return f.nutanix
+}
+
 // Equal compares the underlying failure domain.
 func (f failureDomain) Equal(other FailureDomain) bool {
 	if other == nil {
@@ -159,6 +170,8 @@ func (f failureDomain) Equal(other FailureDomain) bool {
 		return reflect.DeepEqual(f.openstack, other.OpenStack())
 	case configv1.VSpherePlatformType:
 		return reflect.DeepEqual(f.vsphere, other.VSphere())
+	case configv1.NutanixPlatformType:
+		return reflect.DeepEqual(f.nutanix, other.Nutanix())
 	}
 
 	return true
@@ -201,6 +214,8 @@ func (f failureDomain) Complete(templateFailureDomain FailureDomain) (FailureDom
 		return f.completeOpenStack(templateFailureDomain.OpenStack()), nil
 	case configv1.VSpherePlatformType:
 		return f.completeVSphere(templateFailureDomain.VSphere()), nil
+	case configv1.NutanixPlatformType:
+		return f.completeNutanix(templateFailureDomain.Nutanix()), nil
 	default:
 		return NewGenericFailureDomain(), nil
 	}
@@ -276,6 +291,16 @@ func (f failureDomain) completeVSphere(templateFailureDomain machinev1.VSphereFa
 	return NewVSphereFailureDomain(*fd)
 }
 
+func (f failureDomain) completeNutanix(templateFailureDomain machinev1.NutanixFailureDomainReference) FailureDomain {
+	fd := templateFailureDomain.DeepCopy()
+
+	if f.nutanix.Name != "" {
+		fd.Name = f.nutanix.Name
+	}
+
+	return NewNutanixFailureDomain(*fd)
+}
+
 // NewFailureDomains creates a set of FailureDomains representing the input failure
 // domains held within the ControlPlaneMachineSet.
 func NewFailureDomains(failureDomains *machinev1.FailureDomains) ([]FailureDomain, error) {
@@ -295,6 +320,8 @@ func NewFailureDomains(failureDomains *machinev1.FailureDomains) ([]FailureDomai
 		return newOpenStackFailureDomains(*failureDomains)
 	case configv1.VSpherePlatformType:
 		return newVSphereFailureDomains(*failureDomains)
+	case configv1.NutanixPlatformType:
+		return newNutanixFailureDomains(*failureDomains)
 	case configv1.PlatformType(""):
 		// An empty failure domains definition is allowed.
 		return nil, nil
@@ -375,6 +402,21 @@ func newVSphereFailureDomains(failureDomains machinev1.FailureDomains) ([]Failur
 	return foundFailureDomains, nil
 }
 
+// newNutanixFailureDomains constructs a slice of Nutanix FailureDomain from machinev1.FailureDomains.
+func newNutanixFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
+	foundFailureDomains := []FailureDomain{}
+
+	if len(failureDomains.Nutanix) == 0 {
+		return foundFailureDomains, errMissingFailureDomain
+	}
+
+	for _, fdRef := range failureDomains.Nutanix {
+		foundFailureDomains = append(foundFailureDomains, NewNutanixFailureDomain(fdRef))
+	}
+
+	return foundFailureDomains, nil
+}
+
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
 // Note this is exported to allow other packages to construct individual failure domains
 // in tests.
@@ -414,6 +456,14 @@ func NewVSphereFailureDomain(fd machinev1.VSphereFailureDomain) FailureDomain {
 	return &failureDomain{
 		platformType: configv1.VSpherePlatformType,
 		vsphere:      fd,
+	}
+}
+
+// NewNutanixFailureDomain creates an Nutanix failure domain from the machinev1.NutanixFailureDomainReference.
+func NewNutanixFailureDomain(fdRef machinev1.NutanixFailureDomainReference) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.NutanixPlatformType,
+		nutanix:      fdRef,
 	}
 }
 
@@ -523,6 +573,15 @@ func openstackFailureDomainToString(fd machinev1.OpenStackFailureDomain) string 
 func vsphereFailureDomainToString(fd machinev1.VSphereFailureDomain) string {
 	if fd.Name != "" {
 		return fmt.Sprintf("VSphereFailureDomain{Name:%s}", fd.Name)
+	}
+
+	return unknownFailureDomain
+}
+
+// nutanixFailureDomainToString converts the NutanixFailureDomainReference into a string.
+func nutanixFailureDomainToString(fdRef machinev1.NutanixFailureDomainReference) string {
+	if fdRef.Name != "" {
+		return fmt.Sprintf("NutanixFailureDomainReference{Name:%s}", fdRef.Name)
 	}
 
 	return unknownFailureDomain

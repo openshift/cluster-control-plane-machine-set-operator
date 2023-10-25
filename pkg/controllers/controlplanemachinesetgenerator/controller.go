@@ -251,7 +251,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.NutanixPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(logger, machines)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(logger, machines, machineSets, infrastructure)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}

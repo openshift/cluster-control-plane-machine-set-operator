@@ -33,7 +33,10 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 )
 
-var vsphereInfrastructureWithFailureDomains = configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+var (
+	vsphereInfrastructureWithFailureDomains = configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+	nutanixInfrastructureWithFailureDomains = configv1resourcebuilder.Infrastructure().AsNutanixWithFailureDomains("nutanix-test", nil).Build()
+)
 
 // stringPtr returns a pointer to the string.
 func stringPtr(s string) *string {
@@ -149,6 +152,20 @@ var _ = Describe("Provider Config", func() {
 				providerSpecBuilder:   machinev1beta1resourcebuilder.VSphereProviderSpec(),
 				infrastructure:        configv1resourcebuilder.Infrastructure().AsVSphere("test-vsphere").Build(),
 				providerConfigMatcher: HaveField("VSphere().Config()", *machinev1beta1resourcebuilder.VSphereProviderSpec().Build()),
+			}),
+			Entry("with a Nutanix config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.NutanixPlatformType,
+				failureDomainsBuilder: machinev1resourcebuilder.NutanixFailureDomains(),
+				providerSpecBuilder:   machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0"),
+				infrastructure:        nutanixInfrastructureWithFailureDomains,
+				providerConfigMatcher: HaveField("Nutanix().Config()", *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build()),
+			}),
+			Entry("with a Nutanix config without failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.NutanixPlatformType,
+				failureDomainsBuilder: nil,
+				providerSpecBuilder:   machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder(),
+				infrastructure:        configv1resourcebuilder.Infrastructure().AsNutanix("nutanix-test").Build(),
+				providerConfigMatcher: HaveField("Nutanix().Config()", *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().Build()),
 			}),
 		)
 	})
@@ -304,6 +321,30 @@ var _ = Describe("Provider Config", func() {
 				matchPath:        "VSphere().ExtractFailureDomain().Name",
 				matchExpectation: "us-central1-b",
 			}),
+			Entry("when keeping a Nutanix zone the same", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				failureDomain:    failuredomain.NewNutanixFailureDomain(machinev1resourcebuilder.NewNutanixFailureDomainBuilder().WithName("fd-pe0").Build()),
+				matchPath:        "Nutanix().ExtractFailureDomain().Name",
+				matchExpectation: "fd-pe0",
+			}),
+			Entry("when changing a Nutanix zone", injectFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				failureDomain:    failuredomain.NewNutanixFailureDomain(machinev1resourcebuilder.NewNutanixFailureDomainBuilder().WithName("fd-pe1").Build()),
+				matchPath:        "Nutanix().ExtractFailureDomain().Name",
+				matchExpectation: "fd-pe1",
+			}),
 			Entry("when keeping an OpenStack compute availability zone the same", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
 					platformType: configv1.OpenStackPlatformType,
@@ -445,6 +486,18 @@ var _ = Describe("Provider Config", func() {
 				providerSpecBuilder:   machinev1beta1resourcebuilder.VSphereProviderSpec(),
 				infrastructure:        vsphereInfrastructureWithoutFailureDomains,
 				providerConfigMatcher: HaveField("VSphere().Config()", *machinev1beta1resourcebuilder.VSphereProviderSpec().Build()),
+			}),
+			Entry("with a Nutanix config with failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.NutanixPlatformType,
+				providerSpecBuilder:   machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0"),
+				infrastructure:        *nutanixInfrastructureWithFailureDomains,
+				providerConfigMatcher: HaveField("Nutanix().Config()", *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build()),
+			}),
+			Entry("with a Nutanix config without failure domains", providerConfigTableInput{
+				expectedPlatformType:  configv1.NutanixPlatformType,
+				providerSpecBuilder:   machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder(),
+				infrastructure:        *configv1resourcebuilder.Infrastructure().AsNutanix("nutanix-test").Build(),
+				providerConfigMatcher: HaveField("Nutanix().Config()", *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().Build()),
 			}),
 		)
 	})
@@ -625,6 +678,16 @@ var _ = Describe("Provider Config", func() {
 				expectedFailureDomain: failuredomain.NewVSphereFailureDomain(machinev1.VSphereFailureDomain{
 					Name: "us-central1-a",
 				}),
+			}),
+			Entry("with a Nutanix fd-pe0 failure domain", extractFailureDomainTableInput{
+				providerConfig: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				expectedFailureDomain: failuredomain.NewNutanixFailureDomain(machinev1resourcebuilder.NewNutanixFailureDomainBuilder().WithName("fd-pe0").Build()),
 			}),
 		)
 	})
@@ -822,6 +885,40 @@ var _ = Describe("Provider Config", func() {
 				},
 				expectedEqual: false,
 			}),
+			Entry("with matching Nutanix configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				expectedEqual: true,
+			}),
+			Entry("with mis-matched Nutanix configs", equalTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe1").Build(),
+						infrastructure: nutanixInfrastructureWithFailureDomains,
+					},
+				},
+				expectedEqual: false,
+			}),
 			Entry("with matching Generic configs", equalTableInput{
 				basePC: &providerConfig{
 					platformType: configv1.ExternalPlatformType,
@@ -933,6 +1030,15 @@ var _ = Describe("Provider Config", func() {
 					},
 				},
 				expectedOut: machinev1beta1resourcebuilder.VSphereProviderSpec().BuildRawExtension().Raw,
+			}),
+			Entry("with a Nutanix config", rawConfigTableInput{
+				providerConfig: providerConfig{
+					platformType: configv1.NutanixPlatformType,
+					nutanix: NutanixProviderConfig{
+						providerConfig: *machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").Build(),
+					},
+				},
+				expectedOut: machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder().WithFailureDomains(nutanixInfrastructureWithFailureDomains.Spec.PlatformSpec.Nutanix.FailureDomains).WithFailureDomainName("fd-pe0").BuildRawExtension().Raw,
 			}),
 		)
 	})
