@@ -60,6 +60,10 @@ const (
 	// degradedClusterState is used to denote that the control plane machine set has detected a degraded cluster.
 	// In this case, the controller will not perform any further actions.
 	degradedClusterState = "Cluster state is degraded. The control plane machine set will not take any action until issues have been resolved."
+
+	// infrastructureName is the name of the Infrastructure resource. Any changes to this resource will need to be
+	// reflected in changes to the ControlPlaneMachineSet configuration.
+	infrastructureName = "cluster"
 )
 
 var (
@@ -133,6 +137,11 @@ func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) er
 			&configv1.ClusterOperator{},
 			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
 			builder.WithPredicates(util.FilterClusterOperator(r.OperatorName)),
+		).
+		Watches(
+			&configv1.Infrastructure{},
+			handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace)),
+			builder.WithPredicates(util.FilterInfrastructure(infrastructureName)),
 		).
 		// Override the default log constructor as it makes the logs very chatty.
 		WithLogConstructor(func(req *reconcile.Request) logr.Logger {

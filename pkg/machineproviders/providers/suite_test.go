@@ -27,6 +27,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	configv1builder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -80,6 +82,9 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	infrastructure := configv1builder.Infrastructure().AsAWS("test", "eu-west-2").WithName(util.InfrastructureName).Build()
+	Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
 
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)

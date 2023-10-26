@@ -26,8 +26,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	configv1builder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
@@ -62,6 +64,7 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
 		},
 		ErrorIfCRDPathMissing: true,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
@@ -77,12 +80,16 @@ var _ = BeforeSuite(func() {
 	testScheme = scheme.Scheme
 	Expect(machinev1.Install(testScheme)).To(Succeed())
 	Expect(machinev1beta1.Install(testScheme)).To(Succeed())
+	Expect(configv1.Install(testScheme)).To(Succeed())
 
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	infrastructure := configv1builder.Infrastructure().AsAWS("cluster", "us-east-1").WithName("cluster").Build()
+	Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
 
 	// CEL requires Kube 1.25 and above, so check for the minimum server version.
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)

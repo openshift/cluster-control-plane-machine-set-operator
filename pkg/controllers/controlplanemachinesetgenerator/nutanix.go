@@ -46,7 +46,7 @@ func generateControlPlaneMachineSetNutanixSpec(logger logr.Logger, machines []ma
 func buildControlPlaneMachineSetNutanixMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's providerSpec: %w", err)
 	}

@@ -33,7 +33,7 @@ import (
 
 // checkOpenStackMachinesServerGroups checks if all machines have the same ServerGroup (the reference is the newest machine's ServerGroup).
 func checkOpenStackMachinesServerGroups(logger logr.Logger, machines []machinev1beta1.Machine) error {
-	newestMachineProviderConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
+	newestMachineProviderConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec, nil)
 	if err != nil {
 		return fmt.Errorf("failed to extract newest machine's OpenStack providerSpec: %w", err)
 	}
@@ -43,7 +43,7 @@ func checkOpenStackMachinesServerGroups(logger logr.Logger, machines []machinev1
 
 	for _, machine := range machines {
 		// get the providerSpec from the machine
-		providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machine.Spec)
+		providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machine.Spec, nil)
 		if err != nil {
 			return fmt.Errorf("failed to extract machine's OpenStack providerSpec: %w", err)
 		}
@@ -65,7 +65,7 @@ func generateControlPlaneMachineSetOpenStackSpec(logger logr.Logger, machines []
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to check OpenStack machines ServerGroup: %w", err)
 	}
 
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines)
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's OpenStack failure domains: %w", err)
 	}
@@ -87,7 +87,7 @@ func generateControlPlaneMachineSetOpenStackSpec(logger logr.Logger, machines []
 func buildControlPlaneMachineSetOpenStackMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine, failureDomains *machinev1builder.FailureDomainsApplyConfiguration) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's OpenStack providerSpec: %w", err)
 	}
