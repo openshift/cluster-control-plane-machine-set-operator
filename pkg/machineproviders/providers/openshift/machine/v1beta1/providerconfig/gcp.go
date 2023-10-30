@@ -37,7 +37,9 @@ type GCPProviderConfig struct {
 func (g GCPProviderConfig) InjectFailureDomain(fd machinev1.GCPFailureDomain) GCPProviderConfig {
 	newGCPProviderConfig := g
 
-	newGCPProviderConfig.providerConfig.Zone = fd.Zone
+	if fd.Zone != "" {
+		newGCPProviderConfig.providerConfig.Zone = fd.Zone
+	}
 
 	return newGCPProviderConfig
 }

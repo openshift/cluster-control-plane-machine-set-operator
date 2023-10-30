@@ -18,6 +18,7 @@ package controlplanemachinesetgenerator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -34,7 +35,9 @@ import (
 // generateControlPlaneMachineSetAzureSpec generates an Azure flavored ControlPlaneMachineSet Spec.
 func generateControlPlaneMachineSetAzureSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
 	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
-	if err != nil {
+	if errors.Is(err, errNoFailureDomains) {
+		// This is a special case where we don't have any failure domains.
+	} else if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's Azure failure domains: %w", err)
 	}
 
@@ -55,14 +58,26 @@ func generateControlPlaneMachineSetAzureSpec(logger logr.Logger, machines []mach
 func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []machinev1beta1.Machine) (*machinev1beta1builder.MachineSpecApplyConfiguration, error) {
 	// The machines slice is sorted by the creation time.
 	// We want to get the provider config for the newest machine.
-	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machines[0].Spec, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract machine's azure providerSpec: %w", err)
+	providerConfigs := []providerconfig.ProviderConfig{}
+
+	for _, machine := range machines {
+		providerconfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machine.Spec, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract machine's azure providerSpec: %w", err)
+		}
+
+		providerConfigs = append(providerConfigs, providerconfig)
 	}
 
-	azureProviderSpec := providerConfig.Azure().Config()
-	// Remove field related to the faliure domain.
-	azureProviderSpec.Zone = nil
+	azureProviderSpec := providerConfigs[0].Azure().Config()
+
+	if !allProviderConfigZonesMatch(providerConfigs) {
+		azureProviderSpec.Zone = ""
+	}
+
+	if !allProviderConfigSubnetsMatch(providerConfigs) {
+		azureProviderSpec.Subnet = ""
+	}
 
 	rawBytes, err := json.Marshal(azureProviderSpec)
 	if err != nil {
@@ -78,6 +93,30 @@ func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []
 	}, nil
 }
 
+func allProviderConfigSubnetsMatch(providerConfigs []providerconfig.ProviderConfig) bool {
+	firstSubnet := providerConfigs[0].Azure().Config().Subnet
+
+	for _, config := range providerConfigs {
+		if config.Azure().Config().Subnet != firstSubnet {
+			return false
+		}
+	}
+
+	return true
+}
+
+func allProviderConfigZonesMatch(providerConfigs []providerconfig.ProviderConfig) bool {
+	firstZone := providerConfigs[0].Azure().Config().Zone
+
+	for _, config := range providerConfigs {
+		if config.Azure().Config().Zone != firstZone {
+			return false
+		}
+	}
+
+	return true
+}
+
 // buildAzureFailureDomains builds an Azure flavored FailureDomains for the ControlPlaneMachineSet.
 func buildAzureFailureDomains(failureDomains *failuredomain.Set) (machinev1.FailureDomains, error) { //nolint:unparam
 	azureFailureDomains := []machinev1.AzureFailureDomain{}
@@ -86,10 +125,55 @@ func buildAzureFailureDomains(failureDomains *failuredomain.Set) (machinev1.Fail
 		azureFailureDomains = append(azureFailureDomains, fd.Azure())
 	}
 
+	// If there is only one failure domain, then all of its fields are already set in the template providerSpec.
+	if len(azureFailureDomains) <= 1 {
+		return machinev1.FailureDomains{}, nil
+	}
+
+	if allFailureDomainsSubnetsMatch(azureFailureDomains) {
+		for i := range azureFailureDomains {
+			azureFailureDomains[i].Subnet = ""
+		}
+	}
+
+	if allFailureDomainsZonesMatch(azureFailureDomains) {
+		for i := range azureFailureDomains {
+			azureFailureDomains[i].Zone = ""
+		}
+	}
+
 	cpmsFailureDomain := machinev1.FailureDomains{
 		Azure:    &azureFailureDomains,
 		Platform: configv1.AzurePlatformType,
 	}
 
 	return cpmsFailureDomain, nil
+}
+
+func allFailureDomainsZonesMatch(azureFailureDomains []machinev1.AzureFailureDomain) bool {
+	if len(azureFailureDomains) == 0 {
+		return true
+	}
+
+	for _, fd := range azureFailureDomains {
+		if fd.Zone != azureFailureDomains[0].Zone {
+			return false
+		}
+	}
+
+	return true
+}
+
+func allFailureDomainsSubnetsMatch(azureFailureDomains []machinev1.AzureFailureDomain) bool {
+	if len(azureFailureDomains) == 0 {
+		return true
+	}
+
+	for _, fd := range azureFailureDomains {
+		if fd.Subnet != azureFailureDomains[0].Subnet {
+			return false
+		}
+	}
+
+	return true
 }

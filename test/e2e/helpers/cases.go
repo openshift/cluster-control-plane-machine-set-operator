@@ -335,6 +335,10 @@ func ItShouldPerformControlPlaneMachineSetRegeneration(opts *ControlPlaneMachine
 			),
 		)
 
+		// Failure domain fields need to be removed from template providerSpec for comparison.
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value, err = opts.TestFramework.ConvertToControlPlaneMachineSetProviderSpec(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec)
+		Expect(err).NotTo(HaveOccurred(), "template providerSpec should support removal of failure domain fields")
+
 		By("Checking the control plane machine set has the correct providerSpec")
 		Expect(cpms).To(
 			HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw",

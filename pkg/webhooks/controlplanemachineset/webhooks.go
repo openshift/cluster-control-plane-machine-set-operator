@@ -255,7 +255,7 @@ func (r *ControlPlaneMachineSetWebhook) validateOpenShiftProviderMachineSpec(ctx
 
 	templateProviderConfig := providerConfig
 
-	if template.FailureDomains.Platform != "" {
+	if template.FailureDomains == nil || template.FailureDomains.Platform != "" {
 		failureDomains, err := failuredomain.NewFailureDomains(template.FailureDomains)
 		if err != nil {
 			return []error{field.Invalid(parentPath, template.FailureDomains, fmt.Sprintf("error constructing failure domain config: %s", err))}
@@ -301,10 +301,15 @@ func (r *ControlPlaneMachineSetWebhook) validateOpenShiftProviderMachineSpec(ctx
 func validateOpenShiftMachineV1BetaTemplateOnCreate(logger logr.Logger, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) []error {
 	errs := []error{}
 
-	if template.FailureDomains.Platform == "" {
+	if template.FailureDomains == nil || template.FailureDomains.Platform == "" {
 		errs = append(errs, checkOpenShiftProviderSpecFailureDomainMatchesMachines(logger, parentPath.Child("spec", "providerSpec"), template, machines, infrastructure)...)
 	} else {
-		errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(logger, parentPath.Child("failureDomains"), template.FailureDomains, machines, infrastructure)...)
+		providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, template.Spec, infrastructure)
+		if err != nil {
+			errs = append(errs, field.Invalid(parentPath.Child("spec", "providerSpec"), template.Spec, fmt.Sprintf("could not parse provider spec: %v", err)))
+		}
+		templateFailureDomain := providerConfig.ExtractFailureDomain()
+		errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(logger, parentPath.Child("failureDomains"), templateFailureDomain, template.FailureDomains, machines, infrastructure)...)
 	}
 
 	return errs
@@ -424,7 +429,7 @@ func checkOpenShiftProviderSpecFailureDomainMatchesMachines(logger logr.Logger, 
 
 // checkOpenShiftFailureDomainsMatchMachines ensures that failure domains of the Control Plane Machines match the
 // failure domains defined on the OpenShift Machine template on the ControlPlaneMachineSet.
-func checkOpenShiftFailureDomainsMatchMachines(logger logr.Logger, parentPath *field.Path, failureDomains machinev1.FailureDomains, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) []error {
+func checkOpenShiftFailureDomainsMatchMachines(logger logr.Logger, parentPath *field.Path, templateFailureDomain failuredomain.FailureDomain, failureDomains *machinev1.FailureDomains, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) []error {
 	errs := []error{}
 
 	machineFailureDomains, err := getMachineFailureDomains(logger, machines, infrastructure)
@@ -437,13 +442,18 @@ func checkOpenShiftFailureDomainsMatchMachines(logger logr.Logger, parentPath *f
 		return append(errs, field.Invalid(parentPath, failureDomains, fmt.Sprintf("error getting failure domains from control plane machine set machine template: %v", err)))
 	}
 
+	comparableSpecifiedFailureDomains, err := failuredomain.CompleteFailureDomains(specifiedFailureDomains, templateFailureDomain)
+	if err != nil {
+		return append(errs, field.InternalError(parentPath.Child("platform"), fmt.Errorf("could not make failure domains comparable: %w", err)))
+	}
+
 	// Failure domains used by control plane machines but not specified in the control plane machine set
-	if missingFailureDomains := missingFailureDomains(machineFailureDomains, specifiedFailureDomains); len(missingFailureDomains) > 0 {
+	if missingFailureDomains := missingFailureDomains(machineFailureDomains, comparableSpecifiedFailureDomains); len(missingFailureDomains) > 0 {
 		errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("control plane machines are using unspecified failure domain(s) %s", missingFailureDomains)))
 	}
 
 	// Failure domains specified in the control plane machine set but not used by control plane machines
-	if missingFailureDomains := missingFailureDomains(specifiedFailureDomains, machineFailureDomains); len(missingFailureDomains) > 0 {
+	if missingFailureDomains := missingFailureDomains(comparableSpecifiedFailureDomains, machineFailureDomains); len(missingFailureDomains) > 0 {
 		if duplicatedFailureDomains := duplicatedFailureDomains(machineFailureDomains); len(duplicatedFailureDomains) > 0 {
 			errs = append(errs, field.Forbidden(parentPath, fmt.Sprintf("no control plane machine is using specified failure domain(s) %s, failure domain(s) %s are duplicated within the control plane machines, please correct failure domains to match control plane machines", missingFailureDomains, duplicatedFailureDomains)))
 		}

@@ -19,6 +19,7 @@ package failuredomain
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -27,12 +28,30 @@ import (
 
 var _ = Describe("FailureDomains", func() {
 	Context("NewFailureDomains", func() {
+
+		Context("with nil failure domains configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				failureDomains, err = NewFailureDomains(&machinev1.FailureDomains{})
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should return a nil list", func() {
+				Expect(failureDomains).To(BeNil())
+			})
+		})
+
 		Context("with no failure domains configuration", func() {
 			var failureDomains []FailureDomain
 			var err error
 
 			BeforeEach(func() {
-				failureDomains, err = NewFailureDomains(machinev1.FailureDomains{})
+				failureDomains, err = NewFailureDomains(&machinev1.FailureDomains{})
 			})
 
 			It("should not error", func() {
@@ -51,7 +70,7 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				config := machinev1resourcebuilder.AWSFailureDomains().BuildFailureDomains()
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("should not error", func() {
@@ -75,7 +94,7 @@ var _ = Describe("FailureDomains", func() {
 				config := machinev1resourcebuilder.AWSFailureDomains().BuildFailureDomains()
 				config.AWS = nil
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("returns an error", func() {
@@ -94,7 +113,7 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				config := machinev1resourcebuilder.AzureFailureDomains().BuildFailureDomains()
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("should not error", func() {
@@ -118,7 +137,7 @@ var _ = Describe("FailureDomains", func() {
 				config := machinev1resourcebuilder.AzureFailureDomains().BuildFailureDomains()
 				config.Azure = nil
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("returns an error", func() {
@@ -137,7 +156,7 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				config := machinev1resourcebuilder.GCPFailureDomains().BuildFailureDomains()
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("should not error", func() {
@@ -161,7 +180,7 @@ var _ = Describe("FailureDomains", func() {
 				config := machinev1resourcebuilder.GCPFailureDomains().BuildFailureDomains()
 				config.GCP = nil
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("returns an error", func() {
@@ -180,7 +199,7 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				config := machinev1resourcebuilder.OpenStackFailureDomains().BuildFailureDomains()
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("should not error", func() {
@@ -207,7 +226,7 @@ var _ = Describe("FailureDomains", func() {
 					machinev1resourcebuilder.OpenStackFailureDomainBuilder{AvailabilityZone: "nova-az2", RootVolume: &machinev1.RootVolume{VolumeType: "volume.hostC"}},
 				).BuildFailureDomains()
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("should not error", func() {
@@ -231,7 +250,7 @@ var _ = Describe("FailureDomains", func() {
 				config := machinev1resourcebuilder.OpenStackFailureDomains().BuildFailureDomains()
 				config.OpenStack = nil
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("returns an error", func() {
@@ -252,7 +271,7 @@ var _ = Describe("FailureDomains", func() {
 					Platform: configv1.BareMetalPlatformType,
 				}
 
-				failureDomains, err = NewFailureDomains(config)
+				failureDomains, err = NewFailureDomains(&config)
 			})
 
 			It("returns an error", func() {
@@ -578,4 +597,324 @@ var _ = Describe("FailureDomains", func() {
 
 	})
 
+	Context("Complete", func() {
+		type testCase struct {
+			failureDomain         FailureDomain
+			templateFailureDomain FailureDomain
+			expectedResult        FailureDomain
+			expectedError         error
+		}
+
+		DescribeTable("can combine failure domain with template failure domain",
+			func(tc testCase) {
+				result, err := tc.failureDomain.Complete(tc.templateFailureDomain)
+				if tc.expectedError != nil {
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(tc.expectedError))
+
+					return
+				}
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result.String()).To(Equal(tc.expectedResult.String()))
+				Expect(result.Equal(tc.expectedResult)).To(BeTrue())
+			},
+			Entry("AWS failure domain",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1a").WithSubnet(machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ARN:  ptr.To[string]("arn-subnet-1"),
+						}).Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1a").WithSubnet(machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ARN:  ptr.To[string]("arn-subnet-1"),
+						}).Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1a").WithSubnet(machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ARN:  ptr.To[string]("arn-subnet-1"),
+						}).Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("AWS failure domain with empty template",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1a").WithSubnet(machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ARN:  ptr.To[string]("arn-subnet-1"),
+						}).Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws:          machinev1resourcebuilder.AWSFailureDomain().Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1a").WithSubnet(machinev1.AWSResourceReference{
+							Type: machinev1.AWSARNReferenceType,
+							ARN:  ptr.To[string]("arn-subnet-1"),
+						}).Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("AWS failure domain with different zone, subnet from template",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1c").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1a").WithSubnet(machinev1.AWSResourceReference{
+							Type:    machinev1.AWSFiltersReferenceType,
+							Filters: &[]machinev1.AWSResourceFilter{{Name: "tag:Name", Values: []string{"subnet-1"}}},
+						}).Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws: machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("us-west-1c").WithSubnet(machinev1.AWSResourceReference{
+							Type:    machinev1.AWSFiltersReferenceType,
+							Filters: &[]machinev1.AWSResourceFilter{{Name: "tag:Name", Values: []string{"subnet-1"}}},
+						}).Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("Azure failure domain with subnet from failuredomain",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").WithSubnet("subnet-1").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").WithSubnet("subnet-1").Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("Azure failure domain with empty template",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").WithSubnet("subnet-1").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").WithSubnet("subnet-1").Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("Azure failure domain with different zone, subnet from template",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("1").WithSubnet("subnet-1").Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.AzurePlatformType,
+						azure:        machinev1resourcebuilder.AzureFailureDomain().WithZone("2").WithSubnet("subnet-1").Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("GCP failure domain",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("1").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("1").Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("1").Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("GCP failure domain with empty template",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("1").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("1").Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("GCP failure domain with different zone",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("2").Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("1").Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.GCPPlatformType,
+						gcp:          machinev1resourcebuilder.GCPFailureDomain().WithZone("2").Build(),
+					},
+				},
+			),
+			Entry("OpenStack failure domain",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "fast-az2",
+							}).Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "fast-az2",
+							}).Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "fast-az2",
+							}).Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("OpenStack failure domain with empty template",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "fast-az2",
+							}).Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack:    machinev1resourcebuilder.OpenStackFailureDomain().Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "fast-az2",
+							}).Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("OpenStack failure domain with different volume type",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "different-az2",
+							}).Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "fast-az2",
+							}).Build(),
+					},
+					expectedResult: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "different-az2",
+							}).Build(),
+					},
+					expectedError: nil,
+				},
+			),
+			Entry("Nil template failure domain",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("1").Build(),
+					},
+					templateFailureDomain: nil,
+					expectedResult: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("1").Build(),
+					},
+					expectedError: errMissingTemplateFailureDomain,
+				},
+			),
+			Entry("Mismatched platform types",
+				testCase{
+					failureDomain: failureDomain{
+						platformType: configv1.OpenStackPlatformType,
+						openstack: machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az0").
+							WithRootVolume(&machinev1.RootVolume{
+								AvailabilityZone: "cinder-az2",
+								VolumeType:       "different-az2",
+							}).Build(),
+					},
+					templateFailureDomain: failureDomain{
+						platformType: configv1.AWSPlatformType,
+						aws:          machinev1resourcebuilder.AWSFailureDomain().WithAvailabilityZone("1").Build(),
+					},
+					expectedResult: nil,
+					expectedError:  errMismatchedPlatformType,
+				},
+			),
+			Entry("Generic failure domain",
+				testCase{
+					failureDomain:         NewGenericFailureDomain(),
+					templateFailureDomain: NewGenericFailureDomain(),
+					expectedResult:        NewGenericFailureDomain(),
+					expectedError:         nil,
+				},
+			),
+		)
+	})
 })
