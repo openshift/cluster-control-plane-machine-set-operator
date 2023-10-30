@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
-	github.com/aws/aws-sdk-go v1.45.3
+	github.com/aws/aws-sdk-go v1.46.6
 	github.com/go-logr/logr v1.2.4
 	github.com/go-test/deep v1.1.0
 	github.com/golang/mock v1.6.0
