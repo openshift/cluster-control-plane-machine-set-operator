@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,18 +30,30 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 
+	batchv1 "k8s.io/api/batch/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/klogr"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	azurecompute "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
+	azureauth "github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/option"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -61,6 +74,10 @@ var (
 
 	// errMissingInstanceSize is returned when the instance size is missing.
 	errMissingInstanceSize = errors.New("instance size is missing")
+
+	// errCredentialsSecret is returned when getting data from the cloud provider credentials secret fails or
+	// constructing the secret fails.
+	errCredentialsSecret = errors.New("credentials secret error")
 )
 
 // Framework is an interface for getting clients and information
@@ -103,6 +120,12 @@ type Framework interface {
 
 	// UpdateDefaultedValueFromCPMS updates a field that is defaulted by the defaulting webhook in the MAO with a desired value.
 	UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExtension) (*runtime.RawExtension, error)
+
+	// DeleteAnInstanceFromCloudProvider deletes an instance from the cloud provider.
+	DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Machine) error
+
+	// TerminateKubelet terminates kubelet on a node that is being referenced by the input machine.
+	TerminateKubelet(node *corev1.Node, delObjects map[string]runtimeclient.Object) error
 }
 
 // PlatformSupportLevel is used to identify which tests should run
@@ -119,6 +142,14 @@ const (
 	// Full means that the platform is supported by CPMS,
 	// and the CPMS will be created automatically.
 	Full
+)
+
+const (
+	// Namespace that contains the cloud credentials secret.
+	namespaceSecret = "openshift-machine-api"
+
+	// Name of the field that contains credentials within the cloud credentials secret for GCP.
+	gcpCredentialsSecretKey = "service_account.json"
 )
 
 // framework is an implementation of the Framework interface.
@@ -209,6 +240,11 @@ func (f *framework) GetScheme() *runtime.Scheme {
 	return f.scheme
 }
 
+// GetLogger returns the logger.
+func (f *framework) GetLogger() logr.Logger {
+	return f.logger
+}
+
 // NewEmptyControlPlaneMachineSet returns a new control plane machine set with
 // just the name and namespace set.
 func (f *framework) NewEmptyControlPlaneMachineSet() *machinev1.ControlPlaneMachineSet {
@@ -291,6 +327,195 @@ func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExt
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
+}
+
+// DeleteAnInstanceFromCloudProvider deletes an instances from a cloud provider.
+// Currently supported are AWS, Azure and GCP.
+func (f *framework) DeleteAnInstanceFromCloudProvider(machine *machinev1beta1.Machine) error {
+	ctx := f.GetContext()
+	client := f.client
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	if err := client.Get(f.GetContext(), f.ControlPlaneMachineSetKey(), cpms); err != nil {
+		return fmt.Errorf("control plane machine set should exist: %w", err)
+	}
+
+	switch f.GetPlatformType() {
+	case configv1.AWSPlatformType:
+		return deleteAWSInstance(ctx, client, machine)
+	case configv1.AzurePlatformType:
+		return deleteAzureInstance(ctx, client, machine)
+	case configv1.GCPPlatformType:
+		return deleteGCPInstance(ctx, client, f.logger, machine)
+	}
+
+	return nil
+}
+
+// TerminateKubelet terminates kubelet on a node that is being referenced by the input machine.
+func (f *framework) TerminateKubelet(node *corev1.Node, delObjects map[string]runtimeclient.Object) error {
+	client := f.GetClient()
+	ctx := f.GetContext()
+
+	serviceAccount, err := createServiceAccount(ctx, client)
+	if err != nil {
+		return fmt.Errorf("failed to create a service account: %w", err)
+	}
+
+	delObjects[serviceAccount.Name] = serviceAccount
+
+	role, err := createRole(ctx, client)
+	if err != nil {
+		return fmt.Errorf("failed to create a role: %w", err)
+	}
+
+	delObjects[role.Name] = role
+
+	roleBinding, err := createRoleBinding(ctx, client)
+	if err != nil {
+		return fmt.Errorf("failed to create a role binding: %w", err)
+	}
+
+	delObjects[roleBinding.Name] = roleBinding
+
+	job, err := createJob(ctx, client, node.Name, serviceAccount.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create a job: %w", err)
+	}
+
+	delObjects[job.Name] = job
+
+	return nil
+}
+
+func createServiceAccount(ctx context.Context, client runtimeclient.Client) (*corev1.ServiceAccount, error) {
+	serviceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-service-account",
+			Namespace: MachineAPINamespace,
+		},
+	}
+
+	if err := client.Create(ctx, serviceAccount); err != nil {
+		return nil, fmt.Errorf("failed to create ServiceAccount: %w", err)
+	}
+
+	return serviceAccount, nil
+}
+
+func createRole(ctx context.Context, client runtimeclient.Client) (*rbacv1.Role, error) {
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-role",
+			Namespace: MachineAPINamespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				ResourceNames: []string{"privileged"},
+				Resources:     []string{"securitycontextconstraints"},
+				Verbs:         []string{"use"},
+			},
+		},
+	}
+
+	if err := client.Create(ctx, role); err != nil {
+		return nil, fmt.Errorf("failed to create Role: %w", err)
+	}
+
+	return role, nil
+}
+
+func createRoleBinding(ctx context.Context, client runtimeclient.Client) (*rbacv1.RoleBinding, error) {
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-role-binding",
+			Namespace: MachineAPINamespace,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "termination-role",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "termination-service-account",
+				Namespace: MachineAPINamespace,
+			},
+		},
+	}
+
+	if err := client.Create(ctx, roleBinding); err != nil {
+		return nil, fmt.Errorf("failed to create RoleBinding: %w", err)
+	}
+
+	return roleBinding, nil
+}
+
+func createJob(ctx context.Context, client runtimeclient.Client, nodeName, serviceAccountName string) (*batchv1.Job, error) { //nolint: funlen
+	script := `apk update && apk add util-linux && chroot /host /bin/bash -c "systemctl stop kubelet";`
+	hostPathDir := corev1.HostPathDirectory
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "termination-job",
+			Namespace: MachineAPINamespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "termination-kubelet",
+							Image:   "alpine:3.12",
+							Command: []string{"/bin/sh", "-c"},
+							Args:    []string{script},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "NAMESPACE",
+									Value: MachineAPINamespace,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: ptr.To[bool](true),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "host",
+									MountPath: "/host",
+								},
+							},
+						},
+					},
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					NodeName:           nodeName,
+					DNSPolicy:          corev1.DNSClusterFirstWithHostNet,
+					ServiceAccountName: serviceAccountName,
+					HostNetwork:        true,
+					HostPID:            true,
+					HostIPC:            true,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/",
+									Type: &hostPathDir,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := client.Create(ctx, job); err != nil {
+		return nil, fmt.Errorf("failed to create job: %w", err)
+	}
+
+	return job, nil
 }
 
 // updateCredentialsSecretNameAzure updates the credentialSecret field from the ControlPlaneMachineSet.
@@ -897,6 +1122,229 @@ func setProviderSpecValue(rawProviderSpec *runtime.RawExtension, value interface
 		Object: providerSpecValue,
 	}
 	rawProviderSpec.Raw = nil
+
+	return nil
+}
+
+// newConfigForStaticCreds gives us bytes that we should write to a temporary file with shared credentials for AWS.
+func newConfigForStaticCreds(accessKey string, accessSecret string) []byte {
+	buf := &bytes.Buffer{}
+	fmt.Fprint(buf, "[default]\n")
+	fmt.Fprintf(buf, "aws_access_key_id = %s\n", accessKey)
+	fmt.Fprintf(buf, "aws_secret_access_key = %s\n", accessSecret)
+
+	return buf.Bytes()
+}
+
+// sharedCredentialsFileFromSecret creates a new temporary file containing the AWS credentials.
+func sharedCredentialsFileFromSecret(credentialsSecret *corev1.Secret) (string, error) {
+	var data []byte
+
+	if len(credentialsSecret.Data["aws_access_key_id"]) > 0 && len(credentialsSecret.Data["aws_secret_access_key"]) > 0 {
+		data = newConfigForStaticCreds(
+			string(credentialsSecret.Data["aws_access_key_id"]),
+			string(credentialsSecret.Data["aws_secret_access_key"]),
+		)
+	} else {
+		return "", fmt.Errorf("missing values in AWS credentials secret: %w", errCredentialsSecret)
+	}
+
+	f, err := os.CreateTemp("", "aws-shared-credentials")
+	if err != nil {
+		return "", fmt.Errorf("failed to create file for shared credentials: %w", err)
+	}
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	if _, err := f.Write(data); err != nil {
+		return "", fmt.Errorf("failed to write credentials to %s: %w", f.Name(), err)
+	}
+
+	return f.Name(), nil
+}
+
+// deleteAWSInstance deletes an instance from the AWS cloud provider.
+func deleteAWSInstance(ctx context.Context, client runtimeclient.Client, machine *machinev1beta1.Machine) error {
+	var credentialsSecret corev1.Secret
+	if err := client.Get(ctx, runtimeclient.ObjectKey{
+		Namespace: namespaceSecret,
+		Name:      "aws-cloud-credentials",
+	}, &credentialsSecret); err != nil {
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for AWS: %w", err)
+	}
+
+	providerStatus := &machinev1beta1.AWSMachineProviderStatus{}
+	providerStatusRaw := machine.Status.ProviderStatus
+
+	if err := json.Unmarshal(providerStatusRaw.Raw, providerStatus); err != nil {
+		return fmt.Errorf("failed to unmarshal provider status: %w", err)
+	}
+
+	instanceID := providerStatus.InstanceID
+	region := machine.Labels["machine.openshift.io/region"]
+
+	sessionOptions := session.Options{
+		Config: aws.Config{
+			Region: aws.String(region),
+		},
+	}
+
+	sharedCredsFile, err := sharedCredentialsFileFromSecret(&credentialsSecret)
+	if err != nil {
+		return fmt.Errorf("could not create a shared credentials file from an AWS credentials secret: %w", errCredentialsSecret)
+	}
+
+	sessionOptions.SharedConfigState = session.SharedConfigEnable
+	sessionOptions.SharedConfigFiles = []string{sharedCredsFile}
+
+	session, err := session.NewSessionWithOptions(sessionOptions)
+	if err != nil {
+		return fmt.Errorf("could not create a session: %w", err)
+	}
+
+	awsClient := ec2.New(session)
+
+	input := &ec2.TerminateInstancesInput{
+		DryRun:      aws.Bool(false),
+		InstanceIds: aws.StringSlice([]string{*instanceID}),
+	}
+
+	_, err = awsClient.TerminateInstances(input)
+	if err != nil {
+		return fmt.Errorf("should be able to delete an AWS instance: %w", err)
+	}
+
+	return nil
+}
+
+// azureCredentialsData contains values from the cloud credentials secret on Azure.
+type azureCredentialsData struct {
+	subscriptionID string
+	resourceGroup  string
+	clientID       string
+	clientSecret   string
+	tenantID       string
+}
+
+// getAzureCredentialsData gets values from cloud credentials secret.
+func getAzureCredentialsData(credentialsSecret *corev1.Secret) (*azureCredentialsData, error) {
+	subscriptionID, ok := credentialsSecret.Data["azure_subscription_id"]
+	if !ok {
+		return nil, fmt.Errorf("could not get subscriptionID from Azure credentials secret: %w", errCredentialsSecret)
+	}
+
+	resourceGroup, ok := credentialsSecret.Data["azure_resourcegroup"]
+	if !ok {
+		return nil, fmt.Errorf("could not get resourceGroup from Azure credentials secret: %w", errCredentialsSecret)
+	}
+
+	clientID, ok := credentialsSecret.Data["azure_client_id"]
+	if !ok {
+		return nil, fmt.Errorf("could not get clientID from Azure credentials secret: %w", errCredentialsSecret)
+	}
+
+	clientSecret, ok := credentialsSecret.Data["azure_client_secret"]
+	if !ok {
+		return nil, fmt.Errorf("could not get clientSecret from Azure credentials secret: %w", errCredentialsSecret)
+	}
+
+	tenantID, ok := credentialsSecret.Data["azure_tenant_id"]
+	if !ok {
+		return nil, fmt.Errorf("could not get tenantID from Azure credentials secret: %w", errCredentialsSecret)
+	}
+
+	return &azureCredentialsData{
+		subscriptionID: string(subscriptionID),
+		resourceGroup:  string(resourceGroup),
+		clientID:       string(clientID),
+		clientSecret:   string(clientSecret),
+		tenantID:       string(tenantID),
+	}, nil
+}
+
+// deleteAzureInstance deletes an instance from the Azure cloud provider.
+func deleteAzureInstance(ctx context.Context, client runtimeclient.Client, machine *machinev1beta1.Machine) error {
+	var credentialsSecret corev1.Secret
+	if err := client.Get(ctx, runtimeclient.ObjectKey{
+		Namespace: namespaceSecret,
+		Name:      "azure-cloud-credentials",
+	}, &credentialsSecret); err != nil {
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for Azure: %w", err)
+	}
+
+	secretData, err := getAzureCredentialsData(&credentialsSecret)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve data from credentials secret: %w", err)
+	}
+
+	vmName := machine.Status.NodeRef.Name
+
+	authorizer, err := azureauth.NewClientCredentialsConfig(secretData.clientID, secretData.clientSecret, secretData.tenantID).Authorizer()
+	if err != nil {
+		return fmt.Errorf("failed to authenticate with Azure: %w", err)
+	}
+
+	vmClient := azurecompute.NewVirtualMachinesClient(secretData.subscriptionID)
+	vmClient.Authorizer = authorizer
+
+	forceDeletion := false
+
+	_, err = vmClient.Delete(ctx, secretData.resourceGroup, vmName, &forceDeletion)
+	if err != nil {
+		return fmt.Errorf("should be able to delete an Azure instance: %w", err)
+	}
+
+	return nil
+}
+
+// deleteGCPInstance deletes an instance from the GCP cloud provider.
+func deleteGCPInstance(ctx context.Context, client runtimeclient.Client, logger logr.Logger, machine *machinev1beta1.Machine) error {
+	var credentialsSecret corev1.Secret
+	if err := client.Get(ctx, runtimeclient.ObjectKey{
+		Namespace: namespaceSecret,
+		Name:      "gcp-cloud-credentials",
+	}, &credentialsSecret); err != nil {
+		return fmt.Errorf("should be able to retrieve the cloud credentials secret for GCP: %w", errCredentialsSecret)
+	}
+
+	serviceAccountJSON, ok := credentialsSecret.Data[gcpCredentialsSecretKey]
+	if !ok {
+		return fmt.Errorf("credentials secret does not have field %s set: %w", gcpCredentialsSecretKey, errCredentialsSecret)
+	}
+
+	creds, err := google.CredentialsFromJSON(ctx, serviceAccountJSON, compute.CloudPlatformScope)
+	if err != nil {
+		return fmt.Errorf("failed to get GCP credentials from JSON: %w", err)
+	}
+
+	computeService, err := compute.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return fmt.Errorf("failed to create new compute service: %w", err)
+	}
+
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(logger, machinev1beta1.MachineSpec{
+		ProviderSpec: machinev1beta1.ProviderSpec{
+			Value: machine.Spec.ProviderSpec.Value,
+		},
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get provider config: %w", err)
+	}
+
+	gcpProviderSpec := providerConfig.GCP().Config()
+
+	projectID := gcpProviderSpec.ProjectID
+	zone := gcpProviderSpec.Zone
+	instanceName := machine.Status.NodeRef.Name
+
+	_, err = computeService.Instances.Delete(projectID, zone, instanceName).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("should be able to delete a GCP instance: %w", err)
+	}
 
 	return nil
 }

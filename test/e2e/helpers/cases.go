@@ -141,7 +141,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.RollingUpdate)
+			return CheckRolloutForIndex(testFramework, rolloutCtx, index, machinev1.RollingUpdate)
 		})
 
 		wg.Wait()
@@ -224,6 +224,49 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 
 		By("Waiting for the cluster to stabilise after the rollout")
 		EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
+		By("Cluster stabilised after the rollout")
+	})
+}
+
+// ItShouldReplaceTheOutDatedMachineInDeleting checks that the control plane machine set replaces the outdated
+// machine in phase Deleting in the given index.
+func ItShouldReplaceTheOutDatedMachineInDeleting(testFramework framework.Framework, index int) {
+	It("should replace the outdated machine when deleted", func() {
+		k8sClient := testFramework.GetClient()
+		ctx := testFramework.GetContext()
+
+		machine, err := machineForIndex(testFramework, index)
+		Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
+
+		By(fmt.Sprintf("The machine at index %d should be deleting phase", index))
+		Eventually(komega.Object(machine), 3*time.Minute).Should(
+			HaveField("Status.Phase", HaveValue(Equal("Deleting"))),
+		)
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
+		defer cancel()
+
+		wg := &sync.WaitGroup{}
+
+		framework.Async(wg, cancel, func() bool {
+			return CheckReplicasDoesNotExceedSurgeCapacity(rolloutCtx)
+		})
+
+		framework.Async(wg, cancel, func() bool {
+			return WaitForControlPlaneMachineSetDesiredReplicas(rolloutCtx, cpms.DeepCopy())
+		})
+
+		wg.Wait()
+
+		// If there's an error in the context, either it timed out or one of the async checks failed.
+		Expect(rolloutCtx.Err()).ToNot(HaveOccurred(), "rollout should have completed successfully")
+		By("Control plane machine rollout completed successfully")
+
+		By("Waiting for the cluster to stabilise after the rollout")
+		EventuallyClusterOperatorsShouldStabilise(30*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
