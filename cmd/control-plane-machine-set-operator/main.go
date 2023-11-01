@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
@@ -38,6 +39,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	cpmscontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachineset"
 	cpmsgeneratorcontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachinesetgenerator"
@@ -108,9 +110,17 @@ func main() { //nolint:funlen,cyclop
 	})
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                        scheme,
-		MetricsBindAddress:            metricsAddr,
-		Port:                          webhookPort,
+		Scheme:             scheme,
+		MetricsBindAddress: metricsAddr,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port: webhookPort,
+			TLSOpts: []func(*tls.Config){
+				func(t *tls.Config) {
+					t.MinVersion = tls.VersionTLS12
+					t.CipherSuites = util.GetAllowedTLSCipherSuites()
+				},
+			},
+		}),
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElectionNamespace:       leaderElectionConfig.ResourceNamespace,
 		LeaderElection:                leaderElectionConfig.LeaderElect,
