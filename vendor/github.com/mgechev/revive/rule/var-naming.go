@@ -13,50 +13,27 @@ import (
 
 var anyCapsRE = regexp.MustCompile(`[A-Z]`)
 
-// regexp for constant names like `SOME_CONST`, `SOME_CONST_2`, `X123_3`, `_SOME_PRIVATE_CONST` (#851, #865)
-var upperCaseConstRE = regexp.MustCompile(`^_?[A-Z][A-Z\d]*(_[A-Z\d]+)*$`)
-
 // VarNamingRule lints given else constructs.
 type VarNamingRule struct {
-	configured     bool
-	whitelist      []string
-	blacklist      []string
-	upperCaseConst bool // if true - allows to use UPPER_SOME_NAMES for constants
+	configured bool
+	whitelist  []string
+	blacklist  []string
 	sync.Mutex
 }
 
 func (r *VarNamingRule) configure(arguments lint.Arguments) {
 	r.Lock()
-	defer r.Unlock()
-	if r.configured {
-		return
-	}
-
-	r.configured = true
-	if len(arguments) >= 1 {
-		r.whitelist = getList(arguments[0], "whitelist")
-	}
-
-	if len(arguments) >= 2 {
-		r.blacklist = getList(arguments[1], "blacklist")
-	}
-
-	if len(arguments) >= 3 {
-		// not pretty code because should keep compatibility with TOML (no mixed array types) and new map parameters
-		thirdArgument := arguments[2]
-		asSlice, ok := thirdArgument.([]interface{})
-		if !ok {
-			panic(fmt.Sprintf("Invalid third argument to the var-naming rule. Expecting a %s of type slice, got %T", "options", arguments[2]))
+	if !r.configured {
+		if len(arguments) >= 1 {
+			r.whitelist = getList(arguments[0], "whitelist")
 		}
-		if len(asSlice) != 1 {
-			panic(fmt.Sprintf("Invalid third argument to the var-naming rule. Expecting a %s of type slice, of len==1, but %d", "options", len(asSlice)))
+
+		if len(arguments) >= 2 {
+			r.blacklist = getList(arguments[1], "blacklist")
 		}
-		args, ok := asSlice[0].(map[string]interface{})
-		if !ok {
-			panic(fmt.Sprintf("Invalid third argument to the var-naming rule. Expecting a %s of type slice, of len==1, with map, but %T", "options", asSlice[0]))
-		}
-		r.upperCaseConst = fmt.Sprint(args["upperCaseConst"]) == "true"
+		r.configured = true
 	}
+	r.Unlock()
 }
 
 // Apply applies the rule to given file.
@@ -75,7 +52,6 @@ func (r *VarNamingRule) Apply(file *lint.File, arguments lint.Arguments) []lint.
 		onFailure: func(failure lint.Failure) {
 			failures = append(failures, failure)
 		},
-		upperCaseConst: r.upperCaseConst,
 	}
 
 	// Package names need slightly different handling than other names.
@@ -106,28 +82,22 @@ func (*VarNamingRule) Name() string {
 	return "var-naming"
 }
 
-func (w *lintNames) checkList(fl *ast.FieldList, thing string) {
+func checkList(fl *ast.FieldList, thing string, w *lintNames) {
 	if fl == nil {
 		return
 	}
 	for _, f := range fl.List {
 		for _, id := range f.Names {
-			w.check(id, thing)
+			check(id, thing, w)
 		}
 	}
 }
 
-func (w *lintNames) check(id *ast.Ident, thing string) {
+func check(id *ast.Ident, thing string, w *lintNames) {
 	if id.Name == "_" {
 		return
 	}
 	if knownNameExceptions[id.Name] {
-		return
-	}
-
-	// #851 upperCaseConst support
-	// if it's const
-	if thing == token.CONST.String() && w.upperCaseConst && upperCaseConstRE.Match([]byte(id.Name)) {
 		return
 	}
 
@@ -140,6 +110,15 @@ func (w *lintNames) check(id *ast.Ident, thing string) {
 			Category:   "naming",
 		})
 		return
+	}
+	if len(id.Name) > 2 && id.Name[0] == 'k' && id.Name[1] >= 'A' && id.Name[1] <= 'Z' {
+		should := string(id.Name[1]+'a'-'A') + id.Name[2:]
+		w.onFailure(lint.Failure{
+			Failure:    fmt.Sprintf("don't use leading k in Go names; %s %s should be %s", thing, id.Name, should),
+			Confidence: 0.8,
+			Node:       id,
+			Category:   "naming",
+		})
 	}
 
 	should := lint.Name(id.Name, w.whitelist, w.blacklist)
@@ -165,12 +144,11 @@ func (w *lintNames) check(id *ast.Ident, thing string) {
 }
 
 type lintNames struct {
-	file           *lint.File
-	fileAst        *ast.File
-	onFailure      func(lint.Failure)
-	whitelist      []string
-	blacklist      []string
-	upperCaseConst bool
+	file      *lint.File
+	fileAst   *ast.File
+	onFailure func(lint.Failure)
+	whitelist []string
+	blacklist []string
 }
 
 func (w *lintNames) Visit(n ast.Node) ast.Visitor {
@@ -181,7 +159,7 @@ func (w *lintNames) Visit(n ast.Node) ast.Visitor {
 		}
 		for _, exp := range v.Lhs {
 			if id, ok := exp.(*ast.Ident); ok {
-				w.check(id, "var")
+				check(id, "var", w)
 			}
 		}
 	case *ast.FuncDecl:
@@ -203,24 +181,31 @@ func (w *lintNames) Visit(n ast.Node) ast.Visitor {
 		// not exported in the Go API.
 		// See https://github.com/golang/lint/issues/144.
 		if ast.IsExported(v.Name.Name) || !isCgoExported(v) {
-			w.check(v.Name, thing)
+			check(v.Name, thing, w)
 		}
 
-		w.checkList(v.Type.Params, thing+" parameter")
-		w.checkList(v.Type.Results, thing+" result")
+		checkList(v.Type.Params, thing+" parameter", w)
+		checkList(v.Type.Results, thing+" result", w)
 	case *ast.GenDecl:
 		if v.Tok == token.IMPORT {
 			return w
 		}
-
-		thing := v.Tok.String()
+		var thing string
+		switch v.Tok {
+		case token.CONST:
+			thing = "const"
+		case token.TYPE:
+			thing = "type"
+		case token.VAR:
+			thing = "var"
+		}
 		for _, spec := range v.Specs {
 			switch s := spec.(type) {
 			case *ast.TypeSpec:
-				w.check(s.Name, thing)
+				check(s.Name, thing, w)
 			case *ast.ValueSpec:
 				for _, id := range s.Names {
-					w.check(id, thing)
+					check(id, thing, w)
 				}
 			}
 		}
@@ -232,23 +217,23 @@ func (w *lintNames) Visit(n ast.Node) ast.Visitor {
 			if !ok { // might be an embedded interface name
 				continue
 			}
-			w.checkList(ft.Params, "interface method parameter")
-			w.checkList(ft.Results, "interface method result")
+			checkList(ft.Params, "interface method parameter", w)
+			checkList(ft.Results, "interface method result", w)
 		}
 	case *ast.RangeStmt:
 		if v.Tok == token.ASSIGN {
 			return w
 		}
 		if id, ok := v.Key.(*ast.Ident); ok {
-			w.check(id, "range var")
+			check(id, "range var", w)
 		}
 		if id, ok := v.Value.(*ast.Ident); ok {
-			w.check(id, "range var")
+			check(id, "range var", w)
 		}
 	case *ast.StructType:
 		for _, f := range v.Fields.List {
 			for _, id := range f.Names {
-				w.check(id, "struct field")
+				check(id, "struct field", w)
 			}
 		}
 	}

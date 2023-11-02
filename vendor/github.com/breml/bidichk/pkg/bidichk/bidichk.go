@@ -15,7 +15,7 @@ import (
 
 const (
 	doc           = "bidichk detects dangerous unicode character sequences"
-	disallowedDoc = `comma separated list of disallowed runes (full name or short name)
+	disallowedDoc = `coma separated list of disallowed runes (full name or short name)
 
 Supported runes
 

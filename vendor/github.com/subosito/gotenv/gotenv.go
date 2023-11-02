@@ -12,9 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"golang.org/x/text/encoding/unicode"
-	"golang.org/x/text/transform"
 )
 
 const (
@@ -23,13 +20,9 @@ const (
 
 	// Pattern for detecting valid variable within a value
 	variablePattern = `(\\)?(\$)(\{?([A-Z0-9_]+)?\}?)`
-)
 
-// Byte order mark character
-var (
-	bomUTF8    = []byte("\xEF\xBB\xBF")
-	bomUTF16LE = []byte("\xFF\xFE")
-	bomUTF16BE = []byte("\xFE\xFF")
+	// Byte order mark character
+	bom = "\xef\xbb\xbf"
 )
 
 // Env holds key/value pair of valid environment variable
@@ -210,40 +203,19 @@ func splitLines(data []byte, atEOF bool) (advance int, token []byte, err error) 
 
 func strictParse(r io.Reader, override bool) (Env, error) {
 	env := make(Env)
-
-	buf := new(bytes.Buffer)
-	tee := io.TeeReader(r, buf)
-
-	// There can be a maximum of 3 BOM bytes.
-	bomByteBuffer := make([]byte, 3)
-	_, err := tee.Read(bomByteBuffer)
-	if err != nil && err != io.EOF {
-		return env, err
-	}
-
-	z := io.MultiReader(buf, r)
-
-	// We chooes a different scanner depending on file encoding.
-	var scanner *bufio.Scanner
-
-	if bytes.HasPrefix(bomByteBuffer, bomUTF8) {
-		scanner = bufio.NewScanner(transform.NewReader(z, unicode.UTF8BOM.NewDecoder()))
-	} else if bytes.HasPrefix(bomByteBuffer, bomUTF16LE) {
-		scanner = bufio.NewScanner(transform.NewReader(z, unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder()))
-	} else if bytes.HasPrefix(bomByteBuffer, bomUTF16BE) {
-		scanner = bufio.NewScanner(transform.NewReader(z, unicode.UTF16(unicode.BigEndian, unicode.ExpectBOM).NewDecoder()))
-	} else {
-		scanner = bufio.NewScanner(z)
-	}
-
+	scanner := bufio.NewScanner(r)
 	scanner.Split(splitLines)
 
+	firstLine := true
+
 	for scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return env, err
+		line := strings.TrimSpace(scanner.Text())
+
+		if firstLine {
+			line = strings.TrimPrefix(line, bom)
+			firstLine = false
 		}
 
-		line := strings.TrimSpace(scanner.Text())
 		if line == "" || line[0] == '#' {
 			continue
 		}
@@ -291,7 +263,7 @@ func strictParse(r io.Reader, override bool) (Env, error) {
 		}
 	}
 
-	return env, scanner.Err()
+	return env, nil
 }
 
 var (

@@ -97,21 +97,18 @@ func (w lintDeferRule) Visit(node ast.Node) ast.Visitor {
 			w.newFailure("return in a defer function has no effect", n, 1.0, "logic", "return")
 		}
 	case *ast.CallExpr:
-		isCallToRecover := isIdent(n.Fun, "recover")
-		switch {
-		case !w.inADefer && isCallToRecover:
+		if !w.inADefer && isIdent(n.Fun, "recover") {
 			// func fn() { recover() }
 			//
 			// confidence is not 1 because recover can be in a function that is deferred elsewhere
 			w.newFailure("recover must be called inside a deferred function", n, 0.8, "logic", "recover")
-		case w.inADefer && !w.inAFuncLit && isCallToRecover:
+		} else if w.inADefer && !w.inAFuncLit && isIdent(n.Fun, "recover") {
 			// defer helper(recover())
 			//
 			// confidence is not truly 1 because this could be in a correctly-deferred func,
 			// but it is very likely to be a misunderstanding of defer's behavior around arguments.
 			w.newFailure("recover must be called inside a deferred function, this is executing recover immediately", n, 1, "logic", "immediate-recover")
 		}
-
 	case *ast.DeferStmt:
 		if isIdent(n.Call.Fun, "recover") {
 			// defer recover()
@@ -122,12 +119,7 @@ func (w lintDeferRule) Visit(node ast.Node) ast.Visitor {
 		}
 		w.visitSubtree(n.Call.Fun, true, false, false)
 		for _, a := range n.Call.Args {
-			switch a.(type) {
-			case *ast.FuncLit:
-				continue // too hard to analyze deferred calls with func literals args
-			default:
-				w.visitSubtree(a, true, false, false) // check arguments, they should not contain recover()
-			}
+			w.visitSubtree(a, true, false, false) // check arguments, they should not contain recover()
 		}
 
 		if w.inALoop {
@@ -144,7 +136,6 @@ func (w lintDeferRule) Visit(node ast.Node) ast.Visitor {
 					w.newFailure("be careful when deferring calls to methods without pointer receiver", fn, 0.8, "bad practice", "method-call")
 				}
 			}
-
 		}
 		return nil
 	}

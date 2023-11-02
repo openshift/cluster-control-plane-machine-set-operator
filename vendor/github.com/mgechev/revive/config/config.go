@@ -31,6 +31,7 @@ var defaultRules = []lint.Rule{
 	&rule.TimeNamingRule{},
 	&rule.ContextKeysType{},
 	&rule.ContextAsArgumentRule{},
+	&rule.IfReturnRule{},
 	&rule.EmptyBlockRule{},
 	&rule.SuperfluousElseRule{},
 	&rule.UnusedParamRule{},
@@ -86,8 +87,6 @@ var allRules = append([]lint.Rule{
 	&rule.UseAnyRule{},
 	&rule.DataRaceRule{},
 	&rule.CommentSpacingsRule{},
-	&rule.IfReturnRule{},
-	&rule.RedundantImportAlias{},
 }, defaultRules...)
 
 var allFormatters = []lint.Formatter{
@@ -149,14 +148,6 @@ func parseConfig(path string, config *lint.Config) error {
 	if err != nil {
 		return fmt.Errorf("cannot parse the config file: %v", err)
 	}
-	for k, r := range config.Rules {
-		err := r.Initialize()
-		if err != nil {
-			return fmt.Errorf("error in config of rule [%s] : [%v]", k, err)
-		}
-		config.Rules[k] = r
-	}
-
 	return nil
 }
 

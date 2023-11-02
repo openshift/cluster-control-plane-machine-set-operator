@@ -19,11 +19,11 @@ const bannedCharsRuleName = "banned-characters"
 
 func (r *BannedCharsRule) configure(arguments lint.Arguments) {
 	r.Lock()
-	defer r.Unlock()
-	if r.bannedCharList == nil && len(arguments) > 0 {
+	if r.bannedCharList == nil {
 		checkNumberOfArguments(1, arguments, bannedCharsRuleName)
 		r.bannedCharList = r.getBannedCharsList(arguments)
 	}
+	r.Unlock()
 }
 
 // Apply applied the rule to the given file.
