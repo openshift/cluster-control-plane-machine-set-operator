@@ -27,10 +27,10 @@ type packages struct {
 
 func (ps *packages) methodNames(lp *lint.Package) pkgMethods {
 	ps.mu.Lock()
-	defer ps.mu.Unlock()
 
 	for _, pkg := range ps.pkgs {
 		if pkg.pkg == lp {
+			ps.mu.Unlock()
 			return pkg
 		}
 	}
@@ -38,6 +38,7 @@ func (ps *packages) methodNames(lp *lint.Package) pkgMethods {
 	pkgm := pkgMethods{pkg: lp, methods: make(map[string]map[string]*referenceMethod), mu: &sync.Mutex{}}
 	ps.pkgs = append(ps.pkgs, pkgm)
 
+	ps.mu.Unlock()
 	return pkgm
 }
 
@@ -71,7 +72,6 @@ func (*ConfusingNamingRule) Name() string {
 
 // checkMethodName checks if a given method/function name is similar (just case differences) to other method/function of the same struct/file.
 func checkMethodName(holder string, id *ast.Ident, w *lintConfusingNames) {
-
 	if id.Name == "init" && holder == defaultStructName {
 		// ignore init functions
 		return
@@ -137,11 +137,8 @@ func getStructName(r *ast.FieldList) string {
 
 	t := r.List[0].Type
 
-	switch v := t.(type) {
-	case *ast.StarExpr:
-		t = v.X
-	case *ast.IndexExpr:
-		t = v.X
+	if p, _ := t.(*ast.StarExpr); p != nil { // if a pointer receiver => dereference pointer receiver types
+		t = p.X
 	}
 
 	if p, _ := t.(*ast.Ident); p != nil {

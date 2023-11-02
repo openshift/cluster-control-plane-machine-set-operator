@@ -220,10 +220,8 @@ type driverResponse struct {
 	// lists of multiple drivers, go/packages will fall back to the next driver.
 	NotHandled bool
 
-	// Compiler and Arch are the arguments pass of types.SizesFor
-	// to get a types.Sizes to use when type checking.
-	Compiler string
-	Arch     string
+	// Sizes, if not nil, is the types.Sizes to use when type checking.
+	Sizes *types.StdSizes
 
 	// Roots is the set of package IDs that make up the root packages.
 	// We have to encode this separately because when we encode a single package
@@ -264,7 +262,7 @@ func Load(cfg *Config, patterns ...string) ([]*Package, error) {
 	if err != nil {
 		return nil, err
 	}
-	l.sizes = types.SizesFor(response.Compiler, response.Arch)
+	l.sizes = response.Sizes
 	return l.refine(response)
 }
 
