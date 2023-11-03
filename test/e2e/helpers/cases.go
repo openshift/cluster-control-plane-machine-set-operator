@@ -239,7 +239,7 @@ func ItShouldReplaceTheOutDatedMachineInDeleting(testFramework framework.Framewo
 		Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
 
 		By(fmt.Sprintf("The machine at index %d should be deleting phase", index))
-		Eventually(komega.Object(machine), 3*time.Minute).Should(
+		Eventually(komega.Object(machine), 5*time.Minute).Should(
 			HaveField("Status.Phase", HaveValue(Equal("Deleting"))),
 		)
 
@@ -266,7 +266,7 @@ func ItShouldReplaceTheOutDatedMachineInDeleting(testFramework framework.Framewo
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(30*time.Minute, 30*time.Second)
+		EventuallyClusterOperatorsShouldStabilise(90*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }

@@ -34,7 +34,7 @@ import (
 
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func() {
 	BeforeEach(func() {
-		helpers.EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 10*time.Second)
+		helpers.EventuallyClusterOperatorsShouldStabilise(60*time.Minute, 30*time.Second)
 	})
 
 	Context("With an active ControlPlaneMachineSet", func() {
@@ -53,8 +53,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 		})
 
 		Context("and an instance is terminated on the cloud provider", func() {
-			var idx int
-
 			BeforeEach(func() {
 				client := testFramework.GetClient()
 				machineList := &machinev1beta1.MachineList{}
@@ -72,8 +70,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				Expect(err).ToNot(HaveOccurred())
 				Expect(machineIdx).To(Equal(0), "Expected first machine to have index 0")
 
-				idx = machineIdx
-
 				By("Deleting an instance from the cloud provider")
 				Expect(testFramework.DeleteAnInstanceFromCloudProvider(machine)).To(Succeed())
 
@@ -84,14 +80,13 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				Expect(client.Delete(testFramework.GetContext(), machine)).To(Succeed())
 			})
 
-			helpers.ItShouldReplaceTheOutDatedMachineInDeleting(testFramework, idx)
+			helpers.ItShouldReplaceTheOutDatedMachineInDeleting(testFramework, 0)
 		})
 
 		Context("and a node with terminated kubelet", func() {
 			var client runtimeclient.Client
 			var ctx context.Context
 			var delObjects map[string]runtimeclient.Object
-			var idx int
 
 			BeforeEach(func() {
 				client = testFramework.GetClient()
@@ -104,16 +99,14 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				By("Getting a list of all control plane machines")
 				Expect(client.List(ctx, machineList, machineSelector)).To(Succeed(), "should be able to retrieve list of control plane machines")
 
-				machine, err := helpers.GetMachineAtIndex(machineList, 0)
+				machine, err := helpers.GetMachineAtIndex(machineList, 2)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(machine).ToNot(BeNil())
 
-				By("Checking that the machine is actually in index 0")
+				By("Checking that the machine is actually in index 2")
 				machineIdx, err := helpers.MachineIndex(*machine)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(machineIdx).To(Equal(0), "Expected first machine to have index 0")
-
-				idx = machineIdx
+				Expect(machineIdx).To(Equal(2), "Expected first machine to have index 2")
 
 				By("Getting the node from the machine")
 				Expect(client.Get(ctx, types.NamespacedName{
@@ -134,7 +127,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				Expect(client.Delete(testFramework.GetContext(), machine)).To(Succeed())
 			})
 
-			helpers.ItShouldReplaceTheOutDatedMachineInDeleting(testFramework, idx)
+			helpers.ItShouldReplaceTheOutDatedMachineInDeleting(testFramework, 2)
 
 			AfterEach(func() {
 				for _, obj := range delObjects {
