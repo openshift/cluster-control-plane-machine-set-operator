@@ -29,15 +29,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
-
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 const (
@@ -52,6 +51,9 @@ var (
 
 	// errMoreThanOneMachineInIndex is returned when there is more than one machine in the given index.
 	errMoreThanOneMachineInIndex = errors.New("more than one control plane machine in index")
+
+	// errMachineAtIndexNotFound is returned when the machine is not found at selected index.
+	errMachineAtIndexNotFound = errors.New("machine not found at the selected index")
 )
 
 // CheckControlPlaneMachineRollingReplacement checks that the machines with the given index
@@ -187,7 +189,7 @@ func extractMachineIndexCounts(machines []machinev1beta1.Machine) (map[int]int, 
 	indexCounts := map[int]int{}
 
 	for _, machine := range machines {
-		idx, err := machineIndex(machine)
+		idx, err := MachineIndex(machine)
 		if err != nil {
 			return nil, fmt.Errorf("machine name %q does not match expected format: %w", machine.Name, err)
 		}
@@ -198,8 +200,8 @@ func extractMachineIndexCounts(machines []machinev1beta1.Machine) (map[int]int, 
 	return indexCounts, nil
 }
 
-// machineIndex returns the index of the machine, the numeric suffix of the machine name.
-func machineIndex(machine machinev1beta1.Machine) (int, error) {
+// MachineIndex returns the index of the machine, the numeric suffix of the machine name.
+func MachineIndex(machine machinev1beta1.Machine) (int, error) {
 	re := regexp.MustCompile(`^.*-([0-9]+)$`)
 	matches := re.FindStringSubmatch(machine.Name)
 
@@ -235,7 +237,7 @@ func getOldAndNewMachineForIndex(ctx context.Context, testFramework framework.Fr
 	var oldMachine, newMachine *machinev1beta1.Machine
 
 	for _, machine := range machineList.Items {
-		machineIdx, err := machineIndex(machine)
+		machineIdx, err := MachineIndex(machine)
 		if err != nil {
 			return nil, nil, false
 		}
@@ -454,6 +456,20 @@ func IncreaseNewestControlPlaneMachineInstanceSize(testFramework framework.Frame
 	return index, originalProviderSpec, updatedProviderSpec
 }
 
+// GetMachineAtIndex returns a machine at the given index if it exists.
+func GetMachineAtIndex(machineList *machinev1beta1.MachineList, idx int, gomegaArgs ...interface{}) (*machinev1beta1.Machine, error) {
+	for _, m := range machineList.Items {
+		machineIdx, err := MachineIndex(m)
+		Expect(err).ToNot(HaveOccurred())
+
+		if machineIdx == idx {
+			return &m, nil
+		}
+	}
+
+	return nil, errMachineAtIndexNotFound
+}
+
 // newestMachineIndex returns the index of the newest (latest .metadata.creationTimestamp) control plane machine.
 // If multiple machines have the same creationTimestamp, the index of the one with the alphabetically greater name is picked.
 func newestMachineIndex(testFramework framework.Framework) (int, error) {
@@ -470,7 +486,7 @@ func newestMachineIndex(testFramework framework.Framework) (int, error) {
 	sortedMachines := sortMachinesByCreationTimeDescending(machineList.Items)
 	newestMachine := sortedMachines[0]
 
-	index, err := machineIndex(newestMachine)
+	index, err := MachineIndex(newestMachine)
 	if err != nil {
 		return 0, fmt.Errorf("could not get control plane machine index: %w", err)
 	}

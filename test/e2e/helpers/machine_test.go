@@ -36,7 +36,7 @@ var _ = Describe("Machine tests", func() {
 		DescribeTable("should return the correct index", func(in machineIndexTableInput) {
 			Expect(in.machine).ToNot(BeNil())
 
-			index, err := machineIndex(*in.machine)
+			index, err := MachineIndex(*in.machine)
 
 			if in.expectedError != nil {
 				Expect(err).To(MatchError(in.expectedError))
