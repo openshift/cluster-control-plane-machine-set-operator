@@ -28,7 +28,7 @@ TEST_PACKAGES=${TEST_PACKAGES:-$(go list -f "{{ .Dir }}" ./... | grep -v cluster
 
 # Print the command we are going to run as Make would.
 echo ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} "<omitted>"
-${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} ${TEST_PACKAGES}
+GOGC=50 ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} ${TEST_PACKAGES}
 # Capture the test result to exit on error after coverage.
 TEST_RESULT=$?
 

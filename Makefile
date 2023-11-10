@@ -83,7 +83,7 @@ vendor: ## Ensure the vendor directory is up to date.
 
 .PHONY: lint
 lint: ## Run golangci-lint over the codebase.
-	$(call ensure-home, ${GOLANGCI_LINT} run ./... --timeout 5m)
+	$(call ensure-home, GOGC=50 ${GOLANGCI_LINT} run ./... --timeout 5m --new-from-rev=${PULL_BASE_SHA} -v)
 	./hack/verify-log-keys.sh
 
 .PHONY: test
