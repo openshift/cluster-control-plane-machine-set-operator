@@ -806,6 +806,32 @@ var _ = Describe("Webhooks", func() {
 
 				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
 			})
+
+			It("with wrong additional block device for etcd", func() {
+				additionalBlockDevicesWithWrongEtcd := []machinev1alpha1.AdditionalBlockDevice{
+					{
+						Name:    "etcd",
+						SizeGiB: 9,
+						Storage: machinev1alpha1.BlockDeviceStorage{
+							Type: "Local",
+						},
+					},
+				}
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					machinev1resourcebuilder.OpenStackFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				).WithProviderSpecBuilder(
+					machinev1beta1resourcebuilder.OpenStackProviderSpec().WithAdditionalBlockDevices(additionalBlockDevicesWithWrongEtcd),
+				)).Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.additionalBlockDevices: Invalid value: 9: etcd block device size must be at least 10 GiB"),
+				))
+			})
+
 		})
 
 	})
