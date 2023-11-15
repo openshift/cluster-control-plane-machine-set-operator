@@ -52,7 +52,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 			})
 		})
 
-		Context("and an instance is terminated on the cloud provider", func() {
+		Context("and an instance is terminated on the cloud provider", framework.Informing(), func() {
 			BeforeEach(func() {
 				client := testFramework.GetClient()
 				machineList := &machinev1beta1.MachineList{}
@@ -83,7 +83,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 			helpers.ItShouldReplaceTheOutDatedMachineInDeleting(testFramework, 0)
 		})
 
-		Context("and a node with terminated kubelet", func() {
+		Context("and a node with terminated kubelet", framework.Informing(), func() {
 			var client runtimeclient.Client
 			var ctx context.Context
 			var delObjects map[string]runtimeclient.Object

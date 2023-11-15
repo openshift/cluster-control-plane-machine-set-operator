@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
@@ -38,6 +39,9 @@ func TestE2E(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred(), "failed to set up test framework")
 
 	RunSpecs(t, "E2E Suite")
+
+	sources := []string{"junit_control_plane_machine_set_operator.xml", "junit_control_plane_machine_set_operator.informing.xml"}
+	reporters.MergeAndCleanupJUnitReports(sources, "junit_control_plane_machine_set_operator.xml")
 }
 
 var (
@@ -55,3 +59,5 @@ var _ = BeforeSuite(func() {
 	SetDefaultConsistentlyDuration(framework.DefaultTimeout)
 	SetDefaultConsistentlyPollingInterval(framework.DefaultInterval)
 })
+
+var _ = ReportAfterSuite("Flake Reporter", framework.InformingReporter)
