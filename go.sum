@@ -447,12 +447,12 @@ github.com/onsi/ginkgo/v2 v2.12.1 h1:uHNEO1RP2SpuZApSkel9nEh1/Mu+hmQe7Q+Pepg5OYA
 github.com/onsi/ginkgo/v2 v2.12.1/go.mod h1:TE309ZR8s5FsKKpuB1YAQYBzCaAfUgatB/xlT/ETL/o=
 github.com/onsi/gomega v1.28.0 h1:i2rg/p9n/UqIDAMFUJ6qIUUMcsqOuUHgbpbu235Vr1c=
 github.com/onsi/gomega v1.28.0/go.mod h1:A1H2JE76sI14WIP57LMKj7FVfCHx3g3BcZVjJG8bjX8=
-github.com/openshift/api v0.0.0-20231030154605-972704c507c5 h1:lRQFuz3N+wOOUbUDX9JSty9EpEXppNo4CFamtarB2pM=
-github.com/openshift/api v0.0.0-20231030154605-972704c507c5/go.mod h1:qNtV0315F+f8ld52TLtPvrfivZpdimOzTi3kn9IVbtU=
+github.com/openshift/api v0.0.0-20231111020126-d7cd9fe8a9bc h1:oSF6SWbkbm2l2ecKSDm2yjZiX4TklpHDkV5utV2J61U=
+github.com/openshift/api v0.0.0-20231111020126-d7cd9fe8a9bc/go.mod h1:qNtV0315F+f8ld52TLtPvrfivZpdimOzTi3kn9IVbtU=
 github.com/openshift/client-go v0.0.0-20231024221206-506d798bc61c h1:xfag+wccUqc9EdrWsnprD6x5KG2WE+iKGFfFELCwwRA=
 github.com/openshift/client-go v0.0.0-20231024221206-506d798bc61c/go.mod h1:3BkYp+FtKD2TypMD0nTPkVsxUaY4fJPLEMFMlOLtrJM=
-github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231024153329-5007f8cfa182 h1:I7I60/r/wUczsKqmjdW2O0H+gnSUsoFzw8Qkbb/Q39M=
-github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231024153329-5007f8cfa182/go.mod h1:ZLWFFESELV7n0WcEPEEZMI4EgMUKUA5xZw8hskwEvGs=
+github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231113113313-b6681f587761 h1:IZDQnLz+vx8Zko8ukY7YImdckJxcyz8xZZoyQn9U0Cc=
+github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231113113313-b6681f587761/go.mod h1:ze/wAfXufoC+LizDEi7oD76Aj3HiV/TBQuXNiz9rd0Q=
 github.com/openshift/library-go v0.0.0-20231003133513-3a0c1fc00519 h1:i4tHhSfvDj0g0rmD6nHE+FtdLFEQyDWbkuRi8xs5SQ8=
 github.com/openshift/library-go v0.0.0-20231003133513-3a0c1fc00519/go.mod h1:hl8bxWuFMM72N4YH7FKLGWtYhDz/A0xwvaa8Yr5fxYU=
 github.com/otiai10/copy v1.2.0 h1:HvG945u96iNadPoG2/Ja2+AUJeW5YuFQMixq9yirC+k=

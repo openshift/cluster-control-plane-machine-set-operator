@@ -378,7 +378,17 @@ func validateOpenShiftGCPProviderConfig(parentPath *field.Path, providerConfig p
 // validateOpenShiftOpenStackProviderConfig runs OpenStack specific checks on the provider config on the ControlPlaneMachineSet.
 // This ensure that the ControlPlaneMachineSet can safely replace OpenStack control plane machines.
 func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerConfig providerconfig.OpenStackProviderConfig) []error {
-	return []error{}
+	errs := []error{}
+
+	config := providerConfig.Config()
+
+	for _, additionalBlockDevice := range config.AdditionalBlockDevices {
+		if additionalBlockDevice.Name == "etcd" && additionalBlockDevice.SizeGiB < 10 {
+			errs = append(errs, field.Invalid(parentPath.Child("additionalBlockDevices"), additionalBlockDevice.SizeGiB, "etcd block device size must be at least 10 GiB"))
+		}
+	}
+
+	return errs
 }
 
 // fetchControlPlaneMachines returns all control plane machines in the cluster.
