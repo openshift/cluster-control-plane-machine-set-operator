@@ -99,6 +99,8 @@ rules:
       - config.openshift.io
     resources:
       - infrastructures
+      - clusterversions
+      - featuregates      
     verbs:
       - get
       - list

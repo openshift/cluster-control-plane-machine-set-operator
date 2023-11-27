@@ -302,6 +302,18 @@ var _ = Describe("Webhooks", func() {
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": arn is required when type is ARN, and forbidden otherwise"),
 				)))
 			})
+
+			It("when providing invalid template in vSphere configuration", func() {
+				providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("invalid-template")
+				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+				cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				cpms := cpmsBuilder.Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: [spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.valu"),
+				)))
+			})
 		})
 
 		Context("when validating failure domains on AWS", func() {

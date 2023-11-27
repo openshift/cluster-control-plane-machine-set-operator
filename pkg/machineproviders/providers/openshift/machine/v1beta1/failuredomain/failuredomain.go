@@ -69,6 +69,9 @@ type FailureDomain interface {
 	// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
 	OpenStack() machinev1.OpenStackFailureDomain
 
+	// VSphere returns the VSphereFailureDomain if the platform type is VSphere.
+	VSphere() machinev1.VSphereFailureDomain
+
 	// Equal compares the underlying failure domain.
 	Equal(other FailureDomain) bool
 
@@ -84,6 +87,7 @@ type failureDomain struct {
 	azure     machinev1.AzureFailureDomain
 	gcp       machinev1.GCPFailureDomain
 	openstack machinev1.OpenStackFailureDomain
+	vsphere   machinev1.VSphereFailureDomain
 }
 
 // String returns a string representation of the failure domain.
@@ -97,6 +101,8 @@ func (f failureDomain) String() string {
 		return gcpFailureDomainToString(f.gcp)
 	case configv1.OpenStackPlatformType:
 		return openstackFailureDomainToString(f.openstack)
+	case configv1.VSpherePlatformType:
+		return vsphereFailureDomainToString(f.vsphere)
 	default:
 		return fmt.Sprintf("%sFailureDomain{}", f.platformType)
 	}
@@ -127,6 +133,11 @@ func (f failureDomain) OpenStack() machinev1.OpenStackFailureDomain {
 	return f.openstack
 }
 
+// VSphere returns the VSphereFailureDomain if the platform type is VSphere.
+func (f failureDomain) VSphere() machinev1.VSphereFailureDomain {
+	return f.vsphere
+}
+
 // Equal compares the underlying failure domain.
 func (f failureDomain) Equal(other FailureDomain) bool {
 	if other == nil {
@@ -146,6 +157,8 @@ func (f failureDomain) Equal(other FailureDomain) bool {
 		return f.gcp == other.GCP()
 	case configv1.OpenStackPlatformType:
 		return reflect.DeepEqual(f.openstack, other.OpenStack())
+	case configv1.VSpherePlatformType:
+		return reflect.DeepEqual(f.vsphere, other.VSphere())
 	}
 
 	return true
@@ -186,6 +199,8 @@ func (f failureDomain) Complete(templateFailureDomain FailureDomain) (FailureDom
 		return f.completeGCP(templateFailureDomain.GCP()), nil
 	case configv1.OpenStackPlatformType:
 		return f.completeOpenStack(templateFailureDomain.OpenStack()), nil
+	case configv1.VSpherePlatformType:
+		return f.completeVSphere(templateFailureDomain.VSphere()), nil
 	default:
 		return NewGenericFailureDomain(), nil
 	}
@@ -251,6 +266,16 @@ func (f failureDomain) completeOpenStack(templateFailureDomain machinev1.OpenSta
 	return NewOpenStackFailureDomain(*fd)
 }
 
+func (f failureDomain) completeVSphere(templateFailureDomain machinev1.VSphereFailureDomain) FailureDomain {
+	fd := templateFailureDomain.DeepCopy()
+
+	if f.vsphere.Name != "" {
+		fd.Name = f.vsphere.Name
+	}
+
+	return NewVSphereFailureDomain(*fd)
+}
+
 // NewFailureDomains creates a set of FailureDomains representing the input failure
 // domains held within the ControlPlaneMachineSet.
 func NewFailureDomains(failureDomains *machinev1.FailureDomains) ([]FailureDomain, error) {
@@ -268,6 +293,8 @@ func NewFailureDomains(failureDomains *machinev1.FailureDomains) ([]FailureDomai
 		return newGCPFailureDomains(*failureDomains)
 	case configv1.OpenStackPlatformType:
 		return newOpenStackFailureDomains(*failureDomains)
+	case configv1.VSpherePlatformType:
+		return newVSphereFailureDomains(*failureDomains)
 	case configv1.PlatformType(""):
 		// An empty failure domains definition is allowed.
 		return nil, nil
@@ -333,6 +360,21 @@ func newOpenStackFailureDomains(failureDomains machinev1.FailureDomains) ([]Fail
 	return foundFailureDomains, nil
 }
 
+// newVSphereFailureDomains constructs a slice of VSphere FailureDomain from machinev1.FailureDomains.
+func newVSphereFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
+	foundFailureDomains := []FailureDomain{}
+
+	if len(failureDomains.VSphere) == 0 {
+		return foundFailureDomains, errMissingFailureDomain
+	}
+
+	for _, failureDomain := range failureDomains.VSphere {
+		foundFailureDomains = append(foundFailureDomains, NewVSphereFailureDomain(failureDomain))
+	}
+
+	return foundFailureDomains, nil
+}
+
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
 // Note this is exported to allow other packages to construct individual failure domains
 // in tests.
@@ -364,6 +406,14 @@ func NewOpenStackFailureDomain(fd machinev1.OpenStackFailureDomain) FailureDomai
 	return &failureDomain{
 		platformType: configv1.OpenStackPlatformType,
 		openstack:    fd,
+	}
+}
+
+// NewVSphereFailureDomain creates an VSphere failure domain from the machinev1.VSphereFailureDomain.
+func NewVSphereFailureDomain(fd machinev1.VSphereFailureDomain) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.VSpherePlatformType,
+		vsphere:      fd,
 	}
 }
 
@@ -467,4 +517,13 @@ func openstackFailureDomainToString(fd machinev1.OpenStackFailureDomain) string 
 	}
 
 	return "OpenStackFailureDomain{" + strings.Join(failureDomain, ", ") + "}"
+}
+
+// vsphereFailureDomainToString converts the VSphereFailureDomain into a string.
+func vsphereFailureDomainToString(fd machinev1.VSphereFailureDomain) string {
+	if fd.Name != "" {
+		return fmt.Sprintf("VSphereFailureDomain{Name:%s}", fd.Name)
+	}
+
+	return unknownFailureDomain
 }

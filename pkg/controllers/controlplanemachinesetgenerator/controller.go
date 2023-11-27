@@ -28,6 +28,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinev1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -57,6 +58,7 @@ const (
 const (
 	unsupportedNumberOfControlPlaneMachines     = "Unable to generate control plane machine set, unsupported number of control plane machines"
 	unsupportedPlatform                         = "Unable to generate control plane machine set, unsupported platform"
+	notEnabledPlatformVSphere                   = "Unable to generate control plane machine set, vSphere is tech preview. may be enabled with VSphereControlPlaneMachineSet feature gate"
 	controlPlaneMachineSetNotFound              = "Control plane machine set not found"
 	controlPlaneMachineSetUpToDate              = "Control plane machine set is up to date"
 	controlPlaneMachineSetOutdated              = "Control plane machine set is outdated"
@@ -87,6 +89,9 @@ type ControlPlaneMachineSetGeneratorReconciler struct {
 	// Any ControlPlaneMachineSet not in this namespace should be ignored.
 	Namespace string
 	APIReader client.Reader
+
+	// FeatureGateAccessor enables checking of enabled featuregates
+	FeatureGateAccessor featuregates.FeatureGateAccess
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -213,7 +218,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 
 // generateControlPlaneMachineSet generates a control plane machine set based on the current cluster state.
 //
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineSet(logger logr.Logger, infrastructure *configv1.Infrastructure, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (*machinev1.ControlPlaneMachineSet, error) {
 	var (
 		cpmsSpecApplyConfig machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration
@@ -221,6 +226,13 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 	)
 
 	platformType := infrastructure.Status.PlatformStatus.Type
+
+	var currentFeatureGates featuregates.FeatureGate
+	currentFeatureGates, err = r.FeatureGateAccessor.CurrentFeatureGates()
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve current feature gates: %w", err)
+	}
 
 	switch platformType {
 	case configv1.AWSPlatformType:
@@ -245,6 +257,16 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 		}
 	case configv1.OpenStackPlatformType:
 		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetOpenStackSpec(logger, machines, machineSets)
+		if err != nil {
+			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
+		}
+	case configv1.VSpherePlatformType:
+		if !currentFeatureGates.Enabled(configv1.FeatureGateVSphereControlPlaneMachineset) {
+			logger.V(1).WithValues("platform", platformType).Info(unsupportedPlatform)
+			return nil, errUnsupportedPlatform
+		}
+
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetVSphereSpec(logger, machines, machineSets, infrastructure)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}

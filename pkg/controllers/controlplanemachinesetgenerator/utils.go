@@ -167,11 +167,43 @@ func convertViaJSON(in, out interface{}) error {
 	return nil
 }
 
+// buildPlatformFailureDomains returns a failureDomains set for a specific platform.
+//
+//nolint:cyclop
+func buildPlatformFailureDomains(platformType configv1.PlatformType, failureDomains *failuredomain.Set) (*machinev1.FailureDomains, error) {
+	var cpmsFailureDomain machinev1.FailureDomains
+
+	var err error
+
+	switch platformType {
+	case configv1.AWSPlatformType:
+		cpmsFailureDomain, _ = buildAWSFailureDomains(failureDomains)
+	case configv1.AzurePlatformType:
+		cpmsFailureDomain, _ = buildAzureFailureDomains(failureDomains)
+	case configv1.GCPPlatformType:
+		cpmsFailureDomain, _ = buildGCPFailureDomains(failureDomains)
+	case configv1.VSpherePlatformType:
+		cpmsFailureDomain = buildVSphereFailureDomains(failureDomains)
+		if cpmsFailureDomain.VSphere == nil || cpmsFailureDomain.Platform == "" {
+			return nil, errNoFailureDomains
+		}
+	case configv1.OpenStackPlatformType:
+		cpmsFailureDomain, err = buildOpenStackFailureDomains(failureDomains)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build OpenStack failure domains: %w", err)
+		}
+
+		if cpmsFailureDomain.OpenStack == nil || cpmsFailureDomain.Platform == "" {
+			return nil, errNoFailureDomains
+		}
+	default:
+		return nil, fmt.Errorf("%w: %sFailureDomain{}", errUnsupportedPlatform, platformType)
+	}
+
+	return &cpmsFailureDomain, nil
+}
+
 // buildFailureDomains builds a flavored FailureDomain for the ControlPlaneMachineSet according to what platform we are on.
-//
-// TO-DO: remove unparam when there are users of the infrastructure parameter
-//
-//nolint:cyclop,unparam
 func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
 	// Fetch failure domains from the machines
 	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines, infrastructure)
@@ -181,7 +213,9 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 
 	var machineSetFailureDomains []failuredomain.FailureDomain
 
-	switch machineFailureDomains[0].Type() {
+	platformType := machineFailureDomains[0].Type()
+
+	switch platformType {
 	case configv1.AzurePlatformType:
 		// On some platforms, failure domains from machineSets are not suitable for control plane machines.
 	default:
@@ -198,30 +232,9 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 	// Construction of a union of failure domains of machines and machineSets.
 	failureDomains.Insert(machineSetFailureDomains...)
 
-	var cpmsFailureDomain machinev1.FailureDomains
-
-	switch machineFailureDomains[0].Type() {
-	case configv1.AWSPlatformType:
-		cpmsFailureDomain, _ = buildAWSFailureDomains(failureDomains)
-	case configv1.AzurePlatformType:
-		cpmsFailureDomain, _ = buildAzureFailureDomains(failureDomains)
-	case configv1.GCPPlatformType:
-		cpmsFailureDomain, _ = buildGCPFailureDomains(failureDomains)
-	case configv1.OpenStackPlatformType:
-		cpmsFailureDomain, err = buildOpenStackFailureDomains(failureDomains)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build OpenStack failure domains: %w", err)
-		}
-
-		if cpmsFailureDomain.OpenStack == nil || cpmsFailureDomain.Platform == "" {
-			return nil, nil //nolint:nilnil
-		}
-	default:
-		return nil, fmt.Errorf("%w: %sFailureDomain{}", errUnsupportedPlatform, machineFailureDomains[0].Type())
-	}
-
-	if cpmsFailureDomain.Platform == "" {
-		return nil, errNoFailureDomains
+	cpmsFailureDomain, err := buildPlatformFailureDomains(platformType, failureDomains)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build platform specific failure domains: %w", err)
 	}
 
 	cpmsFailureDomainsApplyConfig := &machinev1builder.FailureDomainsApplyConfiguration{}

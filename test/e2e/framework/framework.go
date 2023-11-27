@@ -243,6 +243,8 @@ func (f *framework) IncreaseProviderSpecInstanceSize(rawProviderSpec *runtime.Ra
 		return increaseNutanixInstanceSize(rawProviderSpec, providerConfig)
 	case configv1.OpenStackPlatformType:
 		return increaseOpenStackInstanceSize(rawProviderSpec, providerConfig)
+	case configv1.VSpherePlatformType:
+		return increaseVSphereInstanceSize(rawProviderSpec, providerConfig)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -288,6 +290,8 @@ func (f *framework) UpdateDefaultedValueFromCPMS(rawProviderSpec *runtime.RawExt
 		return updateCredentialsSecretNameGCP(providerConfig)
 	case configv1.NutanixPlatformType:
 		return updateCredentialsSecretNameNutanix(providerConfig)
+	case configv1.VSpherePlatformType:
+		return updateCredentialsSecretNameVSphere(providerConfig)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -353,6 +357,21 @@ func updateCredentialsSecretNameNutanix(providerConfig providerconfig.ProviderCo
 	}, nil
 }
 
+// updateCredentialsSecretNameVSphere updates the credentialSecret field from the ControlPlaneMachineSet.
+func updateCredentialsSecretNameVSphere(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	cfg := providerConfig.VSphere().Config()
+	cfg.CredentialsSecret = nil
+
+	rawBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling nutanix providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
 // ConvertToControlPlaneMachineSetProviderSpec converts a control plane machine provider spec
 // to a raw, control plane machine set suitable provider spec.
 func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec machinev1beta1.ProviderSpec) (*runtime.RawExtension, error) {
@@ -374,6 +393,8 @@ func (f *framework) ConvertToControlPlaneMachineSetProviderSpec(providerSpec mac
 		return convertNutanixProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	case configv1.OpenStackPlatformType:
 		return convertOpenStackProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
+	case configv1.VSpherePlatformType:
+		return convertVSphereProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig)
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatform, f.platform)
 	}
@@ -422,6 +443,22 @@ func convertAzureProviderConfigToControlPlaneMachineSetProviderSpec(providerConf
 	rawBytes, err := json.Marshal(azurePs)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling azure providerSpec: %w", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
+}
+
+// convertVSphereProviderConfigToControlPlaneMachineSetProviderSpec converts an VSphere providerConfig into a
+// raw control plane machine set provider spec.
+func convertVSphereProviderConfigToControlPlaneMachineSetProviderSpec(providerConfig providerconfig.ProviderConfig) (*runtime.RawExtension, error) {
+	vspherePs := providerConfig.VSphere().Config()
+	vspherePs.Name = ""
+
+	rawBytes, err := json.Marshal(vspherePs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling vsphere providerSpec: %w", err)
 	}
 
 	return &runtime.RawExtension{
@@ -531,6 +568,8 @@ func getPlatformSupportLevel(k8sClient runtimeclient.Client) (PlatformSupportLev
 	case configv1.NutanixPlatformType:
 		return Manual, platformType, nil
 	case configv1.OpenStackPlatformType:
+		return Full, platformType, nil
+	case configv1.VSpherePlatformType:
 		return Full, platformType, nil
 	default:
 		return Unsupported, platformType, nil
@@ -684,6 +723,18 @@ func increaseGCPInstanceSize(rawProviderSpec *runtime.RawExtension, providerConf
 func increaseNutanixInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
 	cfg := providerConfig.Nutanix().Config()
 	cfg.VCPUSockets++
+
+	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
+		return fmt.Errorf("failed to set provider spec value: %w", err)
+	}
+
+	return nil
+}
+
+// increaseVSphereInstanceSize increases the instance size of the instance on the providerSpec for an Nutanix providerSpec.
+func increaseVSphereInstanceSize(rawProviderSpec *runtime.RawExtension, providerConfig providerconfig.ProviderConfig) error {
+	cfg := providerConfig.VSphere().Config()
+	cfg.NumCPUs *= 2
 
 	if err := setProviderSpecValue(rawProviderSpec, cfg); err != nil {
 		return fmt.Errorf("failed to set provider spec value: %w", err)
