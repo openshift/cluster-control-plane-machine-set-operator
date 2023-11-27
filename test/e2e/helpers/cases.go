@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
@@ -124,10 +125,21 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		cpms := &machinev1.ControlPlaneMachineSet{}
 		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
+		timeout := 30 * time.Minute
+		platform := configv1.NonePlatformType
+		if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains != nil {
+			platform = cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform
+		}
+
+		if platform == configv1.VSpherePlatformType {
+			timeout = 60 * time.Minute
+			By("Test timeout set to 60 minutes for vSphere")
+		}
+
 		// We give the rollout 30 minutes to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check
 		// until they pass or until the timeout is reached.
-		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), timeout)
 		defer cancel()
 
 		wg := &sync.WaitGroup{}
