@@ -18,7 +18,6 @@ package controlplanemachinesetgenerator
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,11 +32,8 @@ import (
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -2001,40 +1997,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 	})
 })
 
-type nutanixMachineProviderSpecBuilder struct{}
-
-func (n nutanixMachineProviderSpecBuilder) BuildRawExtension() *runtime.RawExtension {
-	nmpc := &machinev1.NutanixMachineProviderConfig{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: machinev1.GroupVersion.String(),
-			Kind:       "NutanixMachineProviderConfig",
-		},
-		UserDataSecret:    &corev1.LocalObjectReference{Name: "nutanix-user-data"},
-		CredentialsSecret: &corev1.LocalObjectReference{Name: "nutanix-credentials"},
-		Image: machinev1.NutanixResourceIdentifier{
-			Type: machinev1.NutanixIdentifierName,
-			Name: ptr.To[string]("rhcos"),
-		},
-		Subnets:        []machinev1.NutanixResourceIdentifier{{Type: machinev1.NutanixIdentifierName, Name: ptr.To[string]("default-net")}},
-		VCPUsPerSocket: int32(1),
-		VCPUSockets:    int32(4),
-		MemorySize:     resource.MustParse(fmt.Sprintf("%dMi", 8096)),
-		Cluster: machinev1.NutanixResourceIdentifier{
-			Type: machinev1.NutanixIdentifierUUID,
-			UUID: ptr.To[string]("7244448a-7fde-400d-bf2e-bd8521459859"),
-		},
-		SystemDiskSize: resource.MustParse(fmt.Sprintf("%dGi", 120)),
-	}
-
-	raw, err := json.Marshal(nmpc)
-	if err != nil {
-		// As we are building the input to json.Marshal, this should never happen.
-		panic(err)
-	}
-
-	return &runtime.RawExtension{Raw: raw}
-}
-
+// For testing controlplanemachinesetgenerator controller on Nutanix.
 var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func() {
 	var mgrCancel context.CancelFunc
 	var mgrDone chan struct{}
@@ -2045,6 +2008,35 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 	var machineSet0, machineSet1, machineSet2, machineSet3, machineSet4 *machinev1beta1.MachineSet
+
+	createInfrastructure := func(withFailureDomains bool) *configv1.Infrastructure {
+		By("Setting up a new infrastructure for the test")
+
+		var infra *configv1.Infrastructure
+		infraBuilder := configv1resourcebuilder.Infrastructure().WithName(util.InfrastructureName)
+		if withFailureDomains {
+			infra = infraBuilder.AsNutanixWithFailureDomains("nutanix-test", nil).Build()
+		} else {
+			infra = infraBuilder.AsNutanix("nutanix-test").Build()
+		}
+
+		Expect(infra).ToNot(BeNil(), "Expected infrastructure object not to be nil")
+		Expect(infra.Spec.PlatformSpec.Nutanix).ToNot(BeNil(), "Expected Nutanix platform spec to be populated")
+		infraStatus := infra.Status.DeepCopy()
+		Expect(k8sClient.Create(ctx, infra)).To(Succeed())
+		// Update Infrastructure Status.
+		Eventually(komega.UpdateStatus(infra, func() {
+			infra.Status = *infraStatus
+		})).Should(Succeed())
+
+		if withFailureDomains {
+			Expect(infra.Spec.PlatformSpec.Nutanix.FailureDomains).To(HaveLen(3), "Expected 3 failure domains for the nutanix platform spec")
+		} else {
+			Expect(infra.Spec.PlatformSpec.Nutanix.FailureDomains).To(HaveLen(0), "Expected no failure domains for the nutanix platform spec")
+		}
+
+		return infra
+	}
 
 	startManager := func(mgr *manager.Manager) (context.CancelFunc, chan struct{}) {
 		mgrCtx, mgrCancel := context.WithCancel(context.Background())
@@ -2066,35 +2058,76 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		<-mgrDone
 	}
 
-	create3MachineSets := func() {
+	createOneMachineSet := func(infra *configv1.Infrastructure, withFailureDomain bool) {
 		machineSetBuilder := machinev1beta1resourcebuilder.MachineSet().WithNamespace(namespaceName)
-		machineSet0 = machineSetBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithGenerateName("machineset-1-").Build()
-		machineSet1 = machineSetBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithGenerateName("machineset-2-").Build()
-		machineSet2 = machineSetBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithGenerateName("machineset-3-").Build()
+		providerSpecBuilder := machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder()
 
+		fds := infra.Spec.PlatformSpec.Nutanix.FailureDomains
+		if withFailureDomain && len(fds) > 0 {
+			providerSpecBuilder = providerSpecBuilder.WithFailureDomains(fds).WithFailureDomainName(fds[0].Name)
+		}
+
+		machineSet0 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithGenerateName("machineset-0-").Build()
 		Expect(k8sClient.Create(ctx, machineSet0)).To(Succeed())
+	}
+
+	create3MachineSets := func(infra *configv1.Infrastructure, withFailureDomain bool) {
+		createOneMachineSet(infra, withFailureDomain)
+
+		machineSetBuilder := machinev1beta1resourcebuilder.MachineSet().WithNamespace(namespaceName)
+		providerSpecBuilder := machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder()
+
+		fds := infra.Spec.PlatformSpec.Nutanix.FailureDomains
+		if withFailureDomain && len(fds) > 0 {
+			providerSpecBuilder = providerSpecBuilder.WithFailureDomains(fds)
+			machineSet1 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[1%len(fds)].Name)).WithGenerateName("machineset-1-").Build()
+			machineSet2 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[2%len(fds)].Name)).WithGenerateName("machineset-2-").Build()
+		} else {
+			machineSet1 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithGenerateName("machineset-1-").Build()
+			machineSet2 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithGenerateName("machineset-2-").Build()
+		}
+
 		Expect(k8sClient.Create(ctx, machineSet1)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet2)).To(Succeed())
 	}
 
-	create5MachineSets := func() {
-		create3MachineSets()
+	create5MachineSets := func(infra *configv1.Infrastructure, withFailureDomain bool) {
+		create3MachineSets(infra, withFailureDomain)
 
 		machineSetBuilder := machinev1beta1resourcebuilder.MachineSet().WithNamespace(namespaceName)
-		machineSet3 = machineSetBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithGenerateName("machineset-3-").Build()
-		machineSet4 = machineSetBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithGenerateName("machineset-4-").Build()
+		providerSpecBuilder := machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder()
+
+		fds := infra.Spec.PlatformSpec.Nutanix.FailureDomains
+		if withFailureDomain && len(fds) > 0 {
+			providerSpecBuilder = providerSpecBuilder.WithFailureDomains(fds)
+			machineSet3 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[3%len(fds)].Name)).WithGenerateName("machineset-3-").Build()
+			machineSet4 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[4%len(fds)].Name)).WithGenerateName("machineset-4-").Build()
+		} else {
+			machineSet3 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithGenerateName("machineset-3-").Build()
+			machineSet4 = machineSetBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithGenerateName("machineset-4-").Build()
+		}
 
 		Expect(k8sClient.Create(ctx, machineSet3)).To(Succeed())
 		Expect(k8sClient.Create(ctx, machineSet4)).To(Succeed())
 	}
 
-	create3CPMachines := func() *[]machinev1beta1.Machine {
+	create3CPMachines := func(infra *configv1.Infrastructure, withFailureDomain bool) *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
 		// so then we can reliably check which machine Provider Spec is picked for the ControlPlaneMachineSet.
 		machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-		machine0 = machineBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithName("master-0").Build()
-		machine1 = machineBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithName("master-1").Build()
-		machine2 = machineBuilder.WithProviderSpecBuilder(nutanixMachineProviderSpecBuilder{}).WithName("master-2").Build()
+		providerSpecBuilder := machinev1resourcebuilder.NewNutanixMachineProviderConfigBuilder()
+
+		fds := infra.Spec.PlatformSpec.Nutanix.FailureDomains
+		if withFailureDomain && len(fds) > 0 {
+			providerSpecBuilder = providerSpecBuilder.WithFailureDomains(fds)
+			machine0 = machineBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[0%len(fds)].Name)).WithName("master-0").Build()
+			machine1 = machineBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[1%len(fds)].Name)).WithName("master-1").Build()
+			machine2 = machineBuilder.WithProviderSpecBuilder(providerSpecBuilder.WithFailureDomainName(fds[2%len(fds)].Name)).WithName("master-2").Build()
+		} else {
+			machine0 = machineBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithName("master-0").Build()
+			machine1 = machineBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithName("master-1").Build()
+			machine2 = machineBuilder.WithProviderSpecBuilder(providerSpecBuilder).WithName("master-2").Build()
+		}
 
 		// Create Machines with some wait time between them
 		// to achieve staggered CreationTimestamp(s).
@@ -2111,23 +2144,19 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
+	})
 
-		By("Setting up a new infrastructure for the test")
-		// Create infrastructure object.
-		infra := configv1resourcebuilder.Infrastructure().WithName(infrastructureName).Build()
-		infra.Status.ControlPlaneTopology = configv1.HighlyAvailableTopologyMode
-		infra.Status.InfrastructureTopology = configv1.HighlyAvailableTopologyMode
-		infra.Status.PlatformStatus = &configv1.PlatformStatus{
-			Type:    configv1.NutanixPlatformType,
-			Nutanix: &configv1.NutanixPlatformStatus{},
-		}
-		infraStatus := infra.Status.DeepCopy()
-		Expect(k8sClient.Create(ctx, infra)).To(Succeed())
-		// Update Infrastructure Status.
-		Eventually(komega.UpdateStatus(infra, func() {
-			infra.Status = *infraStatus
-		})).Should(Succeed())
+	AfterEach(func() {
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			&corev1.Node{},
+			&machinev1beta1.Machine{},
+			&configv1.Infrastructure{},
+			&machinev1beta1.MachineSet{},
+			&machinev1.ControlPlaneMachineSet{},
+		)
+	})
 
+	JustBeforeEach(func() {
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
@@ -2152,19 +2181,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
-	})
 
-	AfterEach(func() {
-		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
-			&corev1.Node{},
-			&machinev1beta1.Machine{},
-			&configv1.Infrastructure{},
-			&machinev1beta1.MachineSet{},
-			&machinev1.ControlPlaneMachineSet{},
-		)
-	})
-
-	JustBeforeEach(func() {
 		By("Starting the manager")
 		mgrCancel, mgrDone = startManager(&mgr)
 	})
@@ -2174,164 +2191,250 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		stopManager()
 	})
 
-	Context("when a Control Plane Machine Set doesn't exist", func() {
+	Context("when nutanix failure domains are not defined", func() {
+		var infra *configv1.Infrastructure
+
 		BeforeEach(func() {
-			cpms = &machinev1.ControlPlaneMachineSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterControlPlaneMachineSetName,
-					Namespace: namespaceName,
-				},
-			}
+			By("Setting up infrastructure resource without FailureDomains for the test")
+			infra = createInfrastructure(false)
 		})
 
-		Context("with 5 Machine Sets", func() {
+		Context("when a Control Plane Machine Set doesn't exist", func() {
 			BeforeEach(func() {
-				By("Creating MachineSets")
-				create5MachineSets()
-			})
-
-			Context("with 3 existing control plane machines", func() {
-				BeforeEach(func() {
-					By("Creating Control Plane Machines")
-					create3CPMachines()
-				})
-
-				It("should create the ControlPlaneMachineSet with the expected fields", func() {
-					By("Checking the Control Plane Machine Set has been created")
-					Eventually(komega.Get(cpms)).Should(Succeed())
-					Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive))
-					Expect(*cpms.Spec.Replicas).To(Equal(int32(3)))
-				})
-
-				It("should create the ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
-					By("Checking the Control Plane Machine Set has been created")
-					Eventually(komega.Get(cpms)).Should(Succeed())
-					// In this case expect the machine Provider Spec of the youngest machine to be used here.
-					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
-					Expect(err).To(BeNil())
-
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec, nil)
-					Expect(err).To(BeNil())
-
-					machineProviderConfig := machineProviderSpec.Generic()
-
-					Expect(cpmsProviderSpec.Generic()).To(Equal(machineProviderConfig))
-				})
-			})
-		})
-
-		Context("with 3 Machine Sets", func() {
-			BeforeEach(func() {
-				By("Creating MachineSets")
-				create3MachineSets()
-			})
-
-			Context("with 3 existing control plane machines", func() {
-				BeforeEach(func() {
-					By("Creating Control Plane Machines")
-					create3CPMachines()
-				})
-
-				It("should create the ControlPlaneMachineSet with the expected fields", func() {
-					By("Checking the Control Plane Machine Set has been created")
-					Eventually(komega.Get(cpms)).Should(Succeed())
-					Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive))
-					Expect(*cpms.Spec.Replicas).To(Equal(int32(3)))
-				})
-
-				It("should create the ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
-					By("Checking the Control Plane Machine Set has been created")
-					Eventually(komega.Get(cpms)).Should(Succeed())
-
-					// In this case expect the machine Provider Spec of the youngest machine to be used here.
-					// In this case it should be `machine-2` given that's the one we created last.
-					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
-					Expect(err).To(BeNil())
-
-					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec, nil)
-					Expect(err).To(BeNil())
-
-					// Remove from the machine Provider Spec the fields that won't be
-					// present on the ControlPlaneMachineSet Provider Spec.
-					machineProviderConfig := machineProviderSpec.Generic()
-
-					Expect(cpmsProviderSpec.Generic()).To(Equal(machineProviderConfig))
-				})
-			})
-		})
-
-		Context("with only 1 existing control plane machine", func() {
-			var logger testutils.TestLogger
-			isSupportedControlPlaneMachinesNumber := false
-
-			BeforeEach(func() {
-				By("Creating 1 Control Plane Machine")
-				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-				machine2 = machineBuilder.WithName("master-2").Build()
-				Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
-				machines := []machinev1beta1.Machine{*machine2}
-
-				By("Invoking the check on whether the number of control plane machines in the cluster is supported")
-				logger = testutils.NewTestLogger()
-				isSupportedControlPlaneMachinesNumber = reconciler.isSupportedControlPlaneMachinesNumber(logger.Logger(), machines)
-			})
-
-			It("should have not created the ControlPlaneMachineSet", func() {
-				Consistently(komega.Get(cpms)).Should(MatchError("controlplanemachinesets.machine.openshift.io \"" + clusterControlPlaneMachineSetName + "\" not found"))
-			})
-
-			It("should detect the cluster has an unsupported number of control plane machines", func() {
-				Expect(isSupportedControlPlaneMachinesNumber).To(BeFalse())
-			})
-
-			It("sets an appropriate log line", func() {
-				Eventually(logger.Entries()).Should(ConsistOf(
-					testutils.LogEntry{
-						Level:         1,
-						KeysAndValues: []interface{}{"count", 1},
-						Message:       unsupportedNumberOfControlPlaneMachines,
-					},
-				))
-			})
-		})
-
-		Context("with an unsupported platform", func() {
-			var logger testutils.TestLogger
-			BeforeEach(func() {
-				By("Creating MachineSets")
-				create5MachineSets()
-
-				By("Creating Control Plane Machines")
-				machines := create3CPMachines()
-
-				infrastructure := configv1resourcebuilder.Infrastructure().WithName(infrastructureName).Build()
-				infrastructure.Status = configv1.InfrastructureStatus{
-					PlatformStatus: &configv1.PlatformStatus{
-						Type: configv1.NonePlatformType,
+				cpms = &machinev1.ControlPlaneMachineSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      clusterControlPlaneMachineSetName,
+						Namespace: namespaceName,
 					},
 				}
-
-				logger = testutils.NewTestLogger()
-				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
-				Expect(generatedCPMS).To(BeNil())
-				Expect(err).To(MatchError(errUnsupportedPlatform))
 			})
 
-			It("should have not created the ControlPlaneMachineSet", func() {
-				Consistently(komega.Get(cpms)).Should(MatchError("controlplanemachinesets.machine.openshift.io \"" + clusterControlPlaneMachineSetName + "\" not found"))
+			Context("with 5 Machine Sets", func() {
+				BeforeEach(func() {
+					By("Creating MachineSets")
+					create5MachineSets(infra, false)
+				})
+
+				Context("with 3 existing control plane machines", func() {
+					BeforeEach(func() {
+						By("Creating Control Plane Machines")
+						create3CPMachines(infra, false)
+					})
+
+					It("should create the ControlPlaneMachineSet with the expected fields", func() {
+						By("Checking the Control Plane Machine Set has been created")
+						Eventually(komega.Get(cpms)).Should(Succeed())
+						Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive))
+						Expect(*cpms.Spec.Replicas).To(Equal(int32(3)))
+						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Nutanix).To(HaveLen(0), "Expected no failure domain for the nutanix platform spec")
+					})
+
+					It("should create the ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
+						By("Checking the Control Plane Machine Set has been created")
+						Eventually(komega.Get(cpms)).Should(Succeed())
+						// In this case expect the machine Provider Spec of the youngest machine to be used here.
+						// In this case it should be `machine-2` given that's the one we created last.
+						cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
+						Expect(err).To(BeNil())
+
+						machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec, nil)
+						Expect(err).To(BeNil())
+
+						machineProviderConfig := machineProviderSpec.Generic()
+
+						Expect(cpmsProviderSpec.Generic()).To(Equal(machineProviderConfig))
+					})
+				})
 			})
 
-			It("sets an appropriate log line", func() {
-				Eventually(logger.Entries()).Should(ConsistOf(
-					testutils.LogEntry{
-						Level:         1,
-						KeysAndValues: []interface{}{"platform", configv1.NonePlatformType},
-						Message:       unsupportedPlatform,
+			Context("with 3 Machine Sets", func() {
+				BeforeEach(func() {
+					By("Creating MachineSets")
+					create3MachineSets(infra, false)
+				})
+
+				Context("with 3 existing control plane machines", func() {
+					BeforeEach(func() {
+						By("Creating Control Plane Machines")
+						create3CPMachines(infra, false)
+					})
+
+					It("should create the ControlPlaneMachineSet with the expected fields", func() {
+						By("Checking the Control Plane Machine Set has been created")
+						Eventually(komega.Get(cpms)).Should(Succeed())
+						Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive))
+						Expect(*cpms.Spec.Replicas).To(Equal(int32(3)))
+					})
+
+					It("should create the ControlPlaneMachineSet with the provider spec matching the youngest machine provider spec", func() {
+						By("Checking the Control Plane Machine Set has been created")
+						Eventually(komega.Get(cpms)).Should(Succeed())
+
+						// In this case expect the machine Provider Spec of the youngest machine to be used here.
+						// In this case it should be `machine-2` given that's the one we created last.
+						cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
+						Expect(err).To(BeNil())
+
+						machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec, nil)
+						Expect(err).To(BeNil())
+
+						// Remove from the machine Provider Spec the fields that won't be
+						// present on the ControlPlaneMachineSet Provider Spec.
+						machineProviderConfig := machineProviderSpec.Generic()
+
+						Expect(cpmsProviderSpec.Generic()).To(Equal(machineProviderConfig))
+					})
+				})
+			})
+
+			Context("with only 1 existing control plane machine", func() {
+				var logger testutils.TestLogger
+				isSupportedControlPlaneMachinesNumber := false
+
+				BeforeEach(func() {
+					By("Creating 1 Control Plane Machine")
+					machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+					machine2 = machineBuilder.WithName("master-2").Build()
+					Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
+					machines := []machinev1beta1.Machine{*machine2}
+
+					By("Invoking the check on whether the number of control plane machines in the cluster is supported")
+					logger = testutils.NewTestLogger()
+					isSupportedControlPlaneMachinesNumber = reconciler.isSupportedControlPlaneMachinesNumber(logger.Logger(), machines)
+				})
+
+				It("should have not created the ControlPlaneMachineSet", func() {
+					Consistently(komega.Get(cpms)).Should(MatchError("controlplanemachinesets.machine.openshift.io \"" + clusterControlPlaneMachineSetName + "\" not found"))
+				})
+
+				It("should detect the cluster has an unsupported number of control plane machines", func() {
+					Expect(isSupportedControlPlaneMachinesNumber).To(BeFalse())
+				})
+
+				It("sets an appropriate log line", func() {
+					Eventually(logger.Entries()).Should(ConsistOf(
+						testutils.LogEntry{
+							Level:         1,
+							KeysAndValues: []interface{}{"count", 1},
+							Message:       unsupportedNumberOfControlPlaneMachines,
+						},
+					))
+				})
+			})
+
+			Context("with an unsupported platform", func() {
+				var logger testutils.TestLogger
+				BeforeEach(func() {
+					By("Creating MachineSets")
+					create5MachineSets(infra, false)
+
+					By("Creating Control Plane Machines")
+					machines := create3CPMachines(infra, false)
+
+					infrastructure := configv1resourcebuilder.Infrastructure().WithName(infrastructureName).Build()
+					infrastructure.Status = configv1.InfrastructureStatus{
+						PlatformStatus: &configv1.PlatformStatus{
+							Type: configv1.NonePlatformType,
+						},
+					}
+
+					logger = testutils.NewTestLogger()
+					generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
+					Expect(generatedCPMS).To(BeNil())
+					Expect(err).To(MatchError(errUnsupportedPlatform))
+				})
+
+				It("should have not created the ControlPlaneMachineSet", func() {
+					Consistently(komega.Get(cpms)).Should(MatchError("controlplanemachinesets.machine.openshift.io \"" + clusterControlPlaneMachineSetName + "\" not found"))
+				})
+
+				It("sets an appropriate log line", func() {
+					Eventually(logger.Entries()).Should(ConsistOf(
+						testutils.LogEntry{
+							Level:         1,
+							KeysAndValues: []interface{}{"platform", configv1.NonePlatformType},
+							Message:       unsupportedPlatform,
+						},
+					))
+				})
+
+			})
+		})
+	})
+
+	Context("when nutanix failure domains are defined", func() {
+		var infra *configv1.Infrastructure
+
+		BeforeEach(func() {
+			By("Setting up infrastructure resource with FailureDomains for the test")
+			infra = createInfrastructure(true)
+		})
+
+		Context("when a ControlPlaneMachineSet resource doesn't exist", func() {
+			BeforeEach(func() {
+				By("Creating MachineSets")
+				createOneMachineSet(infra, true)
+
+				cpms = &machinev1.ControlPlaneMachineSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      clusterControlPlaneMachineSetName,
+						Namespace: namespaceName,
 					},
-				))
+				}
 			})
 
+			Context("with 3 existing control plane machines created with failureDomain reference", func() {
+				BeforeEach(func() {
+					By("Creating Control Plane Machines with failureDomain references")
+					create3CPMachines(infra, true)
+
+				})
+
+				It("should create the ControlPlaneMachineSet with the expected fields", func() {
+					By("Checking the Control Plane Machine Set has been created")
+					Eventually(komega.Get(cpms)).Should(Succeed())
+					Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive))
+					Expect(*cpms.Spec.Replicas).To(Equal(int32(3)))
+
+					cpmsTemplateMachine := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine
+					Expect(cpmsTemplateMachine.FailureDomains.Nutanix).To(HaveLen(3), "Should have 3 failureDomain.")
+
+					nmpc := &machinev1.NutanixMachineProviderConfig{}
+					Expect(json.Unmarshal(cpmsTemplateMachine.Spec.ProviderSpec.Value.Raw, nmpc)).To(Succeed())
+					Expect(nmpc.Cluster.Type).To(BeEmpty(), "The cluster should not be set when failure domains are used.")
+					Expect(nmpc.Subnets).To(HaveLen(0), "The subnets should not be set when failure domains are used.")
+					Expect(nmpc.FailureDomain).To(BeNil())
+				})
+			})
+
+			Context("with 3 existing control plane machines created without failureDomain reference", func() {
+				BeforeEach(func() {
+					By("Creating Control Plane Machines without failureDomain reference")
+					create3CPMachines(infra, false)
+
+				})
+
+				It("should create the ControlPlaneMachineSet with the expected fields", func() {
+					By("Checking the Control Plane Machine Set has been created")
+					Eventually(komega.Get(cpms)).Should(Succeed())
+					Expect(cpms.Spec.State).To(Equal(machinev1.ControlPlaneMachineSetStateInactive))
+					Expect(*cpms.Spec.Replicas).To(Equal(int32(3)))
+
+					cpmsTemplateMachine := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine
+					Expect(cpmsTemplateMachine.FailureDomains.Nutanix).To(HaveLen(0))
+
+					// In this case expect the machine Provider Spec of the youngest machine to be used here.
+					// In this case it should be `machine-2` given that's the one we created last.
+					cpmsProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec, nil)
+					Expect(err).To(BeNil())
+
+					machineProviderSpec, err := providerconfig.NewProviderConfigFromMachineSpec(mgr.GetLogger(), machine2.Spec, nil)
+					Expect(err).To(BeNil())
+					machineProviderConfig := machineProviderSpec.Generic()
+
+					Expect(cpmsProviderSpec.Generic()).To(Equal(machineProviderConfig))
+				})
+			})
 		})
 	})
 })

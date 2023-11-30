@@ -78,6 +78,7 @@ type ControlPlaneMachineSetWebhook struct {
 // SetupWebhookWithManager sets up a new ControlPlaneMachineSet webhook with the manager.
 func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 	r.client = mgr.GetClient()
+	r.logger = logger
 
 	if err := ctrl.NewWebhookManagedBy(mgr).
 		WithValidator(r).
@@ -355,9 +356,29 @@ func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path,
 		return validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
 	case configv1.VSpherePlatformType:
 		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere())
+	case configv1.NutanixPlatformType:
+		return validateOpenShiftNutanixProviderConfig(providerSpecPath.Child("value"), providerConfig.Nutanix(), template.FailureDomains)
 	}
 
 	return []error{}
+}
+
+// validateOpenShiftNutanixProviderConfig runs Nutanix specific checks on the provider config on the ControlPlaneMachineSet.
+// This ensure that the ControlPlaneMachineSet can safely replace Nutanix control plane machines.
+func validateOpenShiftNutanixProviderConfig(parentPath *field.Path, providerConfig providerconfig.NutanixProviderConfig, failureDomains *machinev1.FailureDomains) []error {
+	errs := []error{}
+
+	if failureDomains == nil {
+		return errs
+	}
+
+	for _, fdRef := range failureDomains.Nutanix {
+		if _, err := providerConfig.GetFailureDomainByName(fdRef.Name); err != nil {
+			errs = append(errs, field.Invalid(parentPath.Child("failureDomain", "name"), fdRef.Name, fmt.Sprintf("error: %v", err)))
+		}
+	}
+
+	return errs
 }
 
 // validateOpenShiftAzureProviderConfig runs Azure specific checks on the provider config on the ControlPlaneMachineSet.

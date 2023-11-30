@@ -131,7 +131,7 @@ func newProviderConfigFromProviderSpec(logger logr.Logger, providerSpec machinev
 	case configv1.GCPPlatformType:
 		return newGCPProviderConfig(logger, providerSpec.Value)
 	case configv1.NutanixPlatformType:
-		return newNutanixProviderConfig(logger, providerSpec.Value)
+		return newNutanixProviderConfig(logger, providerSpec.Value, infrastructure)
 	case configv1.OpenStackPlatformType:
 		return newOpenStackProviderConfig(logger, providerSpec.Value)
 	case configv1.VSpherePlatformType:
@@ -158,6 +158,8 @@ type providerConfig struct {
 // InjectFailureDomain is used to inject a failure domain into the ProviderConfig.
 // The returned ProviderConfig will be a copy of the current ProviderConfig with
 // the new failure domain injected.
+//
+//nolint:cyclop
 func (p providerConfig) InjectFailureDomain(fd failuredomain.FailureDomain) (ProviderConfig, error) {
 	if fd == nil {
 		return nil, errNilFailureDomain
@@ -181,6 +183,13 @@ func (p providerConfig) InjectFailureDomain(fd failuredomain.FailureDomain) (Pro
 		}
 
 		newConfig.vsphere = config
+	case configv1.NutanixPlatformType:
+		config, err := p.Nutanix().InjectFailureDomain(fd.Nutanix())
+		if err != nil {
+			return newConfig, fmt.Errorf("failed to inject failure domain: %w", err)
+		}
+
+		newConfig.nutanix = config
 	case configv1.NonePlatformType:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedPlatformType, p.platformType)
 	}
@@ -201,6 +210,8 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 		return failuredomain.NewOpenStackFailureDomain(p.OpenStack().ExtractFailureDomain())
 	case configv1.VSpherePlatformType:
 		return failuredomain.NewVSphereFailureDomain(p.VSphere().ExtractFailureDomain())
+	case configv1.NutanixPlatformType:
+		return failuredomain.NewNutanixFailureDomain(p.Nutanix().ExtractFailureDomain())
 	case configv1.NonePlatformType:
 		return nil
 	default:

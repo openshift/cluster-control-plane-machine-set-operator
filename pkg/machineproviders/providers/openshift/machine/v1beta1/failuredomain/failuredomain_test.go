@@ -305,6 +305,50 @@ var _ = Describe("FailureDomains", func() {
 			})
 		})
 
+		Context("With Nutanix failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1resourcebuilder.NutanixFailureDomains().BuildFailureDomains()
+				failureDomains, err = NewFailureDomains(&config)
+			})
+
+			It("should not error", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should construct a list of failure domains", func() {
+				Expect(failureDomains).To(ConsistOf(
+					HaveField("String()", "NutanixFailureDomainReference{Name:fd-pe0}"),
+					HaveField("String()", "NutanixFailureDomainReference{Name:fd-pe1}"),
+					HaveField("String()", "NutanixFailureDomainReference{Name:fd-pe2}"),
+				))
+			})
+		})
+
+		Context("With invalid Nutanix failure domain configuration", func() {
+			var failureDomains []FailureDomain
+			var err error
+
+			BeforeEach(func() {
+				config := machinev1.FailureDomains{
+					Platform: configv1.NutanixPlatformType,
+					Nutanix:  nil,
+				}
+
+				failureDomains, err = NewFailureDomains(&config)
+			})
+
+			It("returns an error", func() {
+				Expect(err).To(MatchError("missing failure domain configuration"))
+			})
+
+			It("returns an empty list of failure domains", func() {
+				Expect(failureDomains).To(BeEmpty())
+			})
+		})
+
 		Context("With an unsupported platform type", func() {
 			var failureDomains []FailureDomain
 			var err error
@@ -420,6 +464,37 @@ var _ = Describe("FailureDomains", func() {
 			BeforeEach(func() {
 				fd.azure = machinev1resourcebuilder.AzureFailureDomain().Build()
 				fd.azure.Zone = ""
+			})
+
+			It("returns <unknown> for String()", func() {
+				Expect(fd.String()).To(Equal("<unknown>"))
+			})
+		})
+	})
+
+	Context("an Nutanix failure domain", func() {
+		var fd failureDomain
+
+		BeforeEach(func() {
+			fd = failureDomain{
+				platformType: configv1.NutanixPlatformType,
+			}
+		})
+
+		Context("with Nutanix failure domain reference name not empty", func() {
+			BeforeEach(func() {
+				fd.nutanix = machinev1resourcebuilder.NewNutanixFailureDomainBuilder().WithName("fd-pe0").Build()
+			})
+
+			It("returns the Nutanix failure domain reference name", func() {
+				Expect(fd.String()).To(Equal("NutanixFailureDomainReference{Name:fd-pe0}"))
+			})
+		})
+
+		Context("with empty Nutanix failure domain reference name", func() {
+			BeforeEach(func() {
+				fd.nutanix = machinev1.NutanixFailureDomainReference{}
+				fd.nutanix.Name = ""
 			})
 
 			It("returns <unknown> for String()", func() {
@@ -647,6 +722,40 @@ var _ = Describe("FailureDomains", func() {
 				fd2 = failureDomain{
 					platformType: configv1.OpenStackPlatformType,
 					openstack:    machinev1resourcebuilder.OpenStackFailureDomain().WithComputeAvailabilityZone("nova-az1").Build(),
+				}
+			})
+
+			It("returns false", func() {
+				Expect(fd1.Equal(fd2)).To(BeFalse())
+			})
+		})
+
+		Context("With two identical Nutanix failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.NutanixPlatformType,
+					nutanix:      machinev1.NutanixFailureDomainReference{Name: "fd-pe0"},
+				}
+				fd2 = failureDomain{
+					platformType: configv1.NutanixPlatformType,
+					nutanix:      machinev1.NutanixFailureDomainReference{Name: "fd-pe0"},
+				}
+			})
+
+			It("returns true", func() {
+				Expect(fd1.Equal(fd2)).To(BeTrue())
+			})
+		})
+
+		Context("With two different Nutanix failure domains", func() {
+			BeforeEach(func() {
+				fd1 = failureDomain{
+					platformType: configv1.NutanixPlatformType,
+					nutanix:      machinev1.NutanixFailureDomainReference{Name: "fd-pe0"},
+				}
+				fd2 = failureDomain{
+					platformType: configv1.NutanixPlatformType,
+					nutanix:      machinev1.NutanixFailureDomainReference{Name: "fd-pe1"},
 				}
 			})
 
