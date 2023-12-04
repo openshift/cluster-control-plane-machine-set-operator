@@ -107,3 +107,55 @@ An OpenStack failure domain will look something like the example below:
     availabilityZone: "<cinder availability zone>"
     volumeType: "<cinder volume type>"
 ```
+
+## vSphere
+
+On vSphere, the failure domains are represented by the infrastructure resource spec. A vSphere failure domain
+represents a combination of network, datastore, compute cluster, and datacenter. This allows an administrator
+to deploy machines in to separate hardware configurations.
+
+A vSphere failure domain will look something like the example below in the infrastructure resource:
+```yaml
+  spec:
+    cloudConfig:
+      key: config
+      name: cloud-provider-config
+    platformSpec:
+      type: VSphere
+      vsphere:
+        failureDomains:
+        - name: us-east-1
+          region: us-east
+          server: vcs8e-vc.ocp2.dev.cluster.com
+          topology:
+            computeCluster: /IBMCloud/host/vcs-mdcnc-workload-1
+            datacenter: IBMCloud
+            datastore: /IBMCloud/datastore/mdcnc-ds-1
+            networks:
+            - ci-vlan-1289
+            resourcePool: /IBMCloud/host/vcs-mdcnc-workload-1/Resources
+          zone: us-east-1a
+        - name: us-east-2
+          region: us-east
+          server: vcs8e-vc.ocp2.dev.cluster.com
+          topology:
+            computeCluster: /IBMCloud/host/vcs-mdcnc-workload-2
+            datacenter: IBMCloud
+            datastore: /IBMCloud/datastore/mdcnc-ds-2
+            networks:
+            - ci-vlan-1289
+            resourcePool: /IBMCloud/host/vcs-mdcnc-workload-2/Resources
+```
+
+The control plane machine set for vSphere refers to failure domains by their name as defined in the infrastructure
+spec. vSphere failure domains defined in the control plane machine set will look something like the example below:
+```yaml
+  template:
+    machineType: machines_v1beta1_machine_openshift_io
+    machines_v1beta1_machine_openshift_io:
+      failureDomains:
+        platform: VSphere
+        vsphere:
+        - name: us-east-1
+        - name: us-east-2
+```
