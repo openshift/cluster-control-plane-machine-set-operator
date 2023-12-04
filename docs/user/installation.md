@@ -285,3 +285,59 @@ Prior to 4.14, if the masters were configured with Availability Zones (AZ), the 
 one ServerGroup in OpenStack (the one initially created for master-0, ending with the name of the AZ) but configure
 the Machine ProviderSpec with different ServerGroups, one per AZ.
 So if you upgrade a cluster from a previous release to 4.14, you'll need to follow this [solution](https://access.redhat.com/solutions/7013893).
+
+#### Configuring a control plane machine set on vSphere
+
+Currently the only field supported by the vSphere failure domain is the `name`. On vSphere, the failure 
+domains are represented by the infrastructure resource spec. A vSphere failure domain represents a 
+combination of network, datastore, compute cluster, and datacenter. This allows an administrator
+to deploy machines in to separate hardware configurations.
+
+A vSphere failure domain will look something like the example below in the infrastructure resource:
+```yaml
+  spec:
+    cloudConfig:
+      key: config
+      name: cloud-provider-config
+    platformSpec:
+      type: VSphere
+      vsphere:
+        failureDomains:
+        - name: us-east-1
+          region: us-east
+          server: vcs8e-vc.ocp2.dev.cluster.com
+          topology:
+            computeCluster: /IBMCloud/host/vcs-mdcnc-workload-1
+            datacenter: IBMCloud
+            datastore: /IBMCloud/datastore/mdcnc-ds-1
+            networks:
+            - ci-vlan-1289
+            resourcePool: /IBMCloud/host/vcs-mdcnc-workload-1/Resources
+          zone: us-east-1a
+        - name: us-east-2
+          region: us-east
+          server: vcs8e-vc.ocp2.dev.cluster.com
+          topology:
+            computeCluster: /IBMCloud/host/vcs-mdcnc-workload-2
+            datacenter: IBMCloud
+            datastore: /IBMCloud/datastore/mdcnc-ds-2
+            networks:
+            - ci-vlan-1289
+            resourcePool: /IBMCloud/host/vcs-mdcnc-workload-2/Resources
+```
+
+The control plane machine set for vSphere refers to failure domains by their name as defined in the infrastructure
+spec. vSphere failure domains defined in the control plane machine set will look something like the example below:
+```yaml
+  template:
+    machineType: machines_v1beta1_machine_openshift_io
+    machines_v1beta1_machine_openshift_io:
+      failureDomains:
+        platform: VSphere
+        vsphere:
+        - name: us-east-1
+        - name: us-east-2
+```
+
+Prior to 4.15, failure domains were not available for vSphere and control plane machine sets. In 4.15, failure domains
+are available as tech preview.

@@ -88,18 +88,19 @@ Please ensure that you have 3 (or 5) control plane machines before creating the 
 The control plane machine set is currently supported for a number of platforms and OpenShift versions.
 The matrix shows in detail the support for each specific combination.
 
-| Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |      4.14           |
-|------------------------------|:---------------|:--------------------|:--------------------|:--------------------|
-| AWS                          |  Not Supported | Full                | Full                | Full                |
-| Azure                        |  Not Supported | Manual              | Full                | Full                |
-| GCP                          |  Not Supported | Not Supported       | Full                | Full                |
-| OpenStack                    |  Not Supported | Not Supported       | Not Supported       | Full                |
-| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)| Manual (Single Zone)|
-| Other Platforms              |  Not Supported | Not Supported       | Not Supported       | Not Supported       |
+| Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |      4.14           |      4.15           |
+|------------------------------|:---------------|:--------------------|:--------------------|:--------------------|:--------------------|
+| AWS                          |  Not Supported | Full                | Full                | Full                | Full                |
+| Azure                        |  Not Supported | Manual              | Full                | Full                | Full                |
+| GCP                          |  Not Supported | Not Supported       | Full                | Full                | Full                |
+| OpenStack                    |  Not Supported | Not Supported       | Not Supported       | Full                | Full                |
+| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)| Manual (Single Zone)| Manual, Full (Tech preview) |
+| Other Platforms              |  Not Supported | Not Supported       | Not Supported       | Not Supported       | Not Supported       |
 
 #### Keys
 
 `Full`: The control plane machine set is fully supported for this combination.\
+`Full (Tech Preview)`: The control plane machine set is fully implemented for this combination but only available in tech preview.\
 `Manual`: The control plane machine set is supported for this combination and has to be manually configured and installed.\
 `Manual (Single Zone)`: The same as `Manual`, however for this combination only a single failure domain configuration is supported. The failure domain configuration must be embedded within the providerSpec and may not vary between control plane machine indexes.\
 `Not Supported`: The control plane machine set is not yet supported for this combination.
