@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	uberZap "go.uber.org/zap"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -56,8 +57,10 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+var targetPoolsNotSetWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.targetPools: %s", warnTargetPoolsNotSet))
+
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.RawZapOpts(uberZap.Hooks(targetPoolsNotSetWarningCounter.Trigger)), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

@@ -15,6 +15,7 @@ require (
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231130130825-ea989e248004
 	github.com/openshift/library-go v0.0.0-20231003133513-3a0c1fc00519
 	github.com/spf13/pflag v1.0.5
+	go.uber.org/zap v1.25.0
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.2
@@ -209,7 +210,6 @@ require (
 	gitlab.com/bosi/decorder v0.4.0 // indirect
 	go.tmz.dev/musttag v0.7.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/exp v0.0.0-20230510235704-dd950f8aeaea // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230307190834-24139beb5833 // indirect
 	golang.org/x/mod v0.12.0 // indirect
