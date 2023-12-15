@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap/zapcore"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -43,6 +44,41 @@ import (
 // stringPtr returns a pointer to the string value.
 func stringPtr(s string) *string {
 	return &s
+}
+
+// MessageCounter implements counter for zap log messages. The trigger function should be registered as hook for zap logger.
+type MessageCounter interface {
+	Trigger(entry zapcore.Entry) error
+	Reset()
+	Value() int
+}
+
+// NewMessageCounter constructs new MessageCounter with provided message.
+func NewMessageCounter(message string) MessageCounter {
+	return &messageCounter{
+		message: message,
+	}
+}
+
+type messageCounter struct {
+	message string
+	counter int
+}
+
+func (h *messageCounter) Trigger(entry zapcore.Entry) error {
+	if entry.Message == h.message {
+		h.counter++
+	}
+
+	return nil
+}
+
+func (h *messageCounter) Reset() {
+	h.counter = 0
+}
+
+func (h *messageCounter) Value() int {
+	return h.counter
 }
 
 var _ = Describe("Webhooks", func() {
@@ -1096,6 +1132,20 @@ var _ = Describe("Webhooks", func() {
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
 				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: \"object\": selector is immutable")), "The selector should be immutable")
+			})
+
+			It("when removing the target pools", func() {
+				var emptySliceTargetPools []string
+				rawProviderSpec := machinev1beta1resourcebuilder.GCPProviderSpec().WithTargetPools(emptySliceTargetPools).BuildRawExtension()
+
+				// Reset the counter because it is shared by all suite loggers.
+				targetPoolsNotSetWarningCounter.Reset()
+
+				Expect(komega.Update(cpms, func() {
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = rawProviderSpec
+				})()).Should(BeNil(), "Update should be successful")
+
+				Expect(targetPoolsNotSetWarningCounter.Value()).To(Equal(1), "Removing target pools should give a warning")
 			})
 		})
 
