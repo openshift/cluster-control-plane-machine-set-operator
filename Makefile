@@ -1,5 +1,5 @@
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28
+ENVTEST_K8S_VERSION = 1.29
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -23,7 +23,7 @@ GOLANGCI_LINT = go run ${PROJECT_DIR}/vendor/github.com/golangci/golangci-lint/c
 VERSION     ?= $(shell git describe --always --abbrev=7)
 MUTABLE_TAG ?= latest
 IMAGE       ?= cluster-control-plane-machine-set-operator
-BUILD_IMAGE ?= registry.ci.openshift.org/openshift/release:golang-1.20
+BUILD_IMAGE ?= registry.ci.openshift.org/openshift/release:golang-1.21
 
 ifeq ($(shell command -v podman > /dev/null 2>&1 ; echo $$? ), 0)
 	ENGINE=podman

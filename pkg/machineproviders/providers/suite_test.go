@@ -62,7 +62,7 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_10_config-operator_01_infrastructure-Default.crd.yaml"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}

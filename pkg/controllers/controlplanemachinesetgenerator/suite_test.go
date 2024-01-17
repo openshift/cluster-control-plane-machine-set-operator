@@ -65,7 +65,10 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
 			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
+			// Specify specific CRDs to avoid loading all of openshift/api/config/v1, and to avoid loading non Default featuregate CRDs.
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_10_config-operator_01_infrastructure-Default.crd.yaml"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_00_cluster-version-operator_01_clusterversion-Default.crd.yaml"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_10_config-operator_01_featuregate.crd.yaml"),
 		},
 		ErrorIfCRDPathMissing:   true,
 		ControlPlaneStopTimeout: 2 * time.Minute,
