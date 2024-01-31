@@ -456,10 +456,10 @@ github.com/onsi/ginkgo/v2 v2.14.0 h1:vSmGj2Z5YPb9JwCWT6z6ihcUvDhuXLc3sJiqd3jMKAY
 github.com/onsi/ginkgo/v2 v2.14.0/go.mod h1:JkUdW7JkN0V6rFvsHcJ478egV3XH9NxpD27Hal/PhZw=
 github.com/onsi/gomega v1.30.0 h1:hvMK7xYz4D3HapigLTeGdId/NcfQx1VHMJc60ew99+8=
 github.com/onsi/gomega v1.30.0/go.mod h1:9sxs+SwGrKI0+PWe4Fxa9tFQQBG5xSsSbMXOI8PPpoQ=
-github.com/openshift/api v0.0.0-20240112192513-412e126bd40b h1:GfdgT7sKknrqzFU5XRPMIQzv17f9NnZ3K7VQ8obuZMM=
-github.com/openshift/api v0.0.0-20240112192513-412e126bd40b/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
-github.com/openshift/client-go v0.0.0-20240104132419-223261fd8630 h1:JQ/TO3bSDowReecFDvz+Nr0Fx8aoJI0zdo01y2W5NKk=
-github.com/openshift/client-go v0.0.0-20240104132419-223261fd8630/go.mod h1:8W4atsD8vBtEK0qplKpFWo+7XsQwzHTlqL7o/XpagRM=
+github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e h1:cxgCNo/R769CO23AK5TCh45H9SMUGZ8RukiF2/Qif3o=
+github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
+github.com/openshift/client-go v0.0.0-20240125160436-aa5df63097c4 h1:Ct+/c9d5rjZudN+VBLxRJIQfPy1gJZier1P1KdpvCaM=
+github.com/openshift/client-go v0.0.0-20240125160436-aa5df63097c4/go.mod h1:ZS5cpA+0zI/ziDQxAKKvGkRKn9BJppqDYdAph+OUTlo=
 github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231130130825-ea989e248004 h1:z5MmF35DnAa+HOX6AHMrGhkm7YXaKZAxrNL3JsYHJ1I=
 github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20231130130825-ea989e248004/go.mod h1:8U97lU5NyyrNKkVcG3zRXFbI33Z5D+GZYp6k4oHoT9k=
 github.com/openshift/library-go v0.0.0-20240115112243-470c096a1ca9 h1:dQmXUWo3Ko+8K/fxKPF01NuTrD92d/ABBQ4NfxkwbAY=
