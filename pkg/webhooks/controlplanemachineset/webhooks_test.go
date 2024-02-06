@@ -30,10 +30,12 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	"github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder"
+	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
 	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -143,10 +145,104 @@ var _ = Describe("Webhooks", func() {
 	Context("on create", func() {
 		var builder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 		var machineTemplate machinev1resourcebuilder.OpenShiftMachineV1Beta1TemplateBuilder
+		var infra *configv1.Infrastructure
+		Context("on vSphere", func() {
+			Context("when validating without failure domains", func() {
+				infraOnEntry := configv1.Infrastructure{}
+				infraName := types.NamespacedName{
+					Name: "cluster",
+				}
+
+				BeforeEach(func() {
+					By("Configuring a vSphere infrastructure spec")
+					infra = configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+					Expect(k8sClient.Get(ctx, infraName, &infraOnEntry)).To(Succeed())
+					Expect(k8sClient.Delete(ctx, &infraOnEntry)).To(Succeed())
+					Expect(k8sClient.Create(ctx, infra)).To(Succeed())
+				})
+
+				AfterEach(func() {
+					Expect(k8sClient.Delete(ctx, &infraOnEntry)).To(Succeed())
+					infraOnEntry.ResourceVersion = ""
+					Expect(k8sClient.Create(ctx, &infraOnEntry)).To(Succeed())
+				})
+
+				It("when providing invalid template in vSphere configuration", func() {
+
+					By("Creating a selection of Machines")
+
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infra).WithTemplate("invalid-template")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+					for i := 0; i < 3; i++ {
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value"),
+					)))
+				})
+
+				It("when providing failure domains in vSphere configuration", func() {
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infra).WithTemplate("/IBMCloud/vm/rhcos-415.92.202310310037-0-vmware.x86_64.ova-hw19")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec).WithFailureDomainsBuilder(machinev1resourcebuilder.VSphereFailureDomains())
+
+					zones := []string{"us-central1-a", "us-central1-b", "us-central1-c"}
+					for _, zone := range zones {
+						machineProviderSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infra).WithZone(zone)
+
+						machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+						controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(machineProviderSpec)
+
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+				})
+
+				It("when adding failure domains to vSphere configuration", func() {
+					infra := configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infra).WithTemplate("/IBMCloud/vm/rhcos-415.92.202310310037-0-vmware.x86_64.ova-hw19")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec).WithFailureDomainsBuilder(machinev1resourcebuilder.VSphereFailureDomains())
+
+					for i := 0; i < 3; i++ {
+						machineProviderSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infra).WithZone("us-central1-c")
+
+						machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+						controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(machineProviderSpec)
+
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed())
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+					failureDomains := cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.VSphere
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.VSphere = cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.VSphere[2:]
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.VSphere = append(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.VSphere, failureDomains[0])
+					Expect(k8sClient.Update(ctx, cpms)).To(Succeed())
+				})
+
+			})
+		})
 
 		Context("when validating without failure domains", func() {
 			BeforeEach(func() {
 				providerSpec := machinev1beta1resourcebuilder.AWSProviderSpec().WithAvailabilityZone("us-east-1")
+
 				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
 				// Default CPMS builder should be valid, individual tests will override to make it invalid
 				builder = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
@@ -338,20 +434,7 @@ var _ = Describe("Webhooks", func() {
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": arn is required when type is ARN, and forbidden otherwise"),
 				)))
 			})
-
-			It("when providing invalid template in vSphere configuration", func() {
-				providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("invalid-template")
-				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
-				cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-				cpms := cpmsBuilder.Build()
-
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: [spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.valu"),
-				)))
-			})
 		})
-
 		Context("when validating failure domains on AWS", func() {
 			var builder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 			var filterSubnet = machinev1.AWSResourceReference{
