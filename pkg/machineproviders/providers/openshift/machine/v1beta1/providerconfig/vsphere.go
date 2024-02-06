@@ -38,9 +38,11 @@ type VSphereProviderConfig struct {
 }
 
 func (v VSphereProviderConfig) getFailureDomainFromInfrastructure(fd machinev1.VSphereFailureDomain) (*configv1.VSpherePlatformFailureDomainSpec, error) {
-	for _, failureDomain := range v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
-		if failureDomain.Name == fd.Name {
-			return &failureDomain, nil
+	if v.infrastructure.Spec.PlatformSpec.VSphere != nil {
+		for _, failureDomain := range v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
+			if failureDomain.Name == fd.Name {
+				return &failureDomain, nil
+			}
 		}
 	}
 
