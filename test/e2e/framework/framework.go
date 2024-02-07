@@ -456,6 +456,10 @@ func convertVSphereProviderConfigToControlPlaneMachineSetProviderSpec(providerCo
 	vspherePs := providerConfig.VSphere().Config()
 	vspherePs.Name = ""
 
+	vspherePs.Workspace = &machinev1beta1.Workspace{}
+	vspherePs.Template = ""
+	vspherePs.Network = machinev1beta1.NetworkSpec{}
+
 	rawBytes, err := json.Marshal(vspherePs)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling vsphere providerSpec: %w", err)

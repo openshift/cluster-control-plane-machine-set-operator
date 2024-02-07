@@ -19,6 +19,7 @@ package providerconfig
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -54,7 +55,7 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	workspace := &machinev1beta1.Workspace{}
 
 	if len(topology.ComputeCluster) > 0 {
-		workspace.ResourcePool = fmt.Sprintf("/%s/resources", topology.ComputeCluster)
+		workspace.ResourcePool = path.Clean(fmt.Sprintf("/%s/Resources", topology.ComputeCluster))
 	}
 
 	if len(topology.ResourcePool) > 0 {
@@ -122,7 +123,7 @@ func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDo
 	if len(topology.Template) > 0 {
 		newVSphereProviderConfig.providerConfig.Template = topology.Template[strings.LastIndex(topology.Template, "/")+1:]
 	} else if len(v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains) > 0 {
-		newVSphereProviderConfig.providerConfig.Template = fmt.Sprintf("/%s/vm/%s/%s-rhcos-%s-%s", failureDomain.Topology.Datacenter, v.infrastructure.Status.InfrastructureName, v.infrastructure.Status.InfrastructureName, failureDomain.Region, failureDomain.Zone)
+		newVSphereProviderConfig.providerConfig.Template = fmt.Sprintf("%s-rhcos-%s-%s", v.infrastructure.Status.InfrastructureName, failureDomain.Region, failureDomain.Zone)
 	}
 
 	return newVSphereProviderConfig, nil
@@ -143,7 +144,7 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 		if workspace.Datacenter == topology.Datacenter &&
 			workspace.Datastore == topology.Datastore &&
 			workspace.Server == failureDomain.Server &&
-			workspace.ResourcePool == topology.ResourcePool {
+			path.Clean(workspace.ResourcePool) == path.Clean(topology.ResourcePool) {
 			return machinev1.VSphereFailureDomain{
 				Name: failureDomain.Name,
 			}

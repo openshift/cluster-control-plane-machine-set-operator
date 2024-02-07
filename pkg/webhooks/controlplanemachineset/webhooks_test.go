@@ -148,23 +148,26 @@ var _ = Describe("Webhooks", func() {
 		var infra *configv1.Infrastructure
 		Context("on vSphere", func() {
 			Context("when validating without failure domains", func() {
-				infraOnEntry := configv1.Infrastructure{}
+				infraOnEntry := &configv1.Infrastructure{}
+				currentInfra := &configv1.Infrastructure{}
 				infraName := types.NamespacedName{
 					Name: "cluster",
 				}
-
 				BeforeEach(func() {
 					By("Configuring a vSphere infrastructure spec")
 					infra = configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
-					Expect(k8sClient.Get(ctx, infraName, &infraOnEntry)).To(Succeed())
-					Expect(k8sClient.Delete(ctx, &infraOnEntry)).To(Succeed())
-					Expect(k8sClient.Create(ctx, infra)).To(Succeed())
+
+					Expect(k8sClient.Get(ctx, infraName, currentInfra)).To(Succeed())
+					currentInfra.DeepCopyInto(infraOnEntry)
+
+					infra.Spec.DeepCopyInto(&currentInfra.Spec)
+					Expect(k8sClient.Update(ctx, currentInfra)).To(Succeed())
 				})
 
 				AfterEach(func() {
-					Expect(k8sClient.Delete(ctx, &infraOnEntry)).To(Succeed())
-					infraOnEntry.ResourceVersion = ""
-					Expect(k8sClient.Create(ctx, &infraOnEntry)).To(Succeed())
+					By("Restoring previous infrastructure spec")
+					infraOnEntry.Spec.DeepCopyInto(&currentInfra.Spec)
+					Expect(k8sClient.Update(ctx, currentInfra)).To(Succeed())
 				})
 
 				It("when providing invalid template in vSphere configuration", func() {
