@@ -17,18 +17,21 @@ limitations under the License.
 package providerconfig
 
 import (
+	"encoding/json"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	configv1 "github.com/openshift/api/config/v1"
+	v1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-api-actuator-pkg/testutils"
 	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var _ = Describe("VSphere Provider Config", func() {
+var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func() {
 	var logger testutils.TestLogger
 
 	var providerConfig VSphereProviderConfig
@@ -113,6 +116,69 @@ var _ = Describe("VSphere Provider Config", func() {
 		It("returns the correct VSphere config", func() {
 			Expect(providerConfig.VSphere()).ToNot(BeNil())
 			Expect(providerConfig.VSphere().Config()).To(Equal(expectedVSphereConfig))
+		})
+	})
+
+	Context("with manual static ips", func() {
+		var expectedFailureDomain v1.VSphereFailureDomain
+
+		BeforeEach(func() {
+			providerConfig.providerConfig.Network = machinev1beta1.NetworkSpec{
+				Devices: []machinev1beta1.NetworkDeviceSpec{
+					{
+						IPAddrs: []string{
+							"192.168.133.240",
+						},
+						Gateway: "192.168.133.1",
+						Nameservers: []string{
+							"8.8.8.8",
+						},
+						NetworkName: "test-network",
+					},
+				},
+			}
+			expectedFailureDomain = machinev1resourcebuilder.VSphereFailureDomain().
+				WithZone(usCentral1a).
+				Build()
+
+		})
+
+		It("returns the configured failure domain", func() {
+			Expect(providerConfig.ExtractFailureDomain()).To(Equal(expectedFailureDomain))
+		})
+
+		It("returns expected provider config after injection", func() {
+			injectedProviderConfig, err := providerConfig.InjectFailureDomain(expectedFailureDomain)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(injectedProviderConfig.providerConfig.Network.Devices[0].IPAddrs).To(BeNil())
+			Expect(injectedProviderConfig.providerConfig.Network.Devices[0].Gateway).To(Equal(""))
+			Expect(injectedProviderConfig.providerConfig.Network.Devices[0].Nameservers).To(BeNil())
+		})
+
+		It("returns expected provider config after newVSphereProviderConfig", func() {
+			configBuilder := machinev1beta1resourcebuilder.VSphereProviderSpec()
+
+			machine := machinev1beta1resourcebuilder.Machine().AsMaster().WithProviderSpecBuilder(configBuilder).Build()
+
+			vsMachine := &machinev1beta1.VSphereMachineProviderSpec{}
+			err := json.Unmarshal(machine.Spec.ProviderSpec.Value.Raw, vsMachine)
+			Expect(err).ToNot(HaveOccurred())
+
+			vsMachine.Network.Devices[0].IPAddrs = []string{"192.168.133.14"}
+			vsMachine.Network.Devices[0].Gateway = "192.168.133.1"
+			vsMachine.Network.Devices[0].Nameservers = []string{"8.8.8.8"}
+			vsMachine.Network.Devices[0].NetworkName = "test-network"
+
+			jsonRaw, _ := json.Marshal(vsMachine)
+			machine.Spec.ProviderSpec.Value = &runtime.RawExtension{Raw: jsonRaw}
+
+			infrastructure := configv1resourcebuilder.Infrastructure().AsVSphere("vsphere-test").Build()
+			newProviderSpec, err := newVSphereProviderConfig(logger.Logger(), machine.Spec.ProviderSpec.Value, infrastructure)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(newProviderSpec.VSphere().providerConfig.Network.Devices[0].IPAddrs).To(BeNil())
+			Expect(newProviderSpec.VSphere().providerConfig.Network.Devices[0].Gateway).To(Equal(""))
+			Expect(newProviderSpec.VSphere().providerConfig.Network.Devices[0].Nameservers).To(BeNil())
 		})
 	})
 })
