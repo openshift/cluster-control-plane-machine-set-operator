@@ -548,7 +548,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
+# github.com/openshift/api v0.0.0-20240212121336-f005b4e283f8
 ## explicit; go 1.21
 github.com/openshift/api
 github.com/openshift/api/annotations
@@ -639,7 +639,7 @@ github.com/openshift/client-go/config/listers/config/v1alpha1
 github.com/openshift/client-go/machine/applyconfigurations/internal
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1
-# github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240201120052-f5a6a5f74055
+# github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240214091802-e8d3b3dc5ca4
 ## explicit; go 1.21
 github.com/openshift/cluster-api-actuator-pkg/testutils
 github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder
