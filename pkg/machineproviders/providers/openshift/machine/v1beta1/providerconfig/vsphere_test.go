@@ -94,6 +94,34 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 		})
 	})
 
+	Context("StaticIP", func() {
+
+		BeforeEach(func() {
+			machineProviderConfig := machinev1beta1resourcebuilder.VSphereProviderSpec().
+				WithZone(usCentral1a).WithIPPool().
+				Build()
+
+			providerConfig = VSphereProviderConfig{
+				providerConfig: *machineProviderConfig,
+				infrastructure: configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build(),
+			}
+		})
+
+		It("contains an AddressesFromPools block", func() {
+			Expect(providerConfig.providerConfig.Network.Devices[0].AddressesFromPools).To(Not(BeEmpty()),
+				"expected AddressesFromPools to not be empty as a static IPPool has been configured")
+		})
+
+		It("returns networking with AddressesFromPools and the configured network name from failure domain", func() {
+			expected, err := providerConfig.InjectFailureDomain(providerConfig.ExtractFailureDomain())
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(expected.providerConfig.Network.Devices[0].AddressesFromPools).To(Not(BeNil()),
+				"expected AddressesFromPools to still be present after injecting Failure Domain")
+			Expect(expected.providerConfig.Network.Devices[0].NetworkName).To(Equal(providerConfig.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains[0].Topology.Networks[0]),
+				"expected NetworkName to still be equal to the the original after injection of the Failure Domain")
+		})
+	})
+
 	Context("newVSphereProviderConfig", func() {
 		var providerConfig ProviderConfig
 		var expectedVSphereConfig machinev1beta1.VSphereMachineProviderSpec
