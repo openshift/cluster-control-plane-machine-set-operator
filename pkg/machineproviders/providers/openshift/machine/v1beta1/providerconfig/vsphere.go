@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/go-test/deep"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -81,6 +82,30 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	}
 
 	return workspace
+}
+
+func getReducedTemplate(template string) string {
+	if strings.Contains(template, "/") {
+		return template[strings.LastIndex(template, "/")+1:]
+	}
+
+	return template
+}
+
+// Diff compares two ProviderConfigs and returns a list of differences,
+// or nil if there are none.
+func (v VSphereProviderConfig) Diff(other machinev1beta1.VSphereMachineProviderSpec) ([]string, error) {
+	// templates can be provided either with an absolute path or relative.
+	// this can result in the control plane nodes rolling out when they dont need to.
+	// as long as the OVA name matches that will be considered a match.
+	otherTemplate := getReducedTemplate(other.Template)
+	currentTemplate := getReducedTemplate(v.providerConfig.Template)
+
+	if otherTemplate == currentTemplate {
+		other.Template = v.providerConfig.Template
+	}
+
+	return deep.Equal(v.providerConfig, other), nil
 }
 
 // InjectFailureDomain returns a new VSphereProviderConfig configured with the failure domain.
