@@ -91,13 +91,15 @@ func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDo
 
 	newVSphereProviderConfig.providerConfig.Workspace = newVSphereProviderConfig.getWorkspaceFromFailureDomain(failureDomain)
 	topology := failureDomain.Topology
+	network := newVSphereProviderConfig.providerConfig.Network
 
 	logNetworkInfo(newVSphereProviderConfig.providerConfig.Network, "control plane machine set network before failure domain: %v", v.logger)
 
 	if len(topology.Networks) > 0 {
 		networkSpec := machinev1beta1.NetworkSpec{}
 		// If original has AddressesFromPools, that means static IP is desired for the CPMS.  Keep that and just add the FD info.
-		if len(newVSphereProviderConfig.providerConfig.Network.Devices[0].AddressesFromPools) > 0 {
+		// Note, CPMS may have no network devices defined relying on FD to provide.
+		if len(network.Devices) > 0 && len(network.Devices[0].AddressesFromPools) > 0 {
 			networkSpec.Devices = newVSphereProviderConfig.providerConfig.Network.Devices
 		}
 

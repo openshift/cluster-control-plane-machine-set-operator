@@ -209,4 +209,17 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 			Expect(newProviderSpec.VSphere().providerConfig.Network.Devices[0].Nameservers).To(BeNil())
 		})
 	})
+
+	Context("no network configured", func() {
+		BeforeEach(func() {
+			providerConfig.providerConfig.Network = machinev1beta1.NetworkSpec{}
+		})
+
+		It("should not fail after injectFailureDomain", func() {
+			expected, err := providerConfig.InjectFailureDomain(providerConfig.ExtractFailureDomain())
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(expected.providerConfig.Network.Devices[0].NetworkName).To(Equal(providerConfig.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains[0].Topology.Networks[0]),
+				"expected NetworkName to still be equal to the the original after injection of the Failure Domain")
+		})
+	})
 })
