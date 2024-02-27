@@ -183,6 +183,20 @@ func newVSphereProviderConfig(logger logr.Logger, raw *runtime.RawExtension, inf
 		infrastructure: infrastructure,
 	}
 
+	// For networking, we only need to compare the network name.  For static IPs, we can ignore all ip configuration;
+	// however, we may need to verify the addressesFromPools is present.
+	for index, device := range vsphereMachineProviderSpec.Network.Devices {
+		vsphereMachineProviderSpec.Network.Devices[index] = machinev1beta1.NetworkDeviceSpec{}
+		if device.NetworkName != "" {
+			vsphereMachineProviderSpec.Network.Devices[index].NetworkName = device.NetworkName
+		}
+
+		if device.AddressesFromPools != nil {
+			vsphereMachineProviderSpec.Network.Devices[index].AddressesFromPools = device.AddressesFromPools
+			vsphereMachineProviderSpec.Network.Devices[index].Nameservers = device.Nameservers
+		}
+	}
+
 	config := providerConfig{
 		platformType: configv1.VSpherePlatformType,
 		vsphere:      VSphereProviderConfig,
