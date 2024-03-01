@@ -84,7 +84,8 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	return workspace
 }
 
-func getReducedTemplate(template string) string {
+// getTemplateName returns the name of the name of the template
+func getTemplateName(template string) string {
 	if strings.Contains(template, "/") {
 		return template[strings.LastIndex(template, "/")+1:]
 	}
@@ -95,11 +96,11 @@ func getReducedTemplate(template string) string {
 // Diff compares two ProviderConfigs and returns a list of differences,
 // or nil if there are none.
 func (v VSphereProviderConfig) Diff(other machinev1beta1.VSphereMachineProviderSpec) ([]string, error) {
-	// templates can be provided either with an absolute path or relative.
-	// this can result in the control plane nodes rolling out when they dont need to.
-	// as long as the OVA name matches that will be considered a match.
-	otherTemplate := getReducedTemplate(other.Template)
-	currentTemplate := getReducedTemplate(v.providerConfig.Template)
+	// Templates can be provided either with an absolute path or relative.
+	// This can result in the control plane nodes rolling out when they dont need to.
+	// As long as the OVA name matches that will be considered a match.
+	otherTemplate := getTemplateName(other.Template)
+	currentTemplate := getTemplateName(v.providerConfig.Template)
 
 	if otherTemplate == currentTemplate {
 		other.Template = v.providerConfig.Template
