@@ -90,9 +90,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-//	infrastructure := configv1builder.Infrastructure().AsAWS("cluster", "us-east-1").WithName("cluster").Build()
-//	Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
-
 	// CEL requires Kube 1.25 and above, so check for the minimum server version.
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())

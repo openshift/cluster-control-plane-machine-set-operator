@@ -84,7 +84,7 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	return workspace
 }
 
-// getTemplateName returns the name of the name of the template
+// getTemplateName returns the name of the name of the template.
 func getTemplateName(template string) string {
 	if strings.Contains(template, "/") {
 		return template[strings.LastIndex(template, "/")+1:]
