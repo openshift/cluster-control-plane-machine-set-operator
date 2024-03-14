@@ -397,6 +397,46 @@ var _ = Describe("reconcileMachineUpdates", func() {
 					}
 				},
 			}),
+			Entry("with updates required in a single index, and the outdated index is not ready", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
+					1: {outdatedNonReadyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).
+						WithDiff(instanceDiff).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					mockMachineProvider.EXPECT().WithClient(gomock.Any()).Return(mockMachineProvider).AnyTimes()
+					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(nil).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				},
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", int32(1),
+								"namespace", namespaceName,
+								"name", "machine-1",
+								"diff", instanceDiff,
+							},
+							Message: machineRequiresUpdate,
+						},
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", int32(1),
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: createdReplacement,
+						},
+					}
+				},
+			}),
 			Entry("with updates are required in multiple indexes", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				machineInfos: map[int32][]machineproviders.MachineInfo{
@@ -470,6 +510,60 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						pendingMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build(),
 					},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).
+						WithDiff(instanceDiff).Build()},
+					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
+				},
+				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
+					// Note, in this case it should not create anything new because we are at surge capacity.
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				},
+				expectedLogsBuilder: func() []testutils.LogEntry {
+					return []testutils.LogEntry{
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", int32(0),
+								"namespace", namespaceName,
+								"name", "machine-0",
+								"replacementName", "machine-replacement-0",
+							},
+							Message: waitingForReplacement,
+						},
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", int32(1),
+								"namespace", namespaceName,
+								"name", "machine-1",
+								"diff", instanceDiff,
+							},
+							Message: machineRequiresUpdate,
+						},
+						{
+							Level: 2,
+							KeysAndValues: []interface{}{
+								"updateStrategy", machinev1.RollingUpdate,
+								"index", int32(1),
+								"namespace", namespaceName,
+								"name", "machine-1",
+							},
+							Message: noCapacityForExpansion,
+						},
+					}
+				},
+				expectedResult: ctrl.Result{RequeueAfter: 5 * time.Second},
+			}),
+			Entry("with updates are required in multiple indexes, but the replacement machine is pending, and a later index is not ready", rollingUpdateTableInput{
+				cpmsBuilder: cpmsBuilder.WithReplicas(3),
+				machineInfos: map[int32][]machineproviders.MachineInfo{
+					0: {
+						updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).Build(),
+						pendingMachineBuilder.WithIndex(0).WithMachineName("machine-replacement-0").Build(),
+					},
+					1: {outdatedNonReadyMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).
 						WithDiff(instanceDiff).Build()},
 					2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("node-2").Build()},
 				},

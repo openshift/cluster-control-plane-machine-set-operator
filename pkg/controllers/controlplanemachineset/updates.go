@@ -346,6 +346,11 @@ func (r *ControlPlaneMachineSetReconciler) waitForRemoveMachine(logger logr.Logg
 }
 
 func (r *ControlPlaneMachineSetReconciler) deleteReplacedMachines(ctx context.Context, logger logr.Logger, machineProvider machineproviders.MachineProvider, machines []machineproviders.MachineInfo) (bool, ctrl.Result, error) {
+	if len(machines) < 2 {
+		// No need to delete any machines if there are less than 2 machines in an index.
+		return false, ctrl.Result{}, nil
+	}
+
 	machinesNeedingReplacement := needReplacementMachines(machines)
 	machinesUpdated := updatedMachines(machines)
 	machinesOutdatedNonReady := nonReadyMachines(machinesNeedingReplacement)
