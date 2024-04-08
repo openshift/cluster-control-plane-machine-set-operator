@@ -181,4 +181,16 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 			Expect(newProviderSpec.VSphere().providerConfig.Network.Devices[0].Nameservers).To(BeNil())
 		})
 	})
+
+	Context("no vsphere platform spec in infrastructure", func() {
+		BeforeEach(func() {
+			providerConfig.infrastructure.Spec.PlatformSpec.VSphere = nil
+		})
+
+		It("should should return empty failure domain", func() {
+			expected := providerConfig.ExtractFailureDomain()
+
+			Expect(expected).To(Equal(v1.VSphereFailureDomain{}))
+		})
+	})
 })
