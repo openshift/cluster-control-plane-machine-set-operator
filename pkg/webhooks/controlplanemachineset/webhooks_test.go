@@ -147,10 +147,10 @@ var _ = Describe("Webhooks", Ordered, func() {
 		Context("on vSphere", Ordered, func() {
 			Context("when validating without failure domains", func() {
 				var infrastructure *configv1.Infrastructure
-				BeforeAll(func() {
-					By("Configuring a vSphere infrastructure spec")
 
-					infrastructure = configv1builder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+				BeforeAll(func() {
+					infrastructure = configv1builder.Infrastructure().AsVSphere("vsphere-test").Build()
+					Expect(infrastructure.Spec.PlatformSpec.VSphere.FailureDomains).To(BeNil(), "Failure domains should be nil")
 					Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
 				})
 
@@ -158,7 +158,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					Expect(k8sClient.Delete(ctx, infrastructure)).To(Succeed())
 				})
 
-				It("when providing invalid template in vSphere configuration", func() {
+				It("when providing template with no path in vSphere configuration", func() {
 
 					By("Creating a selection of Machines")
 
@@ -176,10 +176,133 @@ var _ = Describe("Webhooks", Ordered, func() {
 					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 					cpms := cpmsBuilder.Build()
 
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "CPMS must succeed during creation")
+				})
+
+				It("when providing template with valid path in vSphere configuration", func() {
+
+					By("Creating a selection of Machines")
+
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("/datacenter/vm/user-upi-l8x7x-rhcos-us-east-us-east-3a")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+					for i := 0; i < 3; i++ {
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "CPMS must succeed during creation")
+				})
+
+				It("when providing template with invalid path in vSphere configuration", func() {
+
+					By("Creating a selection of Machines")
+
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("/IBMCloud/what-is-this/ngirard-upi-l8x7x-rhcos-us-east-us-east-3a")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+					for i := 0; i < 3; i++ {
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
 					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-						ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template: Invalid value: \"invalid-template\": template must be provided as the full path"),
+						ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template: Invalid value: \"/IBMCloud/what-is-this/ngirard-upi-l8x7x-rhcos-us-east-us-east-3a\": template must be provided as the full path"),
 					)))
 				})
+			})
+
+			Context("when validating failure domains", func() {
+				var infrastructure *configv1.Infrastructure
+				BeforeAll(func() {
+					By("Configuring a vSphere infrastructure spec")
+
+					// Passing in nil for FD will result in defaults being generated.
+					infrastructure = configv1builder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+					Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
+				})
+
+				AfterAll(func() {
+					Expect(k8sClient.Delete(ctx, infrastructure)).To(Succeed())
+				})
+
+				It("when providing template with no path in vSphere configuration", func() {
+
+					By("Creating a selection of Machines")
+
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("invalid-template")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+					for i := 0; i < 3; i++ {
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "CPMS must succeed during creation")
+				})
+
+				It("when providing template with valid path in vSphere configuration", func() {
+
+					By("Creating a selection of Machines")
+
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("/datacenter/vm/user-upi-l8x7x-rhcos-us-east-us-east-3a")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+					for i := 0; i < 3; i++ {
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "CPMS must succeed during creation")
+				})
+
+				It("when providing template with invalid path in vSphere configuration", func() {
+
+					By("Creating a selection of Machines")
+
+					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("/IBMCloud/what-is-this/ngirard-upi-l8x7x-rhcos-us-east-us-east-3a")
+					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+					for i := 0; i < 3; i++ {
+						controlPlaneMachine := controlPlaneMachineBuilder.Build()
+						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+					}
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+						ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template: Invalid value: \"/IBMCloud/what-is-this/ngirard-upi-l8x7x-rhcos-us-east-us-east-3a\": template must be provided as the full path"),
+					)))
+				})
+
 				// "providing" covers a cpms created with a list of failure domains
 				It("when providing failure domains in vSphere configuration", func() {
 					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("/IBMCloud/vm/rhcos-415.92.202310310037-0-vmware.x86_64.ova-hw19")
