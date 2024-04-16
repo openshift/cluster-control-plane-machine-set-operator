@@ -19,9 +19,9 @@ package controlplanemachineset
 import (
 	"context"
 	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	configv1builder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -104,9 +104,92 @@ var _ = Describe("Webhooks", func() {
 		)
 	})
 
+	Context("on vSphere", Ordered, func() {
+
+		Context("when validating without failure domains", func() {
+			var infrastructure *configv1.Infrastructure
+
+			BeforeAll(func() {
+				infrastructure = configv1builder.Infrastructure().AsVSphere("vsphere-test").WithName("cluster").Build()
+				Expect(infrastructure.Spec.PlatformSpec.VSphere.FailureDomains).To(BeNil(), "Failure domains should be nil")
+				Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
+			})
+
+			AfterAll(func() {
+				Expect(k8sClient.Delete(ctx, infrastructure)).To(Succeed())
+			})
+
+			It("when providing template with no path in vSphere configuration", func() {
+				providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithTemplate("no-path-template")
+				machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+				for i := 0; i < 3; i++ {
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+				}
+
+				cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				cpms := cpmsBuilder.Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "CPMS must succeed during creation")
+			})
+
+			It("when providing template with valid path in vSphere configuration", func() {
+				providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("/datacenter/vm/user-upi-l8x7x-rhcos-us-east-us-east-3a")
+				machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+				for i := 0; i < 3; i++ {
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+				}
+
+				cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				cpms := cpmsBuilder.Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "CPMS must succeed during creation")
+			})
+
+			It("when providing template with invalid path in vSphere configuration", func() {
+				providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("/datacenter/what-is-this/user-upi-l8x7x-rhcos-us-east-us-east-3a")
+				machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
+
+				machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
+				controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
+
+				for i := 0; i < 3; i++ {
+					controlPlaneMachine := controlPlaneMachineBuilder.Build()
+					Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
+				}
+
+				cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+				cpms := cpmsBuilder.Build()
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
+					ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template: Invalid value: \"/datacenter/what-is-this/user-upi-l8x7x-rhcos-us-east-us-east-3a\": template must be provided as the full path"),
+				)))
+			})
+		})
+	})
+
 	Context("on create", func() {
 		var builder machinev1resourcebuilder.ControlPlaneMachineSetBuilder
 		var machineTemplate machinev1resourcebuilder.OpenShiftMachineV1Beta1TemplateBuilder
+		var infrastructure *configv1.Infrastructure
+
+		BeforeEach(func() {
+			infrastructure = configv1builder.Infrastructure().AsAWS("cluster", "us-east-1").WithName("cluster").Build()
+			Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(k8sClient.Delete(ctx, infrastructure)).To(Succeed())
+		})
 
 		Context("when validating without failure domains", func() {
 			BeforeEach(func() {
@@ -300,18 +383,6 @@ var _ = Describe("Webhooks", func() {
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": id is required when type is ID, and forbidden otherwise"),
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": arn is required when type is ARN, and forbidden otherwise"),
-				)))
-			})
-
-			It("when providing invalid template in vSphere configuration", func() {
-				providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithTemplate("invalid-template")
-				machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
-				cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-				cpms := cpmsBuilder.Build()
-
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: [spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.valu"),
 				)))
 			})
 		})
@@ -850,6 +921,16 @@ var _ = Describe("Webhooks", func() {
 
 	Context("on update", func() {
 		var cpms *machinev1.ControlPlaneMachineSet
+		var infrastructure *configv1.Infrastructure
+
+		BeforeEach(func() {
+			infrastructure = configv1builder.Infrastructure().AsAWS("cluster", "us-east-1").WithName("cluster").Build()
+			Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(k8sClient.Delete(ctx, infrastructure)).To(Succeed())
+		})
 
 		Context("on AWS", func() {
 			BeforeEach(func() {

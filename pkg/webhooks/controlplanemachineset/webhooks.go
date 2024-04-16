@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -418,12 +419,14 @@ func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerCo
 }
 
 // validateOpenShiftVSphereProviderConfig runs VSphere specific checks on the provider config on the ControlPlaneMachineSet.
-// This ensure that the ControlPlaneMachineSet can safely replace VSphere control plane machines.
+// This ensures that the ControlPlaneMachineSet can safely replace VSphere control plane machines.
 func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) []error {
 	errs := []error{}
 
+	// Check template format.  If "/" found, assume it's a path based definition and verify with pattern.
+	// If not a path template, then assume just a template name (older ocp installs)
 	templatePath := providerConfig.Config().Template
-	if len(templatePath) > 0 {
+	if len(templatePath) > 0 && strings.Contains(templatePath, "/") {
 		matched, err := regexp.MatchString(vsphereTemplateValidationPattern, templatePath)
 		if err != nil {
 			errs = append(errs, field.InternalError(parentPath.Child("template"), fmt.Errorf("error checking the validity of the template path: %w", err)))
