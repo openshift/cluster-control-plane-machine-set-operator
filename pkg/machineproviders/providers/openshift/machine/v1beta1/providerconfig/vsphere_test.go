@@ -222,4 +222,16 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 				"expected NetworkName to still be equal to the the original after injection of the Failure Domain")
 		})
 	})
+
+	Context("no vsphere platform spec in infrastructure", func() {
+		BeforeEach(func() {
+			providerConfig.infrastructure.Spec.PlatformSpec.VSphere = nil
+		})
+
+		It("should should return empty failure domain", func() {
+			expected := providerConfig.ExtractFailureDomain()
+
+			Expect(expected).To(Equal(v1.VSphereFailureDomain{}))
+		})
+	})
 })
