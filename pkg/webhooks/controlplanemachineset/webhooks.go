@@ -62,6 +62,15 @@ const (
 	warnTargetPoolsNotSet = "TargetPools field is not set on ControlPlaneMachineSet. This configuration is valid for private clusters. If your cluster is not private, please determine and set the correct value."
 
 	vsphereTemplateValidationPattern = `^/.*?/vm/.*?`
+
+	// warnVSphereTemplateMayBeIgnored is a warning when cpms has template configured when failure domains are in use.
+	warnVSphereTemplateMayBeIgnored = "template field is configured and may be ignored if configured in the failure domain."
+
+	// warnVSphereFolderMayBeIgnored is a warning when cpms has folder configured when failure domains are in use.
+	warnVSphereFolderMayBeIgnored = "folder field is configured and may be ignored if configured in the failure domain."
+
+	// warnVSphereResourcePoolMayBeIgnored is a warning when cpms has resource pool configured when failure domains are in use.
+	warnVSphereResourcePoolMayBeIgnored = "resourcePool field is configured and may be ignored if configured in the failure domain."
 )
 
 var (
@@ -70,6 +79,12 @@ var (
 
 	// errUpdateNilCPMS is an error when update is called with nil ControlPlaneMachineSet.
 	errUpdateNilCPMS = errors.New("cannot update nil control plane machine set")
+
+	// errVSphereNetworkNotAllowed is an error when cpms has network configured when failure domains are in use.
+	errVSphereNetworkNotAllowed = errors.New("network devices should not be set when control plane nodes are in a failure domain")
+
+	// errVSphereWorkspaceNotAllowed is an error when cpms has workspace configured when failure domains are in use.
+	errVSphereWorkspaceNotAllowed = errors.New("workspace fields should not be set when control plane nodes are in a failure domain")
 )
 
 // ControlPlaneMachineSetWebhook acts as a webhook validator for the
@@ -369,7 +384,7 @@ func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path,
 	case configv1.OpenStackPlatformType:
 		return nil, validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
 	case configv1.VSpherePlatformType:
-		return nil, validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere())
+		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere(), infrastructure)
 	case configv1.NutanixPlatformType:
 		return nil, validateOpenShiftNutanixProviderConfig(providerSpecPath.Child("value"), providerConfig.Nutanix(), template.FailureDomains)
 	}
@@ -441,20 +456,86 @@ func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerCo
 
 // validateOpenShiftVSphereProviderConfig runs VSphere specific checks on the provider config on the ControlPlaneMachineSet.
 // This ensures that the ControlPlaneMachineSet can safely replace VSphere control plane machines.
-func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) []error {
+func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
+	warnings := admission.Warnings{}
+	errs := []error{}
+
+	infraProviderConfig := infrastructure.Spec.PlatformSpec.VSphere
+	if infraProviderConfig != nil && len(infraProviderConfig.FailureDomains) > 0 {
+		// If failure domains are configured, we do not want to have user provide any FD overrides
+		warn, err := checkForFailureDomainIgnoredFields(parentPath, providerConfig)
+		warnings = append(warnings, warn...)
+		errs = append(errs, err...)
+	} else {
+		errs = append(errs, validateTemplate(parentPath, providerConfig.Config().Template)...)
+	}
+
+	return warnings, errs
+}
+
+// checkForFailureDomainIgnoredFields checks all fields that are controlled by failure domain.  Each infraction will result
+// in an error being returned in the error collection.
+func checkForFailureDomainIgnoredFields(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) (admission.Warnings, []error) {
+	warnings := admission.Warnings{}
+	errs := []error{}
+
+	// If failure domains are configured, we do not want to have user provide any FD overrides unless the FD does not define
+	// the field.  In most cases, the fields are required.  We'll check each field to verify that FD has defined the value
+	// in addition to user providing an override.
+
+	// Template is not required.  We will generate a warning when detected to let user know this template may get ignored.
+	if len(providerConfig.Config().Template) > 0 {
+		warnings = append(warnings, fmt.Sprintf("%s: %s", parentPath.Child("template"), warnVSphereTemplateMayBeIgnored))
+		errs = append(errs, validateTemplate(parentPath, providerConfig.Config().Template)...)
+	}
+
+	// Static IP configuration is the only thing we need to allow.  Networks are required to be defined in the FD.
+	devices := providerConfig.Config().Network.Devices
+	for _, device := range devices {
+		if len(device.NetworkName) > 0 {
+			errs = append(errs, field.InternalError(parentPath.Child("network"),
+				fmt.Errorf("%w: %#v", errVSphereNetworkNotAllowed, providerConfig.Config().Network.Devices)))
+		}
+	}
+
+	workspace := providerConfig.Config().Workspace
+	if workspace != nil {
+		workspacePath := parentPath.Child("workspace")
+
+		// In workspace, the Datacenter, Datastore, Server are required to be set in the FD.
+		if len(workspace.Datacenter) > 0 || len(workspace.Datastore) > 0 || len(workspace.Server) > 0 {
+			errs = append(errs, field.InternalError(workspacePath,
+				fmt.Errorf("%w: %#v", errVSphereWorkspaceNotAllowed, workspace)))
+		}
+
+		// Folder and ResourcePool are optional in the infrastructure's FDs.  We'll only generate a warning if they are
+		// set in the workspace.
+		if len(workspace.Folder) > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", workspacePath.Child("folder"), warnVSphereFolderMayBeIgnored))
+		}
+
+		if len(workspace.ResourcePool) > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", workspacePath.Child("resourcePool"), warnVSphereResourcePoolMayBeIgnored))
+		}
+	}
+
+	return warnings, errs
+}
+
+// validateTemplate validates the format of the template.
+func validateTemplate(parentPath *field.Path, template string) []error {
 	errs := []error{}
 
 	// Check template format.  If "/" found, assume it's a path based definition and verify with pattern.
 	// If not a path template, then assume just a template name (older ocp installs)
-	templatePath := providerConfig.Config().Template
-	if len(templatePath) > 0 && strings.Contains(templatePath, "/") {
-		matched, err := regexp.MatchString(vsphereTemplateValidationPattern, templatePath)
+	if len(template) > 0 && strings.Contains(template, "/") {
+		matched, err := regexp.MatchString(vsphereTemplateValidationPattern, template)
 		if err != nil {
 			errs = append(errs, field.InternalError(parentPath.Child("template"), fmt.Errorf("error checking the validity of the template path: %w", err)))
 		}
 
 		if !matched {
-			errs = append(errs, field.Invalid(parentPath.Child("template"), templatePath, "template must be provided as the full path"))
+			errs = append(errs, field.Invalid(parentPath.Child("template"), template, "template must be provided as the full path"))
 		}
 	}
 
