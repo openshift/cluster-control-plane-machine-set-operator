@@ -106,10 +106,6 @@ verify-%: ## Ensure no diff after running some other target
 	make $*
 	./hack/verify-diff.sh
 
-.PHONY: crds-sync
-crds-sync: ## Sync crds in install with the ones in the vendored openshift/api
-	./hack/crds-sync.sh
-
 ##@ Build
 
 .PHONY: build
