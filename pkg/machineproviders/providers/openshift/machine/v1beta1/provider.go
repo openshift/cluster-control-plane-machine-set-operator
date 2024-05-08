@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	v1 "github.com/openshift/api/config/v1"
@@ -56,6 +57,11 @@ const (
 	// openshiftMachineRoleLabel is the OpenShift Machine API machine role label.
 	// This must be present on all OpenShift Machine API Machine templates.
 	openshiftMachineRoleLabel = "machine.openshift.io/cluster-api-machine-role"
+
+	// unreadyNodeGracePeriod is the period in which
+	// the node is presumed being unready for a reboot (e.g. during upgrades) or a brief hiccup.
+	// This leaves some leeway to avoid immediately reacting on brief node unreadiness.
+	unreadyNodeGracePeriod = time.Minute * 20
 )
 
 var (
@@ -464,6 +470,13 @@ func (m *openshiftMachineProvider) isMachineReady(ctx context.Context, machine m
 		return true, nil
 	}
 
+	if ptr.Deref(machine.Status.Phase, "") == runningPhase && isNodeNotReadyWithinNodeGracePeriod(node) {
+		// The machine is running and its node has been notReady only for less than the unreadyNodeGracePeriod, so we consider the CPMS Machine to be ready for now.
+		// We do so to allow some leeway for intermittent blips, hiccups and node reboots (e.g. for node upgrades).
+		// This is due to https://issues.redhat.com/browse/OCPBUGS-20061
+		return true, nil
+	}
+
 	if ptr.Deref(machine.Status.Phase, "") == deletingPhase && isNodeReady(node) {
 		// The machine was previously running but is now being deleted.
 		// The machine is still ready until the node is drained and removed from the cluster.
@@ -517,6 +530,31 @@ func isNodeReady(node *corev1.Node) bool {
 	for _, c := range node.Status.Conditions {
 		if c.Type == corev1.NodeReady {
 			return c.Status == corev1.ConditionTrue
+		}
+	}
+
+	return false
+}
+
+// isNodeNotReadyWithinNodeGracePeriod returns true if a node is NotReady but it has been so only for less than the unreadyNodeGracePeriod; false otherwise.
+func isNodeNotReadyWithinNodeGracePeriod(node *corev1.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	for _, c := range node.Status.Conditions {
+		if c.Type == corev1.NodeReady {
+			if c.Status == corev1.ConditionTrue {
+				return true
+			}
+
+			isWithinUnreadyNodeGracePeriod := c.LastTransitionTime.Add(unreadyNodeGracePeriod).After(time.Now())
+
+			if (c.Status == corev1.ConditionFalse || c.Status == corev1.ConditionUnknown) && isWithinUnreadyNodeGracePeriod {
+				// The node is not ready but the last transition time from ready -> not ready was less than the unreadyNodeGracePeriod,
+				// hence we consider the node to be presumably in rebooting stage (e.g. due to an upgrade).
+				return true
+			}
 		}
 	}
 
