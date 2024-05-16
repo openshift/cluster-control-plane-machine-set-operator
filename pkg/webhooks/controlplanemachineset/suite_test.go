@@ -57,9 +57,13 @@ func TestAPIs(t *testing.T) {
 }
 
 var targetPoolsNotSetWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.targetPools: %s", warnTargetPoolsNotSet))
+var vSphereTemplateWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template: %s", warnVSphereTemplateMayBeIgnored))
+var vSphereFolderWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace.folder: %s", warnVSphereFolderMayBeIgnored))
+var vSphereResourcePoolWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace.resourcePool: %s", warnVSphereResourcePoolMayBeIgnored))
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.RawZapOpts(uberZap.Hooks(targetPoolsNotSetWarningCounter.Trigger)), zap.UseDevMode(true)))
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.RawZapOpts(uberZap.Hooks(targetPoolsNotSetWarningCounter.Trigger,
+		vSphereTemplateWarningCounter.Trigger, vSphereFolderWarningCounter.Trigger, vSphereResourcePoolWarningCounter.Trigger)), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -86,7 +90,7 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme, WarningHandler: client.WarningHandlerOptions{SuppressWarnings: false, AllowDuplicateLogs: true}})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
