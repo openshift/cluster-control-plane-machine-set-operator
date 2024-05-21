@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	configv1 "github.com/openshift/api/config/v1"
+
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	configv1builder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
@@ -60,9 +61,9 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
-			filepath.Join("..", "..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			filepath.Join("..", "..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_10_config-operator_01_infrastructure-Default.crd.yaml"),
+			filepath.Join("..", "..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "zz_generated.crd-manifests"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}

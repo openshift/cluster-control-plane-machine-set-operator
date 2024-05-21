@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -60,17 +60,15 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	klog.SetOutput(GinkgoWriter)
-	logf.SetLogger(klogr.New())
+
+	logf.SetLogger(textlogger.NewLogger(textlogger.NewConfig()))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			// Specify specific CRDs to avoid loading all of openshift/api/config/v1, and to avoid loading non Default featuregate CRDs.
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_10_config-operator_01_infrastructure-Default.crd.yaml"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_00_cluster-version-operator_01_clusterversion-Default.crd.yaml"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_00_cluster-version-operator_01_clusteroperator.crd.yaml"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "zz_generated.crd-manifests"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}

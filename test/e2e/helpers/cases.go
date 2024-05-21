@@ -103,7 +103,9 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 		By("Control plane machine replacement completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
+
 		stabilisationTimeout := 30 * time.Minute
+
 		if opts.StabilisationTimeout.Seconds() != 0 {
 			stabilisationTimeout = opts.StabilisationTimeout
 		}
@@ -126,6 +128,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 		timeout := 30 * time.Minute
+
 		platform := configv1.NonePlatformType
 		if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains != nil {
 			platform = cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform
@@ -133,6 +136,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 
 		if platform == configv1.VSpherePlatformType {
 			timeout = 60 * time.Minute
+
 			By("Test timeout set to 60 minutes for vSphere")
 		}
 

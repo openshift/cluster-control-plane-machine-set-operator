@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 
 	configv1 "github.com/openshift/api/config/v1"
+	features "github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinev1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1"
@@ -261,7 +262,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.VSpherePlatformType:
-		if !currentFeatureGates.Enabled(configv1.FeatureGateVSphereControlPlaneMachineset) {
+		if !currentFeatureGates.Enabled(features.FeatureGateVSphereControlPlaneMachineset) {
 			logger.V(1).WithValues("platform", platformType).Info(unsupportedPlatform)
 			return nil, errUnsupportedPlatform
 		}
