@@ -341,7 +341,9 @@ func validateOpenShiftMachineV1BetaTemplateOnCreate(logger logr.Logger, parentPa
 		if err != nil {
 			errs = append(errs, field.Invalid(parentPath.Child("spec", "providerSpec"), template.Spec, fmt.Sprintf("could not parse provider spec: %v", err)))
 		}
+
 		templateFailureDomain := providerConfig.ExtractFailureDomain()
+
 		errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(logger, parentPath.Child("failureDomains"), templateFailureDomain, template.FailureDomains, machines, infrastructure)...)
 	}
 

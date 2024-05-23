@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -150,7 +150,7 @@ func NewFramework() (Framework, error) {
 		return nil, err
 	}
 
-	logger := klogr.New()
+	logger := textlogger.NewLogger(textlogger.NewConfig())
 	ctrl.SetLogger(logger)
 
 	return &framework{

@@ -35,13 +35,14 @@ import (
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"k8s.io/klog/v2/textlogger"
 
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
@@ -95,12 +96,13 @@ func main() { //nolint:funlen,cyclop
 	pflag.StringVar(&managedNamespace, "namespace", "openshift-machine-api", "The namespace for managed objects, where the machines and control plane machine set will operate.")
 	options.BindLeaderElectionFlags(&leaderElectionConfig, pflag.CommandLine)
 
-	klog.InitFlags(flag.CommandLine)
+	textLoggerConfig := textlogger.NewConfig()
+	textLoggerConfig.AddFlags(flag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	logger := klogr.New()
+	logger := textlogger.NewLogger(textLoggerConfig)
 	ctrl.SetLogger(logger)
 
 	cfg := ctrl.GetConfigOrDie()

@@ -39,6 +39,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+var (
+	// errTransientError is used to mimic a temporary failure from the MachineProvider.
+	errTransientError = errors.New("transient error")
+)
+
 var _ = Describe("reconcileMachineUpdates", func() {
 	var namespaceName string
 	var logger testutils.TestLogger
@@ -67,9 +72,6 @@ var _ = Describe("reconcileMachineUpdates", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockMachineProvider = mock.NewMockMachineProvider(mockCtrl)
 	})
-
-	// transientError is used to mimic a temporary failure from the MachineProvider.
-	transientError := errors.New("transient error")
 
 	// BEGIN: MachineInfo builders for various types of MachineInfo inputs
 
@@ -233,7 +235,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}),
 			Entry("with updates required in a single index, and an error occurs", rollingUpdateTableInput{
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
-				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
+				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, errTransientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).
@@ -243,7 +245,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(errTransientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogsBuilder: func() []testutils.LogEntry {
@@ -260,7 +262,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 							Message: machineRequiresUpdate,
 						},
 						{
-							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, errTransientError),
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
 								"index", int32(1),
@@ -337,7 +339,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			Entry("with updates required in a single index, and the replacement machine is ready, and an error occurs", rollingUpdateTableInput{
 				cpmsBuilder: cpmsBuilder.WithReplicas(3),
 				expectedErrorBuilder: func() error {
-					return fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError)
+					return fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", errTransientError)
 				},
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
@@ -352,12 +354,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 
 					// We expect this particular machine to be called for deletion.
 					machineInfo := updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).Build()
-					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(transientError).Times(1)
+					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), machineInfo.MachineRef).Return(errTransientError).Times(1)
 				},
 				expectedLogsBuilder: func() []testutils.LogEntry {
 					return []testutils.LogEntry{
 						{
-							Error: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", transientError),
+							Error: fmt.Errorf("error deleting Machine %s/%s: %w", namespaceName, "machine-1", errTransientError),
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.RollingUpdate,
 								"index", int32(1),
@@ -1575,7 +1577,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}),
 			Entry("with updates required in a single index, and the machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
-				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
+				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, errTransientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").Build()},
 					1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("node-1").WithNeedsUpdate(true).
@@ -1586,12 +1588,12 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(errTransientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogsBuilder: func() []testutils.LogEntry {
 					return []testutils.LogEntry{{
-						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+						Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, errTransientError),
 						KeysAndValues: []interface{}{
 							"updateStrategy", machinev1.OnDelete,
 							"index", int32(1),
@@ -1706,7 +1708,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 			}),
 			Entry("with updates required in a multiple indexes, and machine has been deleted, and an error occurrs", onDeleteUpdateTableInput{
 				cpmsBuilder:          cpmsBuilder.WithReplicas(3),
-				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError) },
+				expectedErrorBuilder: func() error { return fmt.Errorf("error creating new Machine for index %d: %w", 1, errTransientError) },
 				machineInfos: map[int32][]machineproviders.MachineInfo{
 					0: {updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithNeedsUpdate(true).
 						WithDiff(instanceDiff).Build(),
@@ -1720,7 +1722,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 				setupMock: func(machineInfos map[int32][]machineproviders.MachineInfo) {
 					mockMachineProvider.EXPECT().WithClient(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockMachineProvider, nil).AnyTimes()
 					mockMachineProvider.EXPECT().GetMachineInfos(gomock.Any(), gomock.Any()).Return(machineInfosMaptoSlice(machineInfos), nil).AnyTimes()
-					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(transientError).Times(1)
+					mockMachineProvider.EXPECT().CreateMachine(gomock.Any(), gomock.Any(), int32(1)).Return(errTransientError).Times(1)
 					mockMachineProvider.EXPECT().DeleteMachine(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				},
 				expectedLogsBuilder: func() []testutils.LogEntry {
@@ -1736,7 +1738,7 @@ var _ = Describe("reconcileMachineUpdates", func() {
 						Message: machineRequiresDeleteBeforeUpdate,
 					},
 						{
-							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, transientError),
+							Error: fmt.Errorf("error creating new Machine for index %d: %w", 1, errTransientError),
 							KeysAndValues: []interface{}{
 								"updateStrategy", machinev1.OnDelete,
 								"index", int32(1),

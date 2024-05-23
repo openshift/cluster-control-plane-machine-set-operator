@@ -18,7 +18,6 @@ package controlplanemachineset
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -2218,7 +2217,7 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedLogs: []testutils.LogEntry{
 				{
-					Error: errors.New("no ready control plane machines"),
+					Error: errNoReadyControlPlaneMachines,
 					KeysAndValues: []interface{}{
 						"unreadyMachines", "machine-0,machine-1,machine-2",
 					},
