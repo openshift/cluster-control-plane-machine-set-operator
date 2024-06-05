@@ -93,7 +93,7 @@ func Async(wg *sync.WaitGroup, cancel context.CancelFunc, testFunc func() bool) 
 // The check and condition functions must use the passed Gomega for any assertions so that we can handle failures
 // within the functions appropriately.
 func RunCheckUntil(ctx context.Context, check, condition func(context.Context, GomegaAssertions) bool) bool {
-	return gomega.Eventually(func() error {
+	return gomega.EventuallyWithOffset(1, func() error {
 		checkErr := runAssertion(ctx, check)
 		conditionErr := runAssertion(ctx, condition)
 
