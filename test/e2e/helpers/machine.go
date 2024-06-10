@@ -529,7 +529,8 @@ func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []m
 func isRetryableAPIError(err error) bool {
 	// These errors may indicate a transient error that we can retry in tests.
 	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
-		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) ||
+		isHTTP2ConnectionLost(err) {
 		return true
 	}
 
@@ -539,4 +540,9 @@ func isRetryableAPIError(err error) bool {
 	}
 
 	return false
+}
+
+// Returns if the given err is "http2: client connection lost" error.
+func isHTTP2ConnectionLost(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "http2: client connection lost")
 }
