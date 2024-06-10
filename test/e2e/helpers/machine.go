@@ -529,7 +529,8 @@ func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []m
 func isRetryableAPIError(err error) bool {
 	// These errors may indicate a transient error that we can retry in tests.
 	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
-		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) ||
+		utilnet.IsHTTP2ConnectionLost(err) {
 		return true
 	}
 
