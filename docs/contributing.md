@@ -18,7 +18,7 @@ about the function and notes about any particularly complex parts of the code.
 
 Errors are an important part of the user experience and are key to telling users what went wrong and how to fix it.
 They are also important programatically for determining actions to take in certain scenarios.
-Errors should follow the following conventions:
+Errors should follow the below conventions:
 
 * Error strings must not start with a capital, nor may they end with punctuation
 * Child errors should always be wrapped at the end with `: %w`
