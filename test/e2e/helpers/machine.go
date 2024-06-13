@@ -150,7 +150,7 @@ func EventuallyIndexIsBeingReplaced(ctx context.Context, testFramework framework
 			if err := k8sClient.List(ctx, list, controlPlaneMachineSelector); err != nil {
 				// For temporary errors in listing objects we don't want to break this check,
 				// so we return happy and retry at the next check.
-				return g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+				return g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()), "expected temporary error while listing machines: %v", err)
 			}
 
 			return g.Expect(list).Should(
@@ -164,7 +164,7 @@ func EventuallyIndexIsBeingReplaced(ctx context.Context, testFramework framework
 			if err := k8sClient.List(ctx, list, controlPlaneMachineSelector); err != nil {
 				// For temporary errors in listing the objects we don't want to break the until condition,
 				// so we return false, which is the standard behaviour for this condition when things haven't settled yet.
-				return !g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+				return !g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()), "expected temporary error while listing machines: %v", err)
 			}
 
 			return g.Expect(list).Should(
@@ -292,7 +292,7 @@ func waitForNewMachineRunning(ctx context.Context, testFramework framework.Frame
 			if err := k8sClient.List(ctx, machineList, machineSelector); err != nil {
 				// For temporary errors in listing objects we don't want to break this check,
 				// so we return happy and retry at the next check.
-				return g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+				return g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()), "expected temporary error while listing machines: %v", err)
 			}
 
 			return g.Expect(machineList).Should(HaveField("Items", SatisfyAll(
@@ -316,7 +316,7 @@ func waitForNewMachineRunning(ctx context.Context, testFramework framework.Frame
 			if err := k8sClient.Get(ctx, machineKey, machine); err != nil {
 				// For temporary errors in getting the object we don't want to break the until condition,
 				// so we return false, which is the standard behaviour for this condition when things haven't settled yet.
-				return !g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()))
+				return !g.Expect(err).Should(WithTransform(isRetryableAPIError, BeTrue()), "expected temporary error while listing machines: %v", err)
 			}
 
 			return g.Expect(machine).Should(HaveField("Status.Phase", HaveValue(Equal("Running"))), "expected new machine to be running")
@@ -514,7 +514,8 @@ func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []m
 func isRetryableAPIError(err error) bool {
 	// These errors may indicate a transient error that we can retry in tests.
 	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
-		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) ||
+		isHTTP2ConnectionLost(err) {
 		return true
 	}
 
@@ -524,4 +525,9 @@ func isRetryableAPIError(err error) bool {
 	}
 
 	return false
+}
+
+// Returns if the given err is "http2: client connection lost" error.
+func isHTTP2ConnectionLost(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "http2: client connection lost")
 }
