@@ -230,11 +230,10 @@ func EnsureControlPlaneMachineSetUpdated(testFramework framework.Framework) {
 
 	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
 
-	k8sClient := testFramework.GetClient()
 	ctx := testFramework.GetContext()
 
-	cpms := &machinev1.ControlPlaneMachineSet{}
-	Expect(k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+	Eventually(komega.Get(cpms)).Should(Succeed(), "control plane machine set should exist")
 
 	WaitForControlPlaneMachineSetDesiredReplicas(ctx, cpms)
 }
