@@ -155,6 +155,12 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 			})))
 		})
 
+		It("Set the cluster operator related objects", func() {
+			co := configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+
+			Eventually(komega.Object(co)).Should(HaveField("Status.RelatedObjects", ConsistOf(relatedObjects())))
+		})
+
 		Context("And an invalid cluster operator", func() {
 			BeforeEach(func() {
 				coStatus := configv1resourcebuilder.ClusterOperatorStatus().Build()
@@ -188,6 +194,12 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 						Message: "cluster operator is upgradable",
 					},
 				})))
+			})
+
+			It("Set the cluster operator related objects", func() {
+				co := configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+
+				Eventually(komega.Object(co)).Should(HaveField("Status.RelatedObjects", ConsistOf(relatedObjects())))
 			})
 		})
 	})
@@ -373,6 +385,39 @@ var _ = Describe("Cluster Operator Status", func() {
 						},
 					},
 				},
+			}),
+		)
+	})
+
+	Context("relatedObjectsChanged", func() {
+		type relatedObjectsChangedTableInput struct {
+			currentRelatedObjects []configv1.ObjectReference
+			expected              bool
+		}
+
+		DescribeTable("should return true if the related objects on the ClusterOperator have changed", func(in relatedObjectsChangedTableInput) {
+			co.Status.RelatedObjects = in.currentRelatedObjects
+			Expect(relatedObjectsChanged(co)).To(Equal(in.expected), "relatedObjectsChanged should return %t", in.expected)
+		},
+			Entry("with no related objects", relatedObjectsChangedTableInput{
+				currentRelatedObjects: nil,
+				expected:              true,
+			}),
+			Entry("with too many related objects", relatedObjectsChangedTableInput{
+				currentRelatedObjects: append(relatedObjects(), configv1.ObjectReference{Group: "test", Resource: "test", Name: "test"}),
+				expected:              true,
+			}),
+			Entry("with too few related objects", relatedObjectsChangedTableInput{
+				currentRelatedObjects: relatedObjects()[:len(relatedObjects())-1],
+				expected:              true,
+			}),
+			Entry("with the correct number of related objects, but one is mismatched", relatedObjectsChangedTableInput{
+				currentRelatedObjects: append(relatedObjects()[:len(relatedObjects())-1], configv1.ObjectReference{Group: "test", Resource: "test", Name: "test"}),
+				expected:              true,
+			}),
+			Entry("with the correct related objects", relatedObjectsChangedTableInput{
+				currentRelatedObjects: relatedObjects(),
+				expected:              false,
 			}),
 		)
 	})

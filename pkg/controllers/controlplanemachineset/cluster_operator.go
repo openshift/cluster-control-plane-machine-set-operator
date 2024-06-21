@@ -24,10 +24,34 @@ import (
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const machineAPINamespace = "openshift-machine-api"
+
+// relatedObjects returns the expected set of related objects for the CPMS Cluster Operator.
+func relatedObjects() []configv1.ObjectReference {
+	return []configv1.ObjectReference{
+		{
+			Group:    "",
+			Resource: "namespaces",
+			Name:     machineAPINamespace,
+		},
+		{
+			Group:    machinev1.GroupName,
+			Resource: "controlplanemachinesets",
+			Name:     "",
+		},
+		{
+			Group:    machinev1beta1.GroupName,
+			Resource: "machines",
+			Name:     "",
+		},
+	}
+}
 
 // setClusterOperatorAvailable sets the control-plane-machine-set cluster operator status to available.
 // This is used primarily when a ControlPlaneMachineSet doesn't exist.
@@ -134,6 +158,12 @@ func (r *ControlPlaneMachineSetReconciler) patchClusterOperatorStatus(ctx contex
 		co.Status.Versions = versions
 	}
 
+	if relatedObjectsChanged(co) {
+		needUpdate = true
+
+		co.Status.RelatedObjects = relatedObjects()
+	}
+
 	if !needUpdate {
 		return nil
 	}
@@ -173,4 +203,29 @@ func getStatusForConditionType(conds []configv1.ClusterOperatorStatusCondition, 
 	}
 
 	return string(configv1.ConditionUnknown)
+}
+
+// relatedObjectsChanged returns true if the related objects on the ClusterOperator are different from the expected.
+func relatedObjectsChanged(co *configv1.ClusterOperator) bool {
+	if len(co.Status.RelatedObjects) != len(relatedObjects()) {
+		return true
+	}
+
+	for _, existing := range co.Status.RelatedObjects {
+		found := false
+
+		for _, desired := range relatedObjects() {
+			if existing == desired {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// We didn't find a matching related object.
+			return true
+		}
+	}
+
+	return false
 }
