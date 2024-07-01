@@ -319,8 +319,8 @@ github.com/onsi/ginkgo/v2 v2.17.2 h1:7eMhcy3GimbsA3hEnVKdw/PQM9XN9krpKVXsZdph0/g
 github.com/onsi/ginkgo/v2 v2.17.2/go.mod h1:nP2DPOQoNsQmsVyv5rDA8JkXQoCs6goXIvr/PRJ1eCc=
 github.com/onsi/gomega v1.33.1 h1:dsYjIxxSR755MDmKVsaFQTE22ChNBcuuTWgkUDSubOk=
 github.com/onsi/gomega v1.33.1/go.mod h1:U4R44UsT+9eLIaYRB2a5qajjtQYn0hauxvRm16AVYg0=
-github.com/openshift/api v0.0.0-20240521070407-e278985bcf1b h1:o+QL/D7lQB7cEId5vKK5dzkKXJFvHtOzaHH4VFfgXE0=
-github.com/openshift/api v0.0.0-20240521070407-e278985bcf1b/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
+github.com/openshift/api v0.0.0-20240521141249-8af21b7ed3e3 h1:fxqjG8C/fU1UfUalZhNB01jqIQDlBsCVsFnWZ1V17Rg=
+github.com/openshift/api v0.0.0-20240521141249-8af21b7ed3e3/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
 github.com/openshift/client-go v0.0.0-20240125160436-aa5df63097c4 h1:Ct+/c9d5rjZudN+VBLxRJIQfPy1gJZier1P1KdpvCaM=
 github.com/openshift/client-go v0.0.0-20240125160436-aa5df63097c4/go.mod h1:ZS5cpA+0zI/ziDQxAKKvGkRKn9BJppqDYdAph+OUTlo=
 github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240214091802-e8d3b3dc5ca4 h1:I/zv+AE3tkJLqsV5pAzlqxzzwgRdcl7zTEMWQyWktJQ=
