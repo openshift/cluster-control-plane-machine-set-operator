@@ -65,12 +65,9 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			// Specify specific CRDs to avoid loading all of openshift/api/config/v1, and to avoid loading non Default featuregate CRDs.
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_10_config-operator_01_infrastructure-Default.crd.yaml"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_00_cluster-version-operator_01_clusterversion-Default.crd.yaml"),
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "0000_00_cluster-version-operator_01_clusteroperator.crd.yaml"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "zz_generated.crd-manifests"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}
