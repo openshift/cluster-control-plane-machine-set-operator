@@ -31,7 +31,7 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	applymetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 var errNoFailureDomains = errors.New("no failure domains were generated")
@@ -81,7 +81,7 @@ func genericControlPlaneMachineSetSpec(replicas int32, clusterID string) machine
 		Strategy: &machinev1builder.ControlPlaneMachineSetStrategyApplyConfiguration{
 			Type: util.Ptr(machinev1.RollingUpdate),
 		},
-		Selector: &metav1.LabelSelector{
+		Selector: &applymetav1.LabelSelectorApplyConfiguration{
 			MatchLabels: labels,
 		},
 		Template: &machinev1builder.ControlPlaneMachineSetTemplateApplyConfiguration{

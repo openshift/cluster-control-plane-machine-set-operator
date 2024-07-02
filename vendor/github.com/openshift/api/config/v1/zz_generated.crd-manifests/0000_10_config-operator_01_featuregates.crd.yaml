@@ -6,6 +6,7 @@ metadata:
     api.openshift.io/merged-by-featuregates: "true"
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    release.openshift.io/bootstrap-required: "true"
   name: featuregates.config.openshift.io
 spec:
   group: config.openshift.io
@@ -84,6 +85,9 @@ spec:
                   rule: 'oldSelf == ''DevPreviewNoUpgrade'' ? self == ''DevPreviewNoUpgrade''
                     : true'
             type: object
+            x-kubernetes-validations:
+            - message: .spec.featureSet cannot be removed
+              rule: 'has(oldSelf.featureSet) ? has(self.featureSet) : true'
           status:
             description: status holds observed values from the cluster. They may not
               be overridden.
