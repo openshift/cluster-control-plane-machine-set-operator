@@ -676,8 +676,8 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20240521070407-e278985bcf1b
-## explicit; go 1.21
+# github.com/openshift/api v0.0.0-20240701145226-44d00ee80f5e
+## explicit; go 1.22.0
 github.com/openshift/api
 github.com/openshift/api/annotations
 github.com/openshift/api/apiserver
@@ -696,7 +696,6 @@ github.com/openshift/api/config/v1/zz_generated.crd-manifests
 github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/console
 github.com/openshift/api/console/v1
-github.com/openshift/api/console/v1alpha1
 github.com/openshift/api/features
 github.com/openshift/api/helm
 github.com/openshift/api/helm/v1beta1
@@ -752,8 +751,8 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/client-go v0.0.0-20240125160436-aa5df63097c4
-## explicit; go 1.21
+# github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
+## explicit; go 1.22.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
 github.com/openshift/client-go/config/applyconfigurations/internal
