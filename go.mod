@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
-	github.com/openshift/api v0.0.0-20240701145226-44d00ee80f5e
+	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
 	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240214091802-e8d3b3dc5ca4
 	github.com/openshift/library-go v0.0.0-20240115112243-470c096a1ca9
