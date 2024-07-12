@@ -18,9 +18,11 @@ package providerconfig
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/go-test/deep"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -36,9 +38,11 @@ type VSphereProviderConfig struct {
 }
 
 func (v VSphereProviderConfig) getFailureDomainFromInfrastructure(fd machinev1.VSphereFailureDomain) (*configv1.VSpherePlatformFailureDomainSpec, error) {
-	for _, failureDomain := range v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
-		if failureDomain.Name == fd.Name {
-			return &failureDomain, nil
+	if v.infrastructure.Spec.PlatformSpec.VSphere != nil {
+		for _, failureDomain := range v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
+			if failureDomain.Name == fd.Name {
+				return &failureDomain, nil
+			}
 		}
 	}
 
@@ -50,7 +54,7 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	workspace := &machinev1beta1.Workspace{}
 
 	if len(topology.ComputeCluster) > 0 {
-		workspace.ResourcePool = fmt.Sprintf("/%s/resources", topology.ComputeCluster)
+		workspace.ResourcePool = path.Clean(fmt.Sprintf("/%s/Resources", topology.ComputeCluster))
 	}
 
 	if len(topology.ResourcePool) > 0 {
@@ -78,6 +82,31 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	return workspace
 }
 
+// getTemplateName returns the name of the name of the template.
+func getTemplateName(template string) string {
+	if strings.Contains(template, "/") {
+		return template[strings.LastIndex(template, "/")+1:]
+	}
+
+	return template
+}
+
+// Diff compares two ProviderConfigs and returns a list of differences,
+// or nil if there are none.
+func (v VSphereProviderConfig) Diff(other machinev1beta1.VSphereMachineProviderSpec) ([]string, error) {
+	// Templates can be provided either with an absolute path or relative.
+	// This can result in the control plane nodes rolling out when they dont need to.
+	// As long as the OVA name matches that will be considered a match.
+	otherTemplate := getTemplateName(other.Template)
+	currentTemplate := getTemplateName(v.providerConfig.Template)
+
+	if otherTemplate == currentTemplate {
+		other.Template = v.providerConfig.Template
+	}
+
+	return deep.Equal(v.providerConfig, other), nil
+}
+
 // InjectFailureDomain returns a new VSphereProviderConfig configured with the failure domain.
 func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDomain) (VSphereProviderConfig, error) {
 	newVSphereProviderConfig := v
@@ -103,7 +132,7 @@ func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDo
 	if len(topology.Template) > 0 {
 		newVSphereProviderConfig.providerConfig.Template = topology.Template[strings.LastIndex(topology.Template, "/")+1:]
 	} else if len(v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains) > 0 {
-		newVSphereProviderConfig.providerConfig.Template = fmt.Sprintf("/%s/vm/%s/%s-rhcos-%s-%s", failureDomain.Topology.Datacenter, v.infrastructure.Status.InfrastructureName, v.infrastructure.Status.InfrastructureName, failureDomain.Region, failureDomain.Zone)
+		newVSphereProviderConfig.providerConfig.Template = fmt.Sprintf("%s-rhcos-%s-%s", v.infrastructure.Status.InfrastructureName, failureDomain.Region, failureDomain.Zone)
 	}
 
 	return newVSphereProviderConfig, nil
