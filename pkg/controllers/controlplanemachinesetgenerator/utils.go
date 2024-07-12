@@ -221,7 +221,7 @@ func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.Machin
 	platformType := machineFailureDomains[0].Type()
 
 	switch platformType {
-	case configv1.AzurePlatformType, configv1.NutanixPlatformType:
+	case configv1.AzurePlatformType, configv1.NutanixPlatformType, configv1.VSpherePlatformType:
 		// On some platforms, failure domains from machineSets are not suitable for control plane machines.
 	default:
 		// Fetch failure domains from the machineSets

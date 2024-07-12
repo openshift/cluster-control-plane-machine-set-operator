@@ -25,10 +25,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	uberZap "go.uber.org/zap"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -54,8 +56,13 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+var vSphereTemplateWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template: %s", warnVSphereTemplateMayBeIgnored))
+var vSphereFolderWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace.folder: %s", warnVSphereFolderMayBeIgnored))
+var vSphereResourcePoolWarningCounter = NewMessageCounter(fmt.Sprintf("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace.resourcePool: %s", warnVSphereResourcePoolMayBeIgnored))
+
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.RawZapOpts(uberZap.Hooks(vSphereTemplateWarningCounter.Trigger,
+		vSphereFolderWarningCounter.Trigger, vSphereResourcePoolWarningCounter.Trigger)), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -82,7 +89,7 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme, WarningHandler: client.WarningHandlerOptions{SuppressWarnings: false, AllowDuplicateLogs: true}})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
