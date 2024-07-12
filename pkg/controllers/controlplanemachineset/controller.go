@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -64,6 +65,10 @@ const (
 	// infrastructureName is the name of the Infrastructure resource. Any changes to this resource will need to be
 	// reflected in changes to the ControlPlaneMachineSet configuration.
 	infrastructureName = "cluster"
+
+	// nodeCreationGracePeriod is the grace period to wait for a node after it is created before it is considered unmanaged.
+	// This should allow the NodeLink controller time to link the Node to the Machine.
+	nodeCreationGracePeriod = 1 * time.Minute
 )
 
 var (
@@ -104,6 +109,9 @@ type ControlPlaneMachineSetReconciler struct {
 
 	// lastError allows us to track the last error that occurred during reconciliation.
 	lastError *lastErrorTracker
+
+	// nowFunc is used to get the current time. It is a variable so that it can be overridden in tests.
+	nowFunc func() time.Time
 }
 
 // lastErrorTracker tracks the last error that occurred during reconciliation.
@@ -653,7 +661,7 @@ func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappi
 			}
 		}
 
-		if !found {
+		if !found && !r.nodeIsJustCreated(node) {
 			unmanagedNodeNames = append(unmanagedNodeNames, node.ObjectMeta.Name)
 		}
 	}
@@ -885,4 +893,19 @@ func (r *ControlPlaneMachineSetReconciler) fetchControlPlaneNodes(ctx context.Co
 // isActive determines whether the ControlPlaneMachineSet is marked active.
 func isActive(cpms *machinev1.ControlPlaneMachineSet) bool {
 	return cpms.Spec.State == machinev1.ControlPlaneMachineSetStateActive
+}
+
+// nodeIsJustCreated determines if the node has just been created.
+// We give the Node a grace period to allow the node to be associated with a Machine before we consider it unmanaged.
+// This avoids a race between the CPMS declaring that the Node is unmanaged and the NodeLink controller which needs to
+// detect the new node and update the Machine with the NodeRef.
+func (r *ControlPlaneMachineSetReconciler) nodeIsJustCreated(node corev1.Node) bool {
+	nowFunc := time.Now
+
+	// This is only expected to be used for testing purposes.
+	if r.nowFunc != nil {
+		nowFunc = r.nowFunc
+	}
+
+	return node.ObjectMeta.CreationTimestamp.Add(nodeCreationGracePeriod).After(nowFunc())
 }

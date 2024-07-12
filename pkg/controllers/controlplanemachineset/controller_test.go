@@ -2114,6 +2114,7 @@ var _ = Describe("validateClusterState", func() {
 		expectedError      error
 		expectedConditions []metav1.Condition
 		expectedLogs       []testutils.LogEntry
+		nowFunc            func() time.Time
 	}
 
 	DescribeTable("should validate the cluster state", func(in validateClusterTableInput) {
@@ -2127,6 +2128,7 @@ var _ = Describe("validateClusterState", func() {
 			Client:         k8sClient,
 			UncachedClient: k8sClient,
 			Namespace:      namespaceName,
+			nowFunc:        in.nowFunc,
 		}
 
 		cpms := in.cpmsBuilder.Build()
@@ -2225,7 +2227,7 @@ var _ = Describe("validateClusterState", func() {
 				},
 			},
 		}),
-		Entry("with only 1 machine is ready", validateClusterTableInput{
+		Entry("with only 1 machine is ready, but the nodes have only just been created", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
@@ -2245,6 +2247,36 @@ var _ = Describe("validateClusterState", func() {
 			},
 			expectedError: nil,
 			expectedConditions: []metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
+			},
+			expectedLogs: []testutils.LogEntry{},
+		}),
+		Entry("with only 1 machine is ready, and the nodes have not been linked for a couple of minutes", validateClusterTableInput{
+			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
+				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
+				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
+			}),
+			machineInfos: map[int32][]machineproviders.MachineInfo{
+				0: {pendingMachineBuilder.WithIndex(0).WithMachineName("machine-0").Build()},
+				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
+				2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-2").Build()},
+			},
+			nodes: []*corev1.Node{
+				masterNodeBuilder.WithName("master-0").Build(),
+				masterNodeBuilder.WithName("master-1").Build(),
+				masterNodeBuilder.WithName("master-2").Build(),
+				workerNodeBuilder.WithName("worker-0").Build(),
+				workerNodeBuilder.WithName("worker-1").Build(),
+				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			nowFunc: func() time.Time {
+				// Add a couple of minutes so that the newly created nodes appear to
+				// have been around for a couple of minutes.
+				return time.Now().Add(2 * time.Minute)
+			},
+			expectedError: nil,
+			expectedConditions: []metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 2 unmanaged node(s)").Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionFalse).WithReason(reasonOperatorDegraded).Build(),
 			},
@@ -2258,7 +2290,7 @@ var _ = Describe("validateClusterState", func() {
 				},
 			},
 		}),
-		Entry("with an additional unowned master node", validateClusterTableInput{
+		Entry("with an additional unowned master node, that has been around for a couple of minutes", validateClusterTableInput{
 			cpmsBuilder: cpmsBuilder.WithConditions([]metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionFalse).Build(),
 				progressingConditionBuilder.WithStatus(metav1.ConditionTrue).Build(),
@@ -2276,6 +2308,11 @@ var _ = Describe("validateClusterState", func() {
 				workerNodeBuilder.WithName("worker-0").Build(),
 				workerNodeBuilder.WithName("worker-1").Build(),
 				workerNodeBuilder.WithName("worker-2").Build(),
+			},
+			nowFunc: func() time.Time {
+				// Add a couple of minutes so that the newly created nodes appear to
+				// have been around for a couple of minutes.
+				return time.Now().Add(2 * time.Minute)
 			},
 			expectedError: nil,
 			expectedConditions: []metav1.Condition{
