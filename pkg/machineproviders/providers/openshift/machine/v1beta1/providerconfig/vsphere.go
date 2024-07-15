@@ -35,6 +35,7 @@ import (
 type VSphereProviderConfig struct {
 	providerConfig machinev1beta1.VSphereMachineProviderSpec
 	infrastructure *configv1.Infrastructure
+	logger         logr.Logger
 }
 
 func (v VSphereProviderConfig) getFailureDomainFromInfrastructure(fd machinev1.VSphereFailureDomain) (*configv1.VSpherePlatformFailureDomainSpec, error) {
@@ -118,16 +119,31 @@ func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDo
 
 	newVSphereProviderConfig.providerConfig.Workspace = newVSphereProviderConfig.getWorkspaceFromFailureDomain(failureDomain)
 	topology := failureDomain.Topology
+	network := newVSphereProviderConfig.providerConfig.Network
+
+	v.logger.V(4).Info("control plane machine set network before failure domain", "network", newVSphereProviderConfig.providerConfig.Network)
 
 	if len(topology.Networks) > 0 {
-		newVSphereProviderConfig.providerConfig.Network = machinev1beta1.NetworkSpec{
-			Devices: []machinev1beta1.NetworkDeviceSpec{
-				{
-					NetworkName: topology.Networks[0],
-				},
-			},
+		networkSpec := machinev1beta1.NetworkSpec{}
+		// If original has AddressesFromPools, that means static IP is desired for the CPMS.  Keep that and just add the FD info.
+		// Note, CPMS may have no network devices defined relying on FD to provide.
+		if len(network.Devices) > 0 && len(network.Devices[0].AddressesFromPools) > 0 {
+			networkSpec.Devices = newVSphereProviderConfig.providerConfig.Network.Devices
 		}
+
+		// Set the network name for the device from FD.
+		for index, network := range topology.Networks {
+			if len(networkSpec.Devices) <= index {
+				networkSpec.Devices = append(networkSpec.Devices, machinev1beta1.NetworkDeviceSpec{})
+			}
+
+			networkSpec.Devices[index].NetworkName = network
+		}
+
+		newVSphereProviderConfig.providerConfig.Network = networkSpec
 	}
+
+	v.logger.V(4).Info("control plane machine set network after failure domain", "network", newVSphereProviderConfig.providerConfig.Network)
 
 	if len(topology.Template) > 0 {
 		newVSphereProviderConfig.providerConfig.Template = topology.Template[strings.LastIndex(topology.Template, "/")+1:]
@@ -158,7 +174,7 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 		if workspace.Datacenter == topology.Datacenter &&
 			workspace.Datastore == topology.Datastore &&
 			workspace.Server == failureDomain.Server &&
-			workspace.ResourcePool == topology.ResourcePool {
+			path.Clean(workspace.ResourcePool) == path.Clean(topology.ResourcePool) {
 			return machinev1.VSphereFailureDomain{
 				Name: failureDomain.Name,
 			}
@@ -215,6 +231,7 @@ func newVSphereProviderConfig(logger logr.Logger, raw *runtime.RawExtension, inf
 	VSphereProviderConfig := VSphereProviderConfig{
 		providerConfig: vsphereMachineProviderSpec,
 		infrastructure: infrastructure,
+		logger:         logger,
 	}
 
 	// For networking, we only need to compare the network name.  For static IPs, we can ignore all ip configuration;
