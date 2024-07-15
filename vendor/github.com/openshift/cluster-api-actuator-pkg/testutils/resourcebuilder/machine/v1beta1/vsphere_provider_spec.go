@@ -31,7 +31,7 @@ import (
 // VSphereProviderSpec creates a new VSphere machine config builder.
 func VSphereProviderSpec() VSphereProviderSpecBuilder {
 	return VSphereProviderSpecBuilder{
-		template: "test-ln-xw89i22-c1627-rvtrn-rhcos",
+		template: "/datacenter/vm/test-ln-xw89i22-c1627-rvtrn-rhcos",
 	}
 }
 
@@ -42,6 +42,7 @@ type VSphereProviderSpecBuilder struct {
 	failureDomainName string
 	infrastructure    *configv1.Infrastructure
 	ippool            bool
+	tags              []string
 }
 
 // Build builds a new VSphere machine config based on the configuration provided.
@@ -90,16 +91,13 @@ func (v VSphereProviderSpecBuilder) Build() *machinev1beta1.VSphereMachineProvid
 						Server:     vSphereFailureDomain.Server,
 						Datacenter: vSphereFailureDomain.Topology.Datacenter,
 						Datastore:  vSphereFailureDomain.Topology.Datastore,
-						ResourcePool: fmt.Sprintf("/%s/hosts/%s/resources",
-							vSphereFailureDomain.Topology.Datacenter,
+						ResourcePool: fmt.Sprintf("%s/Resources",
 							vSphereFailureDomain.Topology.ComputeCluster),
 					}
-					networkDevices = []machinev1beta1.NetworkDeviceSpec{
-						{
-							NetworkName: vSphereFailureDomain.Topology.Networks[0],
-						},
-					}
+					networkDevices[0].NetworkName = vSphereFailureDomain.Topology.Networks[0]
 					template = v.template
+
+					break
 				}
 			}
 		}
@@ -122,6 +120,7 @@ func (v VSphereProviderSpecBuilder) Build() *machinev1beta1.VSphereMachineProvid
 		Network: machinev1beta1.NetworkSpec{
 			Devices: networkDevices,
 		},
+		TagIDs:    v.tags,
 		Workspace: workspace,
 		NumCPUs:   4,
 		Template:  template,
@@ -161,6 +160,12 @@ func (v VSphereProviderSpecBuilder) WithInfrastructure(infrastructure configv1.I
 // WithTemplate sets the template for the VSphere machine config builder.
 func (v VSphereProviderSpecBuilder) WithTemplate(template string) VSphereProviderSpecBuilder {
 	v.template = template
+	return v
+}
+
+// WithTags sets the tags for the VSphere machine config builder.
+func (v VSphereProviderSpecBuilder) WithTags(tags []string) VSphereProviderSpecBuilder {
+	v.tags = tags
 	return v
 }
 

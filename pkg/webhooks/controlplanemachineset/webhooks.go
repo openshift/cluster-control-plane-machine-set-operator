@@ -59,6 +59,15 @@ const (
 	clusterSingletonName = "cluster"
 
 	vsphereTemplateValidationPattern = `^/.*?/vm/.*?`
+
+	// warnVSphereTemplateMayBeIgnored is a warning when cpms has template configured when failure domains are in use.
+	warnVSphereTemplateMayBeIgnored = "template field is configured and may be ignored if configured in the failure domain."
+
+	// warnVSphereFolderMayBeIgnored is a warning when cpms has folder configured when failure domains are in use.
+	warnVSphereFolderMayBeIgnored = "folder field is configured and may be ignored if configured in the failure domain."
+
+	// warnVSphereResourcePoolMayBeIgnored is a warning when cpms has resource pool configured when failure domains are in use.
+	warnVSphereResourcePoolMayBeIgnored = "resourcePool field is configured and may be ignored if configured in the failure domain."
 )
 
 var (
@@ -67,6 +76,12 @@ var (
 
 	// errUpdateNilCPMS is an error when update is called with nil ControlPlaneMachineSet.
 	errUpdateNilCPMS = errors.New("cannot update nil control plane machine set")
+
+	// errVSphereNetworkNotAllowed is an error when cpms has network configured when failure domains are in use.
+	errVSphereNetworkNotAllowed = errors.New("network devices should not be set when control plane nodes are in a failure domain")
+
+	// errVSphereWorkspaceNotAllowed is an error when cpms has workspace configured when failure domains are in use.
+	errVSphereWorkspaceNotAllowed = errors.New("workspace fields should not be set when control plane nodes are in a failure domain")
 )
 
 // ControlPlaneMachineSetWebhook acts as a webhook validator for the
@@ -98,7 +113,7 @@ var _ webhook.CustomValidator = &ControlPlaneMachineSetWebhook{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	var errs []error
-	// TODO: actually plug in admission warnings.
+
 	var warnings []string
 
 	infrastructure, err := util.GetInfrastructure(ctx, r.client)
@@ -112,7 +127,9 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
-	errs = append(errs, r.validateSpec(ctx, field.NewPath("spec"), cpms, infrastructure)...)
+	tmpWarnings, tmpErrs := r.validateSpec(ctx, field.NewPath("spec"), cpms, infrastructure)
+	warnings = append(warnings, tmpWarnings...)
+	errs = append(errs, tmpErrs...)
 	errs = append(errs, r.validateSpecOnCreate(ctx, field.NewPath("spec"), cpms, infrastructure)...)
 
 	if len(errs) > 0 {
@@ -125,7 +142,7 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	var errs []error
-	// TODO: actually plug in admission warnings.
+
 	var warnings []string
 
 	if oldObj == nil {
@@ -143,7 +160,9 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
-	errs = append(errs, r.validateSpec(ctx, field.NewPath("spec"), cpms, infrastructure)...)
+	tmpWarnings, tmpErrs := r.validateSpec(ctx, field.NewPath("spec"), cpms, infrastructure)
+	warnings = append(warnings, tmpWarnings...)
+	errs = append(errs, tmpErrs...)
 
 	if len(errs) > 0 {
 		return warnings, utilerrors.NewAggregate(errs)
@@ -194,16 +213,19 @@ func validateMetadata(parentPath *field.Path, metadata metav1.ObjectMeta) []erro
 }
 
 // validateSpec validates that the spec of the ControlPlaneMachineSet resource is valid.
-func (r *ControlPlaneMachineSetWebhook) validateSpec(ctx context.Context, parentPath *field.Path, cpms *machinev1.ControlPlaneMachineSet, infrastructure *configv1.Infrastructure) []error {
+func (r *ControlPlaneMachineSetWebhook) validateSpec(ctx context.Context, parentPath *field.Path, cpms *machinev1.ControlPlaneMachineSet, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
 	errs := []error{}
+	warnings := admission.Warnings{}
 
-	errs = append(errs, r.validateTemplate(ctx, cpms.Namespace, parentPath.Child("template"), cpms.Spec.Template, cpms.Spec.Selector, infrastructure)...)
+	tmpWarnings, tmpErrs := r.validateTemplate(ctx, cpms.Namespace, parentPath.Child("template"), cpms.Spec.Template, cpms.Spec.Selector, infrastructure)
+	warnings = append(warnings, tmpWarnings...)
+	errs = append(errs, tmpErrs...)
 
-	return errs
+	return warnings, errs
 }
 
 // validateTemplate validates the common (on create and update) checks for the ControlPlaneMachineSet template.
-func (r *ControlPlaneMachineSetWebhook) validateTemplate(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.ControlPlaneMachineSetTemplate, selector metav1.LabelSelector, infrastructure *configv1.Infrastructure) []error {
+func (r *ControlPlaneMachineSetWebhook) validateTemplate(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.ControlPlaneMachineSetTemplate, selector metav1.LabelSelector, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
 	switch template.MachineType {
 	case machinev1.OpenShiftMachineV1Beta1MachineType:
 		openshiftMachineTemplatePath := parentPath.Child(string(machinev1.OpenShiftMachineV1Beta1MachineType))
@@ -211,12 +233,12 @@ func (r *ControlPlaneMachineSetWebhook) validateTemplate(ctx context.Context, na
 		if template.OpenShiftMachineV1Beta1Machine == nil {
 			// Note this is a rare exception to discriminated union rules for the naming of this field.
 			// It matches the discriminator exactly.
-			return []error{field.Required(openshiftMachineTemplatePath, fmt.Sprintf("%s is required when machine type is %s", machinev1.OpenShiftMachineV1Beta1MachineType, machinev1.OpenShiftMachineV1Beta1MachineType))}
+			return nil, []error{field.Required(openshiftMachineTemplatePath, fmt.Sprintf("%s is required when machine type is %s", machinev1.OpenShiftMachineV1Beta1MachineType, machinev1.OpenShiftMachineV1Beta1MachineType))}
 		}
 
 		return r.validateOpenShiftMachineV1BetaTemplate(ctx, namespaceName, openshiftMachineTemplatePath, *template.OpenShiftMachineV1Beta1Machine, selector, infrastructure)
 	default:
-		return []error{field.NotSupported(parentPath.Child("machineType"), template.MachineType, []string{string(machinev1.OpenShiftMachineV1Beta1MachineType)})}
+		return nil, []error{field.NotSupported(parentPath.Child("machineType"), template.MachineType, []string{string(machinev1.OpenShiftMachineV1Beta1MachineType)})}
 	}
 }
 
@@ -240,14 +262,17 @@ func validateTemplateOnCreate(logger logr.Logger, parentPath *field.Path, templa
 }
 
 // validateOpenShiftMachineV1BetaTemplate validates the OpenShift Machine API v1beta1 template.
-func (r *ControlPlaneMachineSetWebhook) validateOpenShiftMachineV1BetaTemplate(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, selector metav1.LabelSelector, infrastructure *configv1.Infrastructure) []error {
+func (r *ControlPlaneMachineSetWebhook) validateOpenShiftMachineV1BetaTemplate(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, selector metav1.LabelSelector, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
 	errs := []error{}
+	warnings := admission.Warnings{}
 
 	errs = append(errs, validateTemplateLabels(parentPath.Child("metadata", "labels"), template.ObjectMeta.Labels, selector)...)
-	errs = append(errs, validateOpenShiftProviderConfig(r.logger, parentPath, template, infrastructure)...)
+	tempWarns, tempErrs := validateOpenShiftProviderConfig(r.logger, parentPath, template, infrastructure)
+	warnings = append(warnings, tempWarns...)
+	errs = append(errs, tempErrs...)
 	errs = append(errs, r.validateOpenShiftProviderMachineSpec(ctx, namespaceName, parentPath.Child("spec", "providerSpec"), template, infrastructure)...)
 
-	return errs
+	return warnings, errs
 }
 
 func (r *ControlPlaneMachineSetWebhook) validateOpenShiftProviderMachineSpec(ctx context.Context, namespaceName string, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, infrastructure *configv1.Infrastructure) []error {
@@ -313,7 +338,9 @@ func validateOpenShiftMachineV1BetaTemplateOnCreate(logger logr.Logger, parentPa
 		if err != nil {
 			errs = append(errs, field.Invalid(parentPath.Child("spec", "providerSpec"), template.Spec, fmt.Sprintf("could not parse provider spec: %v", err)))
 		}
+
 		templateFailureDomain := providerConfig.ExtractFailureDomain()
+
 		errs = append(errs, checkOpenShiftFailureDomainsMatchMachines(logger, parentPath.Child("failureDomains"), templateFailureDomain, template.FailureDomains, machines, infrastructure)...)
 	}
 
@@ -340,28 +367,28 @@ func validateTemplateLabels(labelsPath *field.Path, templateLabels map[string]st
 
 // validateOpenShiftProviderConfig checks the provider config on the ControlPlaneMachineSet to ensure that the
 // ControlPlaneMachineSet can safely replace control plane machines.
-func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, infrastructure *configv1.Infrastructure) []error {
+func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
 	providerSpecPath := parentPath.Child("spec", "providerSpec")
 
 	providerConfig, err := providerconfig.NewProviderConfigFromMachineTemplate(logger, template, infrastructure)
 	if err != nil {
-		return []error{field.Invalid(providerSpecPath, template.Spec.ProviderSpec, fmt.Sprintf("error determining provider configuration: %s", err))}
+		return nil, []error{field.Invalid(providerSpecPath, template.Spec.ProviderSpec, fmt.Sprintf("error determining provider configuration: %s", err))}
 	}
 
 	switch providerConfig.Type() {
 	case configv1.AzurePlatformType:
-		return validateOpenShiftAzureProviderConfig(providerSpecPath.Child("value"), providerConfig.Azure())
+		return nil, validateOpenShiftAzureProviderConfig(providerSpecPath.Child("value"), providerConfig.Azure())
 	case configv1.GCPPlatformType:
-		return validateOpenShiftGCPProviderConfig(providerSpecPath.Child("value"), providerConfig.GCP())
+		return nil, validateOpenShiftGCPProviderConfig(providerSpecPath.Child("value"), providerConfig.GCP())
 	case configv1.OpenStackPlatformType:
-		return validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
+		return nil, validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
 	case configv1.VSpherePlatformType:
-		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere())
+		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere(), infrastructure)
 	case configv1.NutanixPlatformType:
-		return validateOpenShiftNutanixProviderConfig(providerSpecPath.Child("value"), providerConfig.Nutanix(), template.FailureDomains)
+		return nil, validateOpenShiftNutanixProviderConfig(providerSpecPath.Child("value"), providerConfig.Nutanix(), template.FailureDomains)
 	}
 
-	return []error{}
+	return nil, []error{}
 }
 
 // validateOpenShiftNutanixProviderConfig runs Nutanix specific checks on the provider config on the ControlPlaneMachineSet.
@@ -420,20 +447,86 @@ func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerCo
 
 // validateOpenShiftVSphereProviderConfig runs VSphere specific checks on the provider config on the ControlPlaneMachineSet.
 // This ensures that the ControlPlaneMachineSet can safely replace VSphere control plane machines.
-func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) []error {
+func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
+	warnings := admission.Warnings{}
+	errs := []error{}
+
+	infraProviderConfig := infrastructure.Spec.PlatformSpec.VSphere
+	if infraProviderConfig != nil && len(infraProviderConfig.FailureDomains) > 0 {
+		// If failure domains are configured, we do not want to have user provide any FD overrides
+		warn, err := checkForFailureDomainIgnoredFields(parentPath, providerConfig)
+		warnings = append(warnings, warn...)
+		errs = append(errs, err...)
+	} else {
+		errs = append(errs, validateTemplate(parentPath, providerConfig.Config().Template)...)
+	}
+
+	return warnings, errs
+}
+
+// checkForFailureDomainIgnoredFields checks all fields that are controlled by failure domain.  Each infraction will result
+// in an error being returned in the error collection.
+func checkForFailureDomainIgnoredFields(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) (admission.Warnings, []error) {
+	warnings := admission.Warnings{}
+	errs := []error{}
+
+	// If failure domains are configured, we do not want to have user provide any FD overrides unless the FD does not define
+	// the field.  In most cases, the fields are required.  We'll check each field to verify that FD has defined the value
+	// in addition to user providing an override.
+
+	// Template is not required.  We will generate a warning when detected to let user know this template may get ignored.
+	if len(providerConfig.Config().Template) > 0 {
+		warnings = append(warnings, fmt.Sprintf("%s: %s", parentPath.Child("template"), warnVSphereTemplateMayBeIgnored))
+		errs = append(errs, validateTemplate(parentPath, providerConfig.Config().Template)...)
+	}
+
+	// Static IP configuration is the only thing we need to allow.  Networks are required to be defined in the FD.
+	devices := providerConfig.Config().Network.Devices
+	for _, device := range devices {
+		if len(device.NetworkName) > 0 {
+			errs = append(errs, field.InternalError(parentPath.Child("network"),
+				fmt.Errorf("%w: %#v", errVSphereNetworkNotAllowed, providerConfig.Config().Network.Devices)))
+		}
+	}
+
+	workspace := providerConfig.Config().Workspace
+	if workspace != nil {
+		workspacePath := parentPath.Child("workspace")
+
+		// In workspace, the Datacenter, Datastore, Server are required to be set in the FD.
+		if len(workspace.Datacenter) > 0 || len(workspace.Datastore) > 0 || len(workspace.Server) > 0 {
+			errs = append(errs, field.InternalError(workspacePath,
+				fmt.Errorf("%w: %#v", errVSphereWorkspaceNotAllowed, workspace)))
+		}
+
+		// Folder and ResourcePool are optional in the infrastructure's FDs.  We'll only generate a warning if they are
+		// set in the workspace.
+		if len(workspace.Folder) > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", workspacePath.Child("folder"), warnVSphereFolderMayBeIgnored))
+		}
+
+		if len(workspace.ResourcePool) > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", workspacePath.Child("resourcePool"), warnVSphereResourcePoolMayBeIgnored))
+		}
+	}
+
+	return warnings, errs
+}
+
+// validateTemplate validates the format of the template.
+func validateTemplate(parentPath *field.Path, template string) []error {
 	errs := []error{}
 
 	// Check template format.  If "/" found, assume it's a path based definition and verify with pattern.
 	// If not a path template, then assume just a template name (older ocp installs)
-	templatePath := providerConfig.Config().Template
-	if len(templatePath) > 0 && strings.Contains(templatePath, "/") {
-		matched, err := regexp.MatchString(vsphereTemplateValidationPattern, templatePath)
+	if len(template) > 0 && strings.Contains(template, "/") {
+		matched, err := regexp.MatchString(vsphereTemplateValidationPattern, template)
 		if err != nil {
 			errs = append(errs, field.InternalError(parentPath.Child("template"), fmt.Errorf("error checking the validity of the template path: %w", err)))
 		}
 
 		if !matched {
-			errs = append(errs, field.Invalid(parentPath.Child("template"), templatePath, "template must be provided as the full path"))
+			errs = append(errs, field.Invalid(parentPath.Child("template"), template, "template must be provided as the full path"))
 		}
 	}
 
