@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:dupl
 package controlplanemachinesetgenerator
 
 import (
@@ -62,7 +63,7 @@ func buildControlPlaneMachineSetAzureMachineSpec(logger logr.Logger, machines []
 
 	azureProviderSpec := providerConfig.Azure().Config()
 	// Remove field related to the faliure domain.
-	azureProviderSpec.Zone = nil
+	azureProviderSpec.Zone = ""
 
 	rawBytes, err := json.Marshal(azureProviderSpec)
 	if err != nil {

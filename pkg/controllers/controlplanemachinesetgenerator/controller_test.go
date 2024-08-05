@@ -776,7 +776,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 						WithMachineTemplateBuilder(
 				machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().
 					WithProviderSpecBuilder(
-						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("defaultinstancetype"),
+						usEast1aProviderSpecBuilderAzure.WithZone("").WithVMSize("outdatedInstancetype"),
 					).
 					WithFailureDomainsBuilder(machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
 						usEast1aFailureDomainBuilderAzure,
@@ -1011,7 +1011,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					// Remove from the machine Provider Spec the fields that won't be
 					// present on the ControlPlaneMachineSet Provider Spec.
 					azureMachineProviderConfig := machineProviderSpec.Azure().Config()
-					azureMachineProviderConfig.Zone = nil
+					azureMachineProviderConfig.Zone = ""
 
 					Expect(cpmsProviderSpec.Azure().Config()).To(Equal(azureMachineProviderConfig))
 				})
@@ -1065,7 +1065,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 					// Remove from the machine Provider Spec the fields that won't be
 					// present on the ControlPlaneMachineSet Provider Spec.
 					azureMachineProviderConfig := machineProviderSpec.Azure().Config()
-					azureMachineProviderConfig.Zone = nil
+					azureMachineProviderConfig.Zone = ""
 
 					Expect(cpmsProviderSpec.Azure().Config()).To(Equal(azureMachineProviderConfig))
 				})
@@ -1188,7 +1188,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				// Remove from the machine Provider Spec the fields that won't be
 				// present on the ControlPlaneMachineSet Provider Spec.
 				azureMachineProviderConfig := machineProviderSpec.Azure().Config()
-				azureMachineProviderConfig.Zone = nil
+				azureMachineProviderConfig.Zone = ""
 
 				oldUID := cpms.UID
 
