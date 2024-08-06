@@ -215,7 +215,7 @@ var _ = Describe("Provider Config", func() {
 					machinev1resourcebuilder.AzureFailureDomain().WithZone("1").Build(),
 				),
 				matchPath:        "Azure().Config().Zone",
-				matchExpectation: stringPtr("1"),
+				matchExpectation: "1",
 			}),
 			Entry("when changing an Azure zone", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
@@ -228,7 +228,7 @@ var _ = Describe("Provider Config", func() {
 					machinev1resourcebuilder.AzureFailureDomain().WithZone("2").Build(),
 				),
 				matchPath:        "Azure().Config().Zone",
-				matchExpectation: stringPtr("2"),
+				matchExpectation: "2",
 			}),
 			Entry("when keeping a GCP zone the same", injectFailureDomainTableInput{
 				providerConfig: &providerConfig{
