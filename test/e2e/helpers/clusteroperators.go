@@ -30,7 +30,7 @@ import (
 
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
-func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
+func EventuallyClusterOperatorsShouldStabilise(minimumAvailability time.Duration, gomegaArgs ...interface{}) {
 	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
 	defer format.UnregisterCustomFormatter(key)
 
@@ -39,7 +39,7 @@ func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 	// that contain elements that are both "Type" something and "Status" something.
 	clusterOperators := &configv1.ClusterOperatorList{}
 
-	By("Waiting for the cluster operators to stabilise (minimum availability time: " + time.Minute.String() + ", timeout: " + gomegaArgs[0].(time.Duration).String() + ", polling interval: " + gomegaArgs[1].(time.Duration).String() + ")")
+	By("Waiting for the cluster operators to stabilise (minimum availability time: " + minimumAvailability.String() + ", timeout: " + gomegaArgs[0].(time.Duration).String() + ", polling interval: " + gomegaArgs[1].(time.Duration).String() + ")")
 
 	Eventually(komega.ObjectList(clusterOperators), gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
 		SatisfyAll(
@@ -47,21 +47,21 @@ func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 				And(
 					HaveField("Type", Equal(configv1.OperatorAvailable)),
 					HaveField("Status", Equal(configv1.ConditionTrue)),
-					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", time.Minute.Milliseconds()))),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", minimumAvailability.Milliseconds()))),
 				),
 			),
 			ContainElement(
 				And(
 					HaveField("Type", Equal(configv1.OperatorProgressing)),
 					HaveField("Status", Equal(configv1.ConditionFalse)),
-					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", time.Minute.Milliseconds()))),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", minimumAvailability.Milliseconds()))),
 				),
 			),
 			ContainElement(
 				And(
 					HaveField("Type", Equal(configv1.OperatorDegraded)),
 					HaveField("Status", Equal(configv1.ConditionFalse)),
-					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", time.Minute.Milliseconds()))),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", minimumAvailability.Milliseconds()))),
 				),
 			),
 		),
