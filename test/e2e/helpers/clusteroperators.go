@@ -17,6 +17,8 @@ limitations under the License.
 package helpers
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -37,13 +39,40 @@ func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 	// that contain elements that are both "Type" something and "Status" something.
 	clusterOperators := &configv1.ClusterOperatorList{}
 
-	By("Waiting for the cluster operators to stabilise")
+	By("Waiting for the cluster operators to stabilise (minimum availability time: " + time.Minute.String() + ", timeout: " + gomegaArgs[0].(time.Duration).String() + ", polling interval: " + gomegaArgs[1].(time.Duration).String() + ")")
 
 	Eventually(komega.ObjectList(clusterOperators), gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
 		SatisfyAll(
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorAvailable)), HaveField("Status", Equal(configv1.ConditionTrue)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorProgressing)), HaveField("Status", Equal(configv1.ConditionFalse)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorDegraded)), HaveField("Status", Equal(configv1.ConditionFalse)))),
+			ContainElement(
+				And(
+					HaveField("Type", Equal(configv1.OperatorAvailable)),
+					HaveField("Status", Equal(configv1.ConditionTrue)),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", time.Minute.Milliseconds()))),
+				),
+			),
+			ContainElement(
+				And(
+					HaveField("Type", Equal(configv1.OperatorProgressing)),
+					HaveField("Status", Equal(configv1.ConditionFalse)),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", time.Minute.Milliseconds()))),
+				),
+			),
+			ContainElement(
+				And(
+					HaveField("Type", Equal(configv1.OperatorDegraded)),
+					HaveField("Status", Equal(configv1.ConditionFalse)),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", time.Minute.Milliseconds()))),
+				),
+			),
 		),
 	))), "cluster operators should all be available, not progressing and not degraded")
+}
+
+// millisecondsSince returns a transform matcher that transforms a time.Time into an int64 representing a duration in milliseconds.
+// The duration is the time since the time.Time was created.
+// If the duration is negative, the time.Time is in the future.
+func millisecondsSince(matcher OmegaMatcher) OmegaMatcher {
+	return WithTransform(func(t time.Time) int64 {
+		return time.Since(t).Milliseconds()
+	}, matcher)
 }
