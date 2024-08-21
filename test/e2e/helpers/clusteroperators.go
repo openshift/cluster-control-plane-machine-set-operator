@@ -30,7 +30,7 @@ import (
 
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
-func EventuallyClusterOperatorsShouldStabilise(minimumAvailability time.Duration, gomegaArgs ...interface{}) {
+func EventuallyClusterOperatorsShouldStabilise(minimumAvailability, timeout, interval time.Duration) {
 	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
 	defer format.UnregisterCustomFormatter(key)
 
@@ -39,9 +39,9 @@ func EventuallyClusterOperatorsShouldStabilise(minimumAvailability time.Duration
 	// that contain elements that are both "Type" something and "Status" something.
 	clusterOperators := &configv1.ClusterOperatorList{}
 
-	By("Waiting for the cluster operators to stabilise (minimum availability time: " + minimumAvailability.String() + ", timeout: " + gomegaArgs[0].(time.Duration).String() + ", polling interval: " + gomegaArgs[1].(time.Duration).String() + ")")
+	By("Waiting for the cluster operators to stabilise (minimum availability time: " + minimumAvailability.String() + ", timeout: " + timeout.String() + ", polling interval: " + interval.String() + ")")
 
-	Eventually(komega.ObjectList(clusterOperators), gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
+	Eventually(komega.ObjectList(clusterOperators), timeout, interval).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
 		SatisfyAll(
 			ContainElement(
 				And(

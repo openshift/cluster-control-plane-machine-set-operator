@@ -258,7 +258,7 @@ func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framewor
 		ExpectControlPlaneMachinesAllRunning(testFramework)
 		ExpectControlPlaneMachinesNotOwned(testFramework)
 		ExpectControlPlaneMachinesWithoutDeletionTimestamp(testFramework)
-		EventuallyClusterOperatorsShouldStabilise(1 * time.Minute)
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 2*time.Minute, 10*time.Second)
 	})
 }
 
@@ -314,7 +314,7 @@ func ItShouldNotCauseARollout(testFramework framework.Framework) {
 		), "control plane machine set replicas should consisently be up to date")
 
 		// Check that the operators are stable.
-		EventuallyClusterOperatorsShouldStabilise(1 * time.Minute)
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 2*time.Minute, 10*time.Second)
 	})
 }
 
@@ -330,7 +330,7 @@ func ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramewor
 		ConsistentlyControlPlaneMachinesWithoutDeletionTimestamp(testFramework)
 
 		// Check that the operators are stable.
-		EventuallyClusterOperatorsShouldStabilise(1 * time.Minute)
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 2*time.Minute, 10*time.Second)
 	})
 }
 
