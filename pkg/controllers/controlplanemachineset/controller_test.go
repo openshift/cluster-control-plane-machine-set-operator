@@ -1129,6 +1129,7 @@ var _ = Describe("With a running controller", func() {
 
 				testOptions.RolloutTimeout = 10 * time.Second
 				testOptions.StabilisationTimeout = 1 * time.Second
+				testOptions.StabilisationMinimumAvailability = 500 * time.Millisecond
 			})
 
 			helpers.ItShouldPerformARollingUpdate(&testOptions)

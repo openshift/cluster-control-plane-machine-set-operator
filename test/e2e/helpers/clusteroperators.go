@@ -17,6 +17,8 @@ limitations under the License.
 package helpers
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -28,7 +30,7 @@ import (
 
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
-func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
+func EventuallyClusterOperatorsShouldStabilise(minimumAvailability, timeout, interval time.Duration) {
 	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
 	defer format.UnregisterCustomFormatter(key)
 
@@ -37,13 +39,40 @@ func EventuallyClusterOperatorsShouldStabilise(gomegaArgs ...interface{}) {
 	// that contain elements that are both "Type" something and "Status" something.
 	clusterOperators := &configv1.ClusterOperatorList{}
 
-	By("Waiting for the cluster operators to stabilise")
+	By("Waiting for the cluster operators to stabilise (minimum availability time: " + minimumAvailability.String() + ", timeout: " + timeout.String() + ", polling interval: " + interval.String() + ")")
 
-	Eventually(komega.ObjectList(clusterOperators), gomegaArgs...).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
+	Eventually(komega.ObjectList(clusterOperators), timeout, interval).Should(HaveField("Items", HaveEach(HaveField("Status.Conditions",
 		SatisfyAll(
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorAvailable)), HaveField("Status", Equal(configv1.ConditionTrue)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorProgressing)), HaveField("Status", Equal(configv1.ConditionFalse)))),
-			ContainElement(And(HaveField("Type", Equal(configv1.OperatorDegraded)), HaveField("Status", Equal(configv1.ConditionFalse)))),
+			ContainElement(
+				And(
+					HaveField("Type", Equal(configv1.OperatorAvailable)),
+					HaveField("Status", Equal(configv1.ConditionTrue)),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", minimumAvailability.Milliseconds()))),
+				),
+			),
+			ContainElement(
+				And(
+					HaveField("Type", Equal(configv1.OperatorProgressing)),
+					HaveField("Status", Equal(configv1.ConditionFalse)),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", minimumAvailability.Milliseconds()))),
+				),
+			),
+			ContainElement(
+				And(
+					HaveField("Type", Equal(configv1.OperatorDegraded)),
+					HaveField("Status", Equal(configv1.ConditionFalse)),
+					HaveField("LastTransitionTime.Time", millisecondsSince(BeNumerically(">", minimumAvailability.Milliseconds()))),
+				),
+			),
 		),
 	))), "cluster operators should all be available, not progressing and not degraded")
+}
+
+// millisecondsSince returns a transform matcher that transforms a time.Time into an int64 representing a duration in milliseconds.
+// The duration is the time since the time.Time was created.
+// If the duration is negative, the time.Time is in the future.
+func millisecondsSince(matcher OmegaMatcher) OmegaMatcher {
+	return WithTransform(func(t time.Time) int64 {
+		return time.Since(t).Milliseconds()
+	}, matcher)
 }

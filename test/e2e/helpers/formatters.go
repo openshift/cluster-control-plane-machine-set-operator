@@ -18,6 +18,7 @@ package helpers
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/onsi/gomega/format"
 	configv1 "github.com/openshift/api/config/v1"
@@ -94,11 +95,14 @@ func getClusterOperatorStatus(co configv1.ClusterOperator) clusterOperatorStatus
 	for _, condition := range co.Status.Conditions {
 		switch condition.Type {
 		case configv1.OperatorAvailable:
-			coStatus.Available = condition.Status == configv1.ConditionTrue
+			// We consider the operator to be available if it is True and has not transitioned in the last minute.
+			coStatus.Available = condition.Status == configv1.ConditionTrue && time.Now().Add(-1*time.Minute).After(condition.LastTransitionTime.Time)
 		case configv1.OperatorProgressing:
-			coStatus.Progressing = condition.Status == configv1.ConditionTrue
+			// We consider the operator to be progressing if it is either True or has transitioned in the last minute.
+			coStatus.Progressing = condition.Status == configv1.ConditionTrue || time.Now().Add(-1*time.Minute).Before(condition.LastTransitionTime.Time)
 		case configv1.OperatorDegraded:
-			coStatus.Degraded = condition.Status == configv1.ConditionTrue
+			// We consider the operator to be degraded if it is either True or has transitioned in the last minute.
+			coStatus.Degraded = condition.Status == configv1.ConditionTrue || time.Now().Add(-1*time.Minute).Before(condition.LastTransitionTime.Time)
 		case configv1.OperatorUpgradeable, configv1.EvaluationConditionsDetected, configv1.RetrievedUpdates:
 			continue
 		}
