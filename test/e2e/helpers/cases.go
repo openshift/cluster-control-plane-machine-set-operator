@@ -43,9 +43,10 @@ func ItShouldHaveAnActiveControlPlaneMachineSet(testFramework framework.Framewor
 
 // RollingUpdatePeriodicTestOptions allow the test cases to be configured.
 type RollingUpdatePeriodicTestOptions struct {
-	TestFramework        framework.Framework
-	RolloutTimeout       time.Duration
-	StabilisationTimeout time.Duration
+	TestFramework                    framework.Framework
+	RolloutTimeout                   time.Duration
+	StabilisationTimeout             time.Duration
+	StabilisationMinimumAvailability time.Duration
 }
 
 // ControlPlaneMachineSetRegenerationTestOptions allow test cases to be configured.
@@ -112,7 +113,12 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 
 		stabilisationInterval := stabilisationTimeout / 50
 
-		EventuallyClusterOperatorsShouldStabilise(stabilisationTimeout, stabilisationInterval)
+		stabilisationMinimumAvailability := time.Minute
+		if opts.StabilisationMinimumAvailability != 0 {
+			stabilisationMinimumAvailability = opts.StabilisationMinimumAvailability
+		}
+
+		EventuallyClusterOperatorsShouldStabilise(stabilisationMinimumAvailability, stabilisationTimeout, stabilisationInterval)
 		By("Cluster stabilised after the rollout")
 	})
 }
@@ -167,7 +173,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(30*time.Minute, 30*time.Second)
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 30*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
@@ -239,7 +245,7 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(20*time.Minute, 20*time.Second)
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 20*time.Minute, 20*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
@@ -252,7 +258,7 @@ func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framewor
 		ExpectControlPlaneMachinesAllRunning(testFramework)
 		ExpectControlPlaneMachinesNotOwned(testFramework)
 		ExpectControlPlaneMachinesWithoutDeletionTimestamp(testFramework)
-		EventuallyClusterOperatorsShouldStabilise()
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 2*time.Minute, 10*time.Second)
 	})
 }
 
@@ -308,7 +314,7 @@ func ItShouldNotCauseARollout(testFramework framework.Framework) {
 		), "control plane machine set replicas should consisently be up to date")
 
 		// Check that the operators are stable.
-		EventuallyClusterOperatorsShouldStabilise()
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 2*time.Minute, 10*time.Second)
 	})
 }
 
@@ -324,7 +330,7 @@ func ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramewor
 		ConsistentlyControlPlaneMachinesWithoutDeletionTimestamp(testFramework)
 
 		// Check that the operators are stable.
-		EventuallyClusterOperatorsShouldStabilise()
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 2*time.Minute, 10*time.Second)
 	})
 }
 
