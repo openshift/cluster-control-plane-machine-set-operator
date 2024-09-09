@@ -24,6 +24,16 @@ import (
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
@@ -34,15 +44,6 @@ import (
 	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/config"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // stringPtr returns a pointer to the string value.
@@ -571,7 +572,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = raw
 
 					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-						Equal("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace: Internal error: workspace fields should not be set when control plane nodes are in a failure domain: &v1beta1.Workspace{Server:\"test-vcenter\", Datacenter:\"\", Folder:\"\", Datastore:\"\", ResourcePool:\"\"}"),
+						Equal("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace: Internal error: workspace fields should not be set when control plane nodes are in a failure domain: &v1beta1.Workspace{Server:\"test-vcenter\", Datacenter:\"\", Folder:\"\", Datastore:\"\", ResourcePool:\"\", VMGroup:\"\"}"),
 					)), "expected to fail with only error about network")
 				})
 
