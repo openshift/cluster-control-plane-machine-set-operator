@@ -24,10 +24,11 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-test/deep"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // VSphereProviderConfig holds the provider spec of a VSphere Machine.
@@ -79,6 +80,10 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 		workspace.Folder = topology.Folder
 	} else {
 		workspace.Folder = fmt.Sprintf("/%s/vm/%s", workspace.Datacenter, v.infrastructure.Status.InfrastructureName)
+	}
+
+	if len(failureDomain.ZoneAffinity.VMGroup) > 0 {
+		workspace.VMGroup = failureDomain.ZoneAffinity.VMGroup
 	}
 
 	return workspace
@@ -175,6 +180,7 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 		if workspace.Datacenter == topology.Datacenter &&
 			workspace.Datastore == topology.Datastore &&
 			workspace.Server == failureDomain.Server &&
+			workspace.VMGroup == failureDomain.ZoneAffinity.VMGroup &&
 			path.Clean(workspace.ResourcePool) == path.Clean(topology.ResourcePool) {
 			return machinev1.VSphereFailureDomain{
 				Name: failureDomain.Name,
