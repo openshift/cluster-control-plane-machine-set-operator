@@ -430,7 +430,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					Expect(vSphereTemplateWarningCounter.Value()).To(Equal(1), "Setting template should give a warning")
 				})
 
-				It("when providing network name in vSphere configuration", func() {
+				It("when providing network name in vSphere configuration without failure domains", func() {
 
 					By("Creating a selection of Machines")
 
@@ -447,6 +447,30 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
 					cpms := cpmsBuilder.Build()
+
+					// Add fields not needed for CPMS when failure domain in use to create error
+					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
+					Expect(json.Unmarshal(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw, vsProviderSpec)).
+						To(Succeed(), "expect to unmarshal current provider spec")
+					vsProviderSpec.Network.Devices = []machinev1beta1.NetworkDeviceSpec{
+						{
+							NetworkName: "test-network",
+						},
+					}
+					specData, err := json.Marshal(vsProviderSpec)
+					Expect(err).To(BeNil(), "expect to be able to marshal changes")
+					raw := &runtime.RawExtension{
+						Raw: specData,
+					}
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = raw
+
+					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "expected to be able to create the control plane machine set")
+				})
+
+				It("when providing network name in vSphere configuration with failure domains", func() {
+
+					By("Creating a selection of Machines")
+					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -516,19 +540,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					By("Creating a selection of Machines")
 
-					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().AsControlPlaneMachineSetProviderSpec()
-					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
-					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
-					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
-
-					for i := 0; i < 3; i++ {
-						controlPlaneMachine := controlPlaneMachineBuilder.Build()
-						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
-					}
-
-					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-					cpms := cpmsBuilder.Build()
+					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -553,19 +565,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					By("Creating a selection of Machines")
 
-					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().AsControlPlaneMachineSetProviderSpec()
-					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
-					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
-					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
-
-					for i := 0; i < 3; i++ {
-						controlPlaneMachine := controlPlaneMachineBuilder.Build()
-						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
-					}
-
-					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-					cpms := cpmsBuilder.Build()
+					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -590,19 +590,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					By("Creating a selection of Machines")
 
-					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().AsControlPlaneMachineSetProviderSpec()
-					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
-					machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
-					controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(providerSpec)
-
-					for i := 0; i < 3; i++ {
-						controlPlaneMachine := controlPlaneMachineBuilder.Build()
-						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
-					}
-
-					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-					cpms := cpmsBuilder.Build()
+					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -625,22 +613,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 				// "providing" covers a cpms created with a list of failure domains
 				It("when providing failure domains in vSphere configuration", func() {
-					providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).AsControlPlaneMachineSetProviderSpec().WithTemplate("/IBMCloud/vm/rhcos-415.92.202310310037-0-vmware.x86_64.ova-hw19")
-					machineTemplate = machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec).WithFailureDomainsBuilder(machinev1resourcebuilder.VSphereFailureDomains())
-
-					zones := []string{"us-central1-a", "us-central1-b", "us-central1-c"}
-					for _, zone := range zones {
-						machineProviderSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().WithInfrastructure(*infrastructure).WithZone(zone)
-
-						machineBuilder := machinev1beta1resourcebuilder.Machine().WithNamespace(namespaceName)
-						controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(machineProviderSpec)
-
-						controlPlaneMachine := controlPlaneMachineBuilder.Build()
-						Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine set")
-					}
-
-					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-					cpms := cpmsBuilder.Build()
+					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
 
 					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "expected to be able to create the control plane machine set")
 				})
