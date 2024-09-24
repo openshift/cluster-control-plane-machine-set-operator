@@ -34,13 +34,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -50,6 +55,7 @@ var testEnv *envtest.Environment
 var testScheme *runtime.Scheme
 var testRESTMapper meta.RESTMapper
 var ctx = context.Background()
+var managerOptions ctrl.Options
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -69,6 +75,21 @@ var _ = BeforeSuite(func() {
 		},
 		ErrorIfCRDPathMissing:   true,
 		ControlPlaneStopTimeout: 2 * time.Minute,
+	}
+
+	managerOptions = ctrl.Options{
+		Scheme: testScheme,
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+			Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+			CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+		}),
+		Controller: config.Controller{
+			SkipNameValidation: ptr.To(true),
+		},
 	}
 
 	var err error

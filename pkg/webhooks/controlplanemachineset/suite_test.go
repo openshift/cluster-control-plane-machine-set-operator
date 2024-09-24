@@ -84,6 +84,14 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	// Tweak the warnings behaviour at a config level.
+	cfg.WarningHandler = logf.NewKubeAPIWarningLogger(
+		logf.Log.WithName("KubeAPIWarningLogger"),
+		logf.KubeAPIWarningLoggerOptions{
+			Deduplicate: false,
+		},
+	)
+
 	testScheme = scheme.Scheme
 	Expect(machinev1.Install(testScheme)).To(Succeed())
 	Expect(machinev1beta1.Install(testScheme)).To(Succeed())
@@ -91,7 +99,7 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme, WarningHandler: client.WarningHandlerOptions{SuppressWarnings: false, AllowDuplicateLogs: true}})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 

@@ -34,11 +34,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
@@ -422,17 +421,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 
 		By("Setting up a manager and controller")
 		var err error
-		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: testScheme,
-			Metrics: server.Options{
-				BindAddress: "0",
-			},
-			WebhookServer: webhook.NewServer(webhook.Options{
-				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-			}),
-		})
+		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
@@ -1012,17 +1001,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 
 		By("Setting up a manager and controller")
 		var err error
-		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: testScheme,
-			Metrics: server.Options{
-				BindAddress: "0",
-			},
-			WebhookServer: webhook.NewServer(webhook.Options{
-				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-			}),
-		})
+		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
@@ -1608,17 +1587,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 
 		By("Setting up a manager and controller")
 		var err error
-		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: testScheme,
-			Metrics: server.Options{
-				BindAddress: "0",
-			},
-			WebhookServer: webhook.NewServer(webhook.Options{
-				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-			}),
-		})
+		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
@@ -2159,17 +2128,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 	JustBeforeEach(func() {
 		By("Setting up a manager and controller")
 		var err error
-		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: testScheme,
-			Metrics: server.Options{
-				BindAddress: "0",
-			},
-			WebhookServer: webhook.NewServer(webhook.Options{
-				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-			}),
-		})
+		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
@@ -2704,17 +2663,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 
 		By("Setting up a manager and controller")
 		var err error
-		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: testScheme,
-			Metrics: server.Options{
-				BindAddress: "0",
-			},
-			WebhookServer: webhook.NewServer(webhook.Options{
-				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-			}),
-		})
+		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
 		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)

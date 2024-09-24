@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -112,6 +113,9 @@ var _ = Describe("Webhooks", Ordered, func() {
 				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
 				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
 			}),
+			Controller: config.Controller{
+				SkipNameValidation: ptr.To(true),
+			},
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
