@@ -99,6 +99,7 @@ type ControlPlaneMachineSetGeneratorReconciler struct {
 func (r *ControlPlaneMachineSetGeneratorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// All predicates are executed before the event handler is called.
 	if err := ctrl.NewControllerManagedBy(mgr).
+		Named("controlplanemachinesetgenerator").
 		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(util.FilterControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
 		Watches(&machinev1beta1.Machine{}, handler.EnqueueRequestsFromMapFunc(util.ObjToControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
 		// Override the default log constructor as it makes the logs very chatty.

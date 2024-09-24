@@ -122,6 +122,7 @@ type lastErrorTracker struct {
 func (r *ControlPlaneMachineSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// All predicates are executed before the event handler is called
 	if err := ctrl.NewControllerManagedBy(mgr).
+		Named("controlplanemachineset").
 		For(&machinev1.ControlPlaneMachineSet{}, builder.WithPredicates(util.FilterControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace))).
 		Watches(
 			&machinev1beta1.Machine{},
