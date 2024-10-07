@@ -12,9 +12,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
-	github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910
+	github.com/openshift/api v0.0.0-20240924155631-232984653385
 	github.com/openshift/client-go v0.0.0-20240918182115-6a8ead8397fd
-	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240923122356-a68f3e3bf306
+	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20241007145816-7038c320d36c
 	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/zap v1.27.0
@@ -25,7 +25,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	sigs.k8s.io/controller-runtime v0.19.0
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20240813182054-0c7827e417ac
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20240923090159-236e448db12c
 	sigs.k8s.io/controller-tools v0.16.3
 	sigs.k8s.io/yaml v1.4.0
 )
