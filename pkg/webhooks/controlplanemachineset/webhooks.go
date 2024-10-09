@@ -142,6 +142,20 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	return warnings, nil
 }
 
+// ShouldValidateSpecUpdate determines if the spec should be validated. For vSphere, in particular, cpms's created before 4.16
+// may have fields that no longer pass validatation due to using the infrastructure resource as a configuration source. as such,
+// it is possible to have the cpms be configured such that it can't be deleted as validation blocks removal of finalizers.
+func (r *ControlPlaneMachineSetWebhook) ShouldValidateSpecUpdate(ctx context.Context, oldCpms, newCpms *machinev1.ControlPlaneMachineSet) (bool, error) {
+	// if cpms is being deleted and finalizers are being dropped, do not validate further
+	if newCpms.DeletionTimestamp != nil {
+		if len(oldCpms.Finalizers) > len(newCpms.Finalizers) && len(newCpms.Finalizers) == 0 {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	var errs []error
@@ -152,9 +166,23 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 		return warnings, errUpdateNilCPMS
 	}
 
+	oldCpms, ok := oldObj.(*machinev1.ControlPlaneMachineSet)
+	if !ok {
+		return warnings, errObjNotCPMS
+	}
+
 	cpms, ok := newObj.(*machinev1.ControlPlaneMachineSet)
 	if !ok {
 		return warnings, errObjNotCPMS
+	}
+
+	shouldValidate, err := r.ShouldValidateSpecUpdate(ctx, oldCpms, cpms)
+	if err != nil {
+		return warnings, fmt.Errorf("error checking if spec should be validated: %w", err)
+	}
+
+	if !shouldValidate {
+		return warnings, nil
 	}
 
 	infrastructure, err := util.GetInfrastructure(ctx, r.client)
@@ -386,7 +414,7 @@ func validateOpenShiftProviderConfig(logger logr.Logger, parentPath *field.Path,
 	case configv1.OpenStackPlatformType:
 		return nil, validateOpenShiftOpenStackProviderConfig(providerSpecPath.Child("value"), providerConfig.OpenStack())
 	case configv1.VSpherePlatformType:
-		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), providerConfig.VSphere(), infrastructure)
+		return validateOpenShiftVSphereProviderConfig(providerSpecPath.Child("value"), template, providerConfig.VSphere(), infrastructure)
 	case configv1.NutanixPlatformType:
 		return nil, validateOpenShiftNutanixProviderConfig(providerSpecPath.Child("value"), providerConfig.Nutanix(), template.FailureDomains)
 	}
@@ -458,14 +486,14 @@ func validateOpenShiftOpenStackProviderConfig(parentPath *field.Path, providerCo
 
 // validateOpenShiftVSphereProviderConfig runs VSphere specific checks on the provider config on the ControlPlaneMachineSet.
 // This ensures that the ControlPlaneMachineSet can safely replace VSphere control plane machines.
-func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
+func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, providerConfig providerconfig.VSphereProviderConfig, infrastructure *configv1.Infrastructure) (admission.Warnings, []error) {
 	warnings := admission.Warnings{}
 	errs := []error{}
 
 	infraProviderConfig := infrastructure.Spec.PlatformSpec.VSphere
 	if infraProviderConfig != nil && len(infraProviderConfig.FailureDomains) > 0 {
 		// If failure domains are configured, we do not want to have user provide any FD overrides
-		warn, err := checkForFailureDomainIgnoredFields(parentPath, providerConfig)
+		warn, err := checkForFailureDomainIgnoredFields(parentPath, template, providerConfig)
 		warnings = append(warnings, warn...)
 		errs = append(errs, err...)
 	} else {
@@ -477,7 +505,9 @@ func validateOpenShiftVSphereProviderConfig(parentPath *field.Path, providerConf
 
 // checkForFailureDomainIgnoredFields checks all fields that are controlled by failure domain.  Each infraction will result
 // in an error being returned in the error collection.
-func checkForFailureDomainIgnoredFields(parentPath *field.Path, providerConfig providerconfig.VSphereProviderConfig) (admission.Warnings, []error) {
+//
+//nolint:cyclop
+func checkForFailureDomainIgnoredFields(parentPath *field.Path, template machinev1.OpenShiftMachineV1Beta1MachineTemplate, providerConfig providerconfig.VSphereProviderConfig) (admission.Warnings, []error) {
 	warnings := admission.Warnings{}
 	errs := []error{}
 
@@ -489,6 +519,15 @@ func checkForFailureDomainIgnoredFields(parentPath *field.Path, providerConfig p
 	if len(providerConfig.Config().Template) > 0 {
 		warnings = append(warnings, fmt.Sprintf("%s: %s", parentPath.Child("template"), warnVSphereTemplateMayBeIgnored))
 		errs = append(errs, validateTemplate(parentPath, providerConfig.Config().Template)...)
+	}
+
+	// if a cluster born before 4.16 has a configured cpms that cpms may(and likely will) contain fields that
+	// conflict with the model of using the infrastructure resource as the configuration source.
+	// in those situations, it is necessary to only validate for field conflicts if failure
+	// domains are defined in the cpms. otherwise, the cpms could be unmodifiable/undeletable due to it
+	// failing validation.
+	if template.FailureDomains == nil || len(template.FailureDomains.VSphere) == 0 {
+		return warnings, errs
 	}
 
 	// Static IP configuration is the only thing we need to allow.  Networks are required to be defined in the FD.
