@@ -82,8 +82,12 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 		workspace.Folder = fmt.Sprintf("/%s/vm/%s", workspace.Datacenter, v.infrastructure.Status.InfrastructureName)
 	}
 
-	if len(failureDomain.ZoneAffinity.VMGroup) > 0 {
-		workspace.VMGroup = failureDomain.ZoneAffinity.VMGroup
+	if failureDomain.ZoneAffinity != nil {
+		if failureDomain.ZoneAffinity.HostGroup != nil {
+			if len(failureDomain.ZoneAffinity.HostGroup.VMGroup) > 0 {
+				workspace.VMGroup = failureDomain.ZoneAffinity.HostGroup.VMGroup
+			}
+		}
 	}
 
 	return workspace
@@ -180,7 +184,7 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 		if workspace.Datacenter == topology.Datacenter &&
 			workspace.Datastore == topology.Datastore &&
 			workspace.Server == failureDomain.Server &&
-			workspace.VMGroup == failureDomain.ZoneAffinity.VMGroup &&
+			workspace.VMGroup == failureDomain.ZoneAffinity.HostGroup.VMGroup &&
 			path.Clean(workspace.ResourcePool) == path.Clean(topology.ResourcePool) {
 			return machinev1.VSphereFailureDomain{
 				Name: failureDomain.Name,
