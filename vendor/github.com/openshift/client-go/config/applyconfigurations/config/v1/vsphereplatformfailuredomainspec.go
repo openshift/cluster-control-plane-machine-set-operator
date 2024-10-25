@@ -5,13 +5,13 @@ package v1
 // VSpherePlatformFailureDomainSpecApplyConfiguration represents a declarative configuration of the VSpherePlatformFailureDomainSpec type for use
 // with apply.
 type VSpherePlatformFailureDomainSpecApplyConfiguration struct {
-	Name       *string                                    `json:"name,omitempty"`
-	Region     *string                                    `json:"region,omitempty"`
-	RegionType *string                                    `json:"regionType,omitempty"`
-	Zone       *string                                    `json:"zone,omitempty"`
-	ZoneType   *string                                    `json:"zoneType,omitempty"`
-	Server     *string                                    `json:"server,omitempty"`
-	Topology   *VSpherePlatformTopologyApplyConfiguration `json:"topology,omitempty"`
+	Name           *string                                               `json:"name,omitempty"`
+	Region         *string                                               `json:"region,omitempty"`
+	Zone           *string                                               `json:"zone,omitempty"`
+	RegionAffinity *VSphereFailureDomainRegionAffinityApplyConfiguration `json:"regionAffinity,omitempty"`
+	ZoneAffinity   *VSphereFailureDomainZoneAffinityApplyConfiguration   `json:"zoneAffinity,omitempty"`
+	Server         *string                                               `json:"server,omitempty"`
+	Topology       *VSpherePlatformTopologyApplyConfiguration            `json:"topology,omitempty"`
 }
 
 // VSpherePlatformFailureDomainSpecApplyConfiguration constructs a declarative configuration of the VSpherePlatformFailureDomainSpec type for use with
@@ -36,14 +36,6 @@ func (b *VSpherePlatformFailureDomainSpecApplyConfiguration) WithRegion(value st
 	return b
 }
 
-// WithRegionType sets the RegionType field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RegionType field is set to the value of the last call.
-func (b *VSpherePlatformFailureDomainSpecApplyConfiguration) WithRegionType(value string) *VSpherePlatformFailureDomainSpecApplyConfiguration {
-	b.RegionType = &value
-	return b
-}
-
 // WithZone sets the Zone field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Zone field is set to the value of the last call.
@@ -52,11 +44,19 @@ func (b *VSpherePlatformFailureDomainSpecApplyConfiguration) WithZone(value stri
 	return b
 }
 
-// WithZoneType sets the ZoneType field in the declarative configuration to the given value
+// WithRegionAffinity sets the RegionAffinity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ZoneType field is set to the value of the last call.
-func (b *VSpherePlatformFailureDomainSpecApplyConfiguration) WithZoneType(value string) *VSpherePlatformFailureDomainSpecApplyConfiguration {
-	b.ZoneType = &value
+// If called multiple times, the RegionAffinity field is set to the value of the last call.
+func (b *VSpherePlatformFailureDomainSpecApplyConfiguration) WithRegionAffinity(value *VSphereFailureDomainRegionAffinityApplyConfiguration) *VSpherePlatformFailureDomainSpecApplyConfiguration {
+	b.RegionAffinity = value
+	return b
+}
+
+// WithZoneAffinity sets the ZoneAffinity field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ZoneAffinity field is set to the value of the last call.
+func (b *VSpherePlatformFailureDomainSpecApplyConfiguration) WithZoneAffinity(value *VSphereFailureDomainZoneAffinityApplyConfiguration) *VSpherePlatformFailureDomainSpecApplyConfiguration {
+	b.ZoneAffinity = value
 	return b
 }
 

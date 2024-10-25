@@ -2,24 +2,24 @@
 
 package v1
 
-// VSphereFailureDomainAffinityApplyConfiguration represents a declarative configuration of the VSphereFailureDomainAffinity type for use
+// VSphereFailureDomainHostGroupApplyConfiguration represents a declarative configuration of the VSphereFailureDomainHostGroup type for use
 // with apply.
-type VSphereFailureDomainAffinityApplyConfiguration struct {
+type VSphereFailureDomainHostGroupApplyConfiguration struct {
 	VMGroup    *string `json:"vmGroup,omitempty"`
 	HostGroup  *string `json:"hostGroup,omitempty"`
 	VMHostRule *string `json:"vmHostRule,omitempty"`
 }
 
-// VSphereFailureDomainAffinityApplyConfiguration constructs a declarative configuration of the VSphereFailureDomainAffinity type for use with
+// VSphereFailureDomainHostGroupApplyConfiguration constructs a declarative configuration of the VSphereFailureDomainHostGroup type for use with
 // apply.
-func VSphereFailureDomainAffinity() *VSphereFailureDomainAffinityApplyConfiguration {
-	return &VSphereFailureDomainAffinityApplyConfiguration{}
+func VSphereFailureDomainHostGroup() *VSphereFailureDomainHostGroupApplyConfiguration {
+	return &VSphereFailureDomainHostGroupApplyConfiguration{}
 }
 
 // WithVMGroup sets the VMGroup field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VMGroup field is set to the value of the last call.
-func (b *VSphereFailureDomainAffinityApplyConfiguration) WithVMGroup(value string) *VSphereFailureDomainAffinityApplyConfiguration {
+func (b *VSphereFailureDomainHostGroupApplyConfiguration) WithVMGroup(value string) *VSphereFailureDomainHostGroupApplyConfiguration {
 	b.VMGroup = &value
 	return b
 }
@@ -27,7 +27,7 @@ func (b *VSphereFailureDomainAffinityApplyConfiguration) WithVMGroup(value strin
 // WithHostGroup sets the HostGroup field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HostGroup field is set to the value of the last call.
-func (b *VSphereFailureDomainAffinityApplyConfiguration) WithHostGroup(value string) *VSphereFailureDomainAffinityApplyConfiguration {
+func (b *VSphereFailureDomainHostGroupApplyConfiguration) WithHostGroup(value string) *VSphereFailureDomainHostGroupApplyConfiguration {
 	b.HostGroup = &value
 	return b
 }
@@ -35,7 +35,7 @@ func (b *VSphereFailureDomainAffinityApplyConfiguration) WithHostGroup(value str
 // WithVMHostRule sets the VMHostRule field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VMHostRule field is set to the value of the last call.
-func (b *VSphereFailureDomainAffinityApplyConfiguration) WithVMHostRule(value string) *VSphereFailureDomainAffinityApplyConfiguration {
+func (b *VSphereFailureDomainHostGroupApplyConfiguration) WithVMHostRule(value string) *VSphereFailureDomainHostGroupApplyConfiguration {
 	b.VMHostRule = &value
 	return b
 }

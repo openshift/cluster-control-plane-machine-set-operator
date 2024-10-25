@@ -675,7 +675,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f => github.com/jcpowermac/api v0.0.0-20241025125111-304588fe4fa5
+# github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f => github.com/jcpowermac/api v0.0.0-20241031140111-89514dc0c86b
 ## explicit; go 1.22.0
 github.com/openshift/api
 github.com/openshift/api/annotations
@@ -750,7 +750,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f => github.com/jcpowermac/client-go v0.0.0-20241025125227-2f913cf9a783
+# github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f => github.com/jcpowermac/client-go v0.0.0-20241030124430-a03b5767c110
 ## explicit; go 1.22.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
@@ -780,7 +780,7 @@ github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1
 github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1
 github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1
 github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/meta/v1
-# github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b => github.com/jcpowermac/library-go v0.0.0-20241025125326-e6593037aea6
+# github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b => github.com/jcpowermac/library-go v0.0.0-20241031141648-0f0d5ca4d8f6
 ## explicit; go 1.22.0
 github.com/openshift/library-go/pkg/apiserver/jsonpatch
 github.com/openshift/library-go/pkg/certs
@@ -1976,6 +1976,6 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# github.com/openshift/api => github.com/jcpowermac/api v0.0.0-20241025125111-304588fe4fa5
-# github.com/openshift/client-go => github.com/jcpowermac/client-go v0.0.0-20241025125227-2f913cf9a783
-# github.com/openshift/library-go => github.com/jcpowermac/library-go v0.0.0-20241025125326-e6593037aea6
+# github.com/openshift/api => github.com/jcpowermac/api v0.0.0-20241031140111-89514dc0c86b
+# github.com/openshift/client-go => github.com/jcpowermac/client-go v0.0.0-20241030124430-a03b5767c110
+# github.com/openshift/library-go => github.com/jcpowermac/library-go v0.0.0-20241031141648-0f0d5ca4d8f6

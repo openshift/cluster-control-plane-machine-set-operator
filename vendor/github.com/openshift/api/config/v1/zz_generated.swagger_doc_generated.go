@@ -1748,8 +1748,8 @@ func (VSphereFailureDomainHostGroup) SwaggerDoc() map[string]string {
 }
 
 var map_VSphereFailureDomainRegionAffinity = map[string]string{
-	"":     "VSphereFailureDomainRegionAffinity contains the region type and two currently empty fields, datacenter and computeCluster for future use.",
-	"type": "type is the string representation of the VSphereFailureDomainRegionType with available options of Datacenter and ComputeCluster When set to ComputeCluster, this means the vCenter cluster defined is the zone. When set to HostGroup, hostGroup must be configured with hostGroup, vmGroup and vmHostRule and this means the zone is defined by the grouping of those fields.",
+	"":     "VSphereFailureDomainRegionAffinity contains the region type which is the string representation of the VSphereFailureDomainRegionType with available options of Datacenter and ComputeCluster.",
+	"type": "type is the string representation of the VSphereFailureDomainRegionType with available options of Datacenter and ComputeCluster. When set to Datacenter, this means the vCenter Datacenter defined is the region. When set to ComputeCluster, this means the vCenter cluster defined is the region.",
 }
 
 func (VSphereFailureDomainRegionAffinity) SwaggerDoc() map[string]string {

@@ -247,8 +247,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/openshift/api => github.com/jcpowermac/api v0.0.0-20241025125111-304588fe4fa5
+replace github.com/openshift/api => github.com/jcpowermac/api v0.0.0-20241031140111-89514dc0c86b
 
-replace github.com/openshift/client-go => github.com/jcpowermac/client-go v0.0.0-20241025125227-2f913cf9a783
+replace github.com/openshift/client-go => github.com/jcpowermac/client-go v0.0.0-20241030124430-a03b5767c110
 
-replace github.com/openshift/library-go => github.com/jcpowermac/library-go v0.0.0-20241025125326-e6593037aea6
+replace github.com/openshift/library-go => github.com/jcpowermac/library-go v0.0.0-20241031141648-0f0d5ca4d8f6

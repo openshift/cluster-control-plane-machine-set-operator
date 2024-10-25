@@ -139,6 +139,11 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.config.v1.AWSPlatformStatus
   map:
     fields:
+    - name: cloudLoadBalancerConfig
+      type:
+        namedType: com.github.openshift.api.config.v1.CloudLoadBalancerConfig
+      default:
+        dnsType: PlatformDefault
     - name: region
       type:
         scalar: string
@@ -3382,18 +3387,45 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.openshift.api.config.v1.VSphereFailureDomainAffinity
+- name: com.github.openshift.api.config.v1.VSphereFailureDomainHostGroup
   map:
     fields:
     - name: hostGroup
       type:
         scalar: string
+      default: ""
     - name: vmGroup
       type:
         scalar: string
+      default: ""
     - name: vmHostRule
       type:
         scalar: string
+      default: ""
+- name: com.github.openshift.api.config.v1.VSphereFailureDomainRegionAffinity
+  map:
+    fields:
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+- name: com.github.openshift.api.config.v1.VSphereFailureDomainZoneAffinity
+  map:
+    fields:
+    - name: hostGroup
+      type:
+        namedType: com.github.openshift.api.config.v1.VSphereFailureDomainHostGroup
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: hostGroup
+        discriminatorValue: HostGroup
 - name: com.github.openshift.api.config.v1.VSpherePlatformFailureDomainSpec
   map:
     fields:
@@ -3405,9 +3437,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: regionType
+    - name: regionAffinity
       type:
-        scalar: string
+        namedType: com.github.openshift.api.config.v1.VSphereFailureDomainRegionAffinity
     - name: server
       type:
         scalar: string
@@ -3420,9 +3452,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: zoneType
+    - name: zoneAffinity
       type:
-        scalar: string
+        namedType: com.github.openshift.api.config.v1.VSphereFailureDomainZoneAffinity
 - name: com.github.openshift.api.config.v1.VSpherePlatformLoadBalancer
   map:
     fields:
@@ -3538,10 +3570,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.config.v1.VSpherePlatformTopology
   map:
     fields:
-    - name: affinity
-      type:
-        namedType: com.github.openshift.api.config.v1.VSphereFailureDomainAffinity
-      default: {}
     - name: computeCluster
       type:
         scalar: string
