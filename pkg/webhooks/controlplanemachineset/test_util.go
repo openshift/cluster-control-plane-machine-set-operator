@@ -28,15 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// createvSphereCPMSWithZones creates a vSphere CPMS and control plane machines which are in corresponding zones.
-func createvSphereCPMSWithZones(
+// createVSphereControlPlaneMachinesWithZones creates control plane machines which are in corresponding failure domains and returns those failure domains.
+func createVSphereControlPlaneMachinesWithZones(
 	ctx context.Context,
 	k8sClient client.Client,
 	namespaceName string,
-	infrastructure *configv1.Infrastructure) *machinev1.ControlPlaneMachineSet {
-	providerSpec := machinev1beta1resourcebuilder.VSphereProviderSpec().AsControlPlaneMachineSetProviderSpec()
-	machineTemplate := machinev1resourcebuilder.OpenShiftMachineV1Beta1Template().WithProviderSpecBuilder(providerSpec)
-
+	infrastructure *configv1.Infrastructure) *machinev1.FailureDomains {
 	fdBuilder := machinev1resourcebuilder.VSphereFailureDomains()
 	failureDomains := fdBuilder.BuildFailureDomains()
 
@@ -47,13 +44,8 @@ func createvSphereCPMSWithZones(
 		controlPlaneMachineBuilder := machineBuilder.WithGenerateName("control-plane-machine-").AsMaster().WithProviderSpecBuilder(machineProviderSpec)
 
 		controlPlaneMachine := controlPlaneMachineBuilder.Build()
-		Expect(k8sClient.Create(ctx, controlPlaneMachine)).To(Succeed(), "expected to be able to create the control plane machine")
+		Eventually(k8sClient.Create(ctx, controlPlaneMachine)).Should(Succeed(), "expected to be able to create the control plane machine")
 	}
 
-	cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
-	cpms := cpmsBuilder.Build()
-
-	cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &failureDomains
-
-	return cpms
+	return &failureDomains
 }
