@@ -142,18 +142,18 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	return warnings, nil
 }
 
-// ShouldValidateSpecUpdate determines if the spec should be validated. For vSphere, in particular, cpms's created before 4.16
+// shouldValidateSpecUpdate determines if the spec should be validated. For vSphere, in particular, cpms's created before 4.16
 // may have fields that no longer pass validatation due to using the infrastructure resource as a configuration source. as such,
 // it is possible to have the cpms be configured such that it can't be deleted as validation blocks removal of finalizers.
-func (r *ControlPlaneMachineSetWebhook) ShouldValidateSpecUpdate(ctx context.Context, oldCpms, newCpms *machinev1.ControlPlaneMachineSet) (bool, error) {
-	// if cpms is being deleted and finalizers are being dropped, do not validate further
+func shouldValidateSpecUpdate(oldCpms, newCpms *machinev1.ControlPlaneMachineSet) bool {
+	// If cpms is being deleted and finalizers are being dropped, do not validate further.
 	if newCpms.DeletionTimestamp != nil {
 		if len(oldCpms.Finalizers) > len(newCpms.Finalizers) && len(newCpms.Finalizers) == 0 {
-			return false, nil
+			return false
 		}
 	}
 
-	return true, nil
+	return true
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
@@ -176,12 +176,7 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 		return warnings, errObjNotCPMS
 	}
 
-	shouldValidate, err := r.ShouldValidateSpecUpdate(ctx, oldCpms, cpms)
-	if err != nil {
-		return warnings, fmt.Errorf("error checking if spec should be validated: %w", err)
-	}
-
-	if !shouldValidate {
+	if !shouldValidateSpecUpdate(oldCpms, cpms) {
 		return warnings, nil
 	}
 
@@ -521,9 +516,9 @@ func checkForFailureDomainIgnoredFields(parentPath *field.Path, template machine
 		errs = append(errs, validateTemplate(parentPath, providerConfig.Config().Template)...)
 	}
 
-	// if a cluster born before 4.16 has a configured cpms that cpms may(and likely will) contain fields that
+	// If a cluster born before OCP 4.16 has a configured cpms that cpms may(and likely will) contain fields that
 	// conflict with the model of using the infrastructure resource as the configuration source.
-	// in those situations, it is necessary to only validate for field conflicts if failure
+	// In those situations, it is necessary to only validate for field conflicts if failure
 	// domains are defined in the cpms. otherwise, the cpms could be unmodifiable/undeletable due to it
 	// failing validation.
 	if template.FailureDomains == nil || len(template.FailureDomains.VSphere) == 0 {
