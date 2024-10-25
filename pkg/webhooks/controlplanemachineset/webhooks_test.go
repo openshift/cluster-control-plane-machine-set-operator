@@ -470,7 +470,12 @@ var _ = Describe("Webhooks", Ordered, func() {
 				It("when providing network name in vSphere configuration with failure domains", func() {
 
 					By("Creating a selection of Machines")
-					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
+					failureDomains := createVSphereControlPlaneMachinesWithZones(ctx, k8sClient, namespaceName, infrastructure)
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = failureDomains
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -540,7 +545,12 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					By("Creating a selection of Machines")
 
-					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
+					failureDomains := createVSphereControlPlaneMachinesWithZones(ctx, k8sClient, namespaceName, infrastructure)
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = failureDomains
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -565,7 +575,12 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					By("Creating a selection of Machines")
 
-					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
+					failureDomains := createVSphereControlPlaneMachinesWithZones(ctx, k8sClient, namespaceName, infrastructure)
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = failureDomains
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -590,7 +605,12 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					By("Creating a selection of Machines")
 
-					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
+					failureDomains := createVSphereControlPlaneMachinesWithZones(ctx, k8sClient, namespaceName, infrastructure)
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = failureDomains
 
 					// Add fields not needed for CPMS when failure domain in use to create error
 					vsProviderSpec := &machinev1beta1.VSphereMachineProviderSpec{}
@@ -613,7 +633,12 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 				// "providing" covers a cpms created with a list of failure domains
 				It("when providing failure domains in vSphere configuration", func() {
-					cpms := createvSphereCPMSWithZones(ctx, k8sClient, namespaceName, infrastructure)
+					failureDomains := createVSphereControlPlaneMachinesWithZones(ctx, k8sClient, namespaceName, infrastructure)
+
+					cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(machineTemplate)
+					cpms := cpmsBuilder.Build()
+
+					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = failureDomains
 
 					Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "expected to be able to create the control plane machine set")
 				})
