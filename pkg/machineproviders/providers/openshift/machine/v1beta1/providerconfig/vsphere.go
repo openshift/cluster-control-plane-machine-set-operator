@@ -181,10 +181,18 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 
 	for _, failureDomain := range failureDomains {
 		topology := failureDomain.Topology
+		vmGroup := ""
+		if failureDomain.ZoneAffinity != nil {
+			if failureDomain.ZoneAffinity.HostGroup != nil {
+				if failureDomain.ZoneAffinity.HostGroup.VMGroup != "" {
+					vmGroup = failureDomain.ZoneAffinity.HostGroup.VMGroup
+				}
+			}
+		}
 		if workspace.Datacenter == topology.Datacenter &&
 			workspace.Datastore == topology.Datastore &&
 			workspace.Server == failureDomain.Server &&
-			workspace.VMGroup == failureDomain.ZoneAffinity.HostGroup.VMGroup &&
+			workspace.VMGroup == vmGroup &&
 			path.Clean(workspace.ResourcePool) == path.Clean(topology.ResourcePool) {
 			return machinev1.VSphereFailureDomain{
 				Name: failureDomain.Name,
