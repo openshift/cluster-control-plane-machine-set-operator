@@ -571,7 +571,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = raw
 
 					Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-						Equal("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace: Internal error: workspace fields should not be set when control plane nodes are in a failure domain: &v1beta1.Workspace{Server:\"test-vcenter\", Datacenter:\"\", Folder:\"\", Datastore:\"\", ResourcePool:\"\"}"),
+						Equal("admission webhook \"controlplanemachineset.machine.openshift.io\" denied the request: spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace: Internal error: workspace fields should not be set when control plane nodes are in a failure domain: &v1beta1.Workspace{Server:\"test-vcenter\", Datacenter:\"\", Folder:\"\", Datastore:\"\", ResourcePool:\"\", VMGroup:\"\"}"),
 					)), "expected to fail with only error about network")
 				})
 
