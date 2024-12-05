@@ -148,6 +148,7 @@ var _ = Describe("MachineProviders", func() {
 		var logger testutils.TestLogger
 		var namespaceName string
 		var recorder *record.FakeRecorder
+		var opts MachineProviderOptions
 
 		const invalidCPMSType = machinev1.ControlPlaneMachineSetMachineType("invalid")
 
@@ -162,6 +163,10 @@ var _ = Describe("MachineProviders", func() {
 			logger = testutils.NewTestLogger()
 
 			recorder = record.NewFakeRecorder(100)
+
+			opts = MachineProviderOptions{
+				AllowMachineNamePrefix: false,
+			}
 		})
 
 		AfterEach(func() {
@@ -178,7 +183,7 @@ var _ = Describe("MachineProviders", func() {
 				cpms := cpmsBuilder.Build()
 				cpms.Spec.Template.MachineType = invalidCPMSType
 
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
 			})
 
 			It("returns an error", func() {
@@ -191,6 +196,26 @@ var _ = Describe("MachineProviders", func() {
 
 			It("does not log", func() {
 				Expect(logger.Entries()).To(BeEmpty())
+			})
+		})
+
+		Context("With allowed machine name prefix", func() {
+			var provider machineproviders.MachineProvider
+			var err error
+
+			BeforeEach(func() {
+				cpms := cpmsBuilder.Build()
+				opts.AllowMachineNamePrefix = true
+
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+			})
+
+			It("does not return an error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns a machine provider", func() {
+				Expect(provider).NotTo(BeNil())
 			})
 		})
 
@@ -226,7 +251,7 @@ var _ = Describe("MachineProviders", func() {
 				var err error
 
 				BeforeEach(func() {
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build())
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build(), opts)
 				})
 
 				It("does not error", func() {
@@ -288,7 +313,42 @@ var _ = Describe("MachineProviders", func() {
 
 				BeforeEach(func() {
 
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build())
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build(), opts)
+				})
+
+				It("does not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("returns an OpenShift Machine v1beta1 implementation of the machine provider", func() {
+					typ := reflect.TypeOf(provider)
+					Expect(typ.String()).To(Equal("*v1beta1.openshiftMachineProvider"))
+				})
+
+				It("logs based on the machine info mappings", func() {
+					Expect(logger.Entries()).To(ConsistOf(
+						testutils.LogEntry{
+							Level: 4,
+							KeysAndValues: []interface{}{
+								"mapping", fmt.Sprintf("%v", map[int32]failuredomain.FailureDomain{
+									0: failuredomain.NewAWSFailureDomain(usEast1aFailureDomainBuilder.Build()),
+									1: failuredomain.NewAWSFailureDomain(usEast1bFailureDomainBuilder.Build()),
+									2: failuredomain.NewAWSFailureDomain(usEast1cFailureDomainBuilder.Build()),
+								}),
+							},
+							Message: "Mapped provided failure domains",
+						},
+					))
+				})
+			})
+
+			Context("with a valid template and allowed machine name prefix", func() {
+				var provider machineproviders.MachineProvider
+				var err error
+
+				BeforeEach(func() {
+					opts.AllowMachineNamePrefix = true
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build(), opts)
 				})
 
 				It("does not error", func() {
@@ -325,7 +385,7 @@ var _ = Describe("MachineProviders", func() {
 					cpms := cpmsBuilder.Build()
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine = nil
 
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
 				})
 
 				It("returns an error", func() {
