@@ -176,6 +176,7 @@ var _ = Describe("MachineProvider", func() {
 
 	Context("NewProvider", func() {
 		var cpms *machinev1.ControlPlaneMachineSet
+		var opts OpenshiftMachineProviderOptions
 
 		masterMachineName := func(suffix string) string {
 			return fmt.Sprintf("%s-master-%s", resourcebuilder.TestClusterIDValue, suffix)
@@ -183,6 +184,7 @@ var _ = Describe("MachineProvider", func() {
 
 		BeforeEach(func() {
 			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			opts = OpenshiftMachineProviderOptions{AllowMachineNamePrefix: false}
 		}, OncePerOrdered)
 
 		Context("with a collection of unbalanced Machines", Ordered, func() {
@@ -214,7 +216,7 @@ var _ = Describe("MachineProvider", func() {
 				recorder := record.NewFakeRecorder(10)
 
 				var err error
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(provider).ToNot(BeNil())
 
@@ -225,6 +227,11 @@ var _ = Describe("MachineProvider", func() {
 			It("should correctly set the replicas", func() {
 				// This expectation is backwards so that gomega can dereference the pointer.
 				Expect(cpms.Spec.Replicas).To(HaveValue(Equal(machineProvider.replicas)))
+			})
+
+			It("should not set machine name prefix", func() {
+				Expect(machineProvider.machineNamePrefix).To(BeEmpty())
+				Expect(machineProvider.allowMachineNamePrefix).To(BeFalse())
 			})
 
 			It("should have cached a list of machines", func() {
@@ -302,6 +309,26 @@ var _ = Describe("MachineProvider", func() {
 			})
 		})
 
+		Context("when machine name prefix is provided and allowed", func() {
+			BeforeEach(func() {
+				cpms.Spec.MachineNamePrefix = "master-node"
+				opts.AllowMachineNamePrefix = true
+			})
+
+			It("should set the machine name prefix", func() {
+				recorder := record.NewFakeRecorder(10)
+
+				provider, err := NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(provider).ToNot(BeNil())
+
+				Expect(provider).To(BeAssignableToTypeOf(&openshiftMachineProvider{}))
+				machineProvider, _ := provider.(*openshiftMachineProvider)
+
+				Expect(machineProvider.machineNamePrefix).To(Equal("master-node"))
+				Expect(machineProvider.allowMachineNamePrefix).To(BeTrue())
+			})
+		})
 	})
 
 	Context("GetMachineInfos", func() {
@@ -1866,6 +1893,53 @@ var _ = Describe("MachineProvider", func() {
 
 				It("does not create any Machines", func() {
 					Consistently(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", BeEmpty()))
+				})
+			})
+
+			Context("with machine name prefix", func() {
+				var p *openshiftMachineProvider
+				var ok bool
+				var machinePrefix string
+
+				BeforeEach(func() {
+					p, ok = provider.(*openshiftMachineProvider)
+					Expect(ok).To(BeTrue())
+				})
+
+				Context("prefix is set and feature gate is on", func() {
+					BeforeEach(func() {
+						machinePrefix = "machine-prefix"
+						p.machineNamePrefix = machinePrefix
+						p.allowMachineNamePrefix = true
+
+						Expect(p.CreateMachine(ctx, logger.Logger(), 0)).To(Succeed())
+					})
+
+					It("machine is created with the prefixed name", func() {
+						nameMatcher := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-%d", machinePrefix, 0))
+
+						machineList := &machinev1beta1.MachineList{}
+						Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
+							ContainElement(HaveField("ObjectMeta.Name", nameMatcher))))
+					})
+				})
+
+				Context("prefix is set but feature gate is off", func() {
+					BeforeEach(func() {
+						machinePrefix = "machine-prefix"
+						p.machineNamePrefix = machinePrefix
+						p.allowMachineNamePrefix = false
+
+						Expect(p.CreateMachine(ctx, logger.Logger(), 0)).To(Succeed())
+					})
+
+					It("does not create machine with the prefixed name", func() {
+						nameMatcher := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-%d", machinePrefix, 0))
+
+						machineList := &machinev1beta1.MachineList{}
+						Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
+							Not(ContainElement(HaveField("ObjectMeta.Name", nameMatcher)))))
+					})
 				})
 			})
 
