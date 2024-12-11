@@ -30,7 +30,6 @@ import (
 	corev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/core/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	metav1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/meta/v1"
-	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -92,16 +91,11 @@ var _ = Describe("Cluster Operator Status with a running controller", func() {
 		})
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		By("Setting up a featureGateAccessor")
-		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
-		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
-
 		reconciler := &ControlPlaneMachineSetReconciler{
-			Client:              k8sClient,
-			UncachedClient:      k8sClient,
-			Namespace:           namespaceName,
-			OperatorName:        operatorName,
-			FeatureGateAccessor: featureGateAccessor,
+			Client:         k8sClient,
+			UncachedClient: k8sClient,
+			Namespace:      namespaceName,
+			OperatorName:   operatorName,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 

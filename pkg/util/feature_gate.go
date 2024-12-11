@@ -52,7 +52,7 @@ func GetReleaseVersion() string {
 }
 
 // SetupFeatureGateAccessor Setup FeatureGateAccess instance.
-func SetupFeatureGateAccessor(mgr manager.Manager) (featuregates.FeatureGateAccess, error) {
+func SetupFeatureGateAccessor(ctx context.Context, mgr manager.Manager) (featuregates.FeatureGateAccess, error) {
 	desiredVersion := GetReleaseVersion()
 	missingVersion := "0.0.1-snapshot"
 
@@ -70,8 +70,8 @@ func SetupFeatureGateAccessor(mgr manager.Manager) (featuregates.FeatureGateAcce
 		configInformers.Config().V1().FeatureGates(),
 		events.NewLoggingEventRecorder("controlplanemachineset"),
 	)
-	go featureGateAccessor.Run(context.Background())
-	go configInformers.Start(context.Background().Done())
+	go featureGateAccessor.Run(ctx)
+	go configInformers.Start(ctx.Done())
 
 	select {
 	case <-featureGateAccessor.InitialFeatureGatesObserved():

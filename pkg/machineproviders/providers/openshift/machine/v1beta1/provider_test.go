@@ -1937,8 +1937,17 @@ var _ = Describe("MachineProvider", func() {
 						nameMatcher := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-%d", machinePrefix, 0))
 
 						machineList := &machinev1beta1.MachineList{}
-						Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
+						Consistently(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
 							Not(ContainElement(HaveField("ObjectMeta.Name", nameMatcher)))))
+					})
+
+					It("rather creates machine with normal format", func() {
+						nameMatcher := MatchRegexp(fmt.Sprintf("%s-master-[a-z0-9]{5}-%d", "cpms-aws-cluster-id", 0))
+
+						machineList := &machinev1beta1.MachineList{}
+						Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items", ContainElement(
+							HaveField("ObjectMeta.Name", nameMatcher),
+						)))
 					})
 				})
 			})

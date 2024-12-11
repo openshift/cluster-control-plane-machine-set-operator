@@ -424,7 +424,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(ctx, mgr)
 		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
 
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -1004,7 +1004,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(ctx, mgr)
 		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
 
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -1590,7 +1590,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(ctx, mgr)
 		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
 
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -2131,7 +2131,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(ctx, mgr)
 		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
 
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{
@@ -2666,7 +2666,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 		mgr, err = ctrl.NewManager(cfg, managerOptions)
 		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		featureGateAccessor, err := util.SetupFeatureGateAccessor(mgr)
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(ctx, mgr)
 		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
 
 		reconciler = &ControlPlaneMachineSetGeneratorReconciler{

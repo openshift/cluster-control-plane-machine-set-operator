@@ -205,6 +205,7 @@ var _ = Describe("MachineProviders", func() {
 
 			BeforeEach(func() {
 				cpms := cpmsBuilder.Build()
+				cpms.Spec.MachineNamePrefix = "machine-prefix"
 				opts.AllowMachineNamePrefix = true
 
 				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
@@ -347,8 +348,10 @@ var _ = Describe("MachineProviders", func() {
 				var err error
 
 				BeforeEach(func() {
+					cpms := cpmsBuilder.Build()
+					cpms.Spec.MachineNamePrefix = "machine-prefix"
 					opts.AllowMachineNamePrefix = true
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build(), opts)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
 				})
 
 				It("does not error", func() {

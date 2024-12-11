@@ -383,3 +383,18 @@ func UpdateControlPlaneMachineSetProviderSpec(testFramework framework.Framework,
 		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec = updatedProviderSpec
 	}), gomegaArgs...).Should(Succeed(), "control plane machine should be able to be updated")
 }
+
+// UpdateControlPlaneMachineSetMachineNamePrefix updates the machine name prefix of the control plane machine set to match the machineNamePrefix given.
+func UpdateControlPlaneMachineSetMachineNamePrefix(testFramework framework.Framework, machineNamePrefix string, gomegaArgs ...interface{}) {
+	By("Updating the machine name prefix of the control plane machine set")
+
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+
+	cpms := testFramework.NewEmptyControlPlaneMachineSet()
+
+	Eventually(komega.Get(cpms), gomegaArgs...).Should(Succeed(), "control plane machine set should exist")
+
+	Eventually(komega.Update(cpms, func() {
+		cpms.Spec.MachineNamePrefix = machineNamePrefix
+	}), gomegaArgs...).Should(Succeed(), "control plane machine should be able to be updated")
+}

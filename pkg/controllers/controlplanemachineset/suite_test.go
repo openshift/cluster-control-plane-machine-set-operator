@@ -55,6 +55,8 @@ var testScheme *runtime.Scheme
 var testRESTMapper meta.RESTMapper
 var ctx = context.Background()
 
+const releaseVersion = "4.14.0"
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -104,10 +106,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Setting a fake version to allow for feature gate / cluster version resolution.
-	Expect(os.Setenv("RELEASE_VERSION", "4.14.0")).To(Succeed())
+	Expect(os.Setenv("RELEASE_VERSION", releaseVersion)).To(Succeed())
 
-	createClusterVersion()
-	createFeatureGate()
+	createClusterVersion(releaseVersion)
 
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
@@ -120,7 +121,7 @@ var _ = AfterSuite(func() {
 })
 
 // Helper method to create the ClusterVersion "version" resource.
-func createClusterVersion() {
+func createClusterVersion(version string) {
 	clusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "version",
@@ -133,7 +134,7 @@ func createClusterVersion() {
 			Desired: configv1.Release{
 				Image:   "blah",
 				URL:     "blah",
-				Version: "4.14.0",
+				Version: version,
 			},
 		},
 	}
@@ -144,7 +145,7 @@ func createClusterVersion() {
 }
 
 // Helper method to crate the FeatureGate "cluster" resource.
-func createFeatureGate() {
+func createFeatureGate(version string, enabled []configv1.FeatureGateAttributes, disabled []configv1.FeatureGateAttributes) {
 	featureGate := &configv1.FeatureGate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cluster",
@@ -157,17 +158,9 @@ func createFeatureGate() {
 		Status: configv1.FeatureGateStatus{
 			FeatureGates: []configv1.FeatureGateDetails{
 				{
-					Enabled: []configv1.FeatureGateAttributes{
-						{
-							Name: "foo",
-						},
-					},
-					Disabled: []configv1.FeatureGateAttributes{
-						{
-							Name: "CPMSMachineNamePrefix",
-						},
-					},
-					Version: "4.14.0",
+					Enabled:  enabled,
+					Disabled: disabled,
+					Version:  version,
 				},
 			},
 		},
