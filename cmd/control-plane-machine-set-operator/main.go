@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/utils/clock"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -164,7 +165,7 @@ func main() { //nolint:funlen,cyclop
 		desiredVersion, missingVersion,
 		configInformers.Config().V1().ClusterVersions(),
 		configInformers.Config().V1().FeatureGates(),
-		events.NewLoggingEventRecorder("controlplanemachineset"),
+		events.NewLoggingEventRecorder("controlplanemachineset", clock.RealClock{}),
 	)
 	go featureGateAccessor.Run(context.Background())
 	go configInformers.Start(context.Background().Done())
