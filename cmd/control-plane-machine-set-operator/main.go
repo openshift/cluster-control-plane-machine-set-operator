@@ -189,10 +189,11 @@ func main() { //nolint:funlen,cyclop
 	}
 
 	if err := (&cpmscontroller.ControlPlaneMachineSetReconciler{
-		UncachedClient: client.NewNamespacedClient(uncachedClient, managedNamespace),
-		Namespace:      managedNamespace,
-		OperatorName:   "control-plane-machine-set",
-		ReleaseVersion: util.GetReleaseVersion(),
+		UncachedClient:      client.NewNamespacedClient(uncachedClient, managedNamespace),
+		Namespace:           managedNamespace,
+		OperatorName:        "control-plane-machine-set",
+		ReleaseVersion:      util.GetReleaseVersion(),
+		FeatureGateAccessor: featureGateAccessor,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ControlPlaneMachineSet")
 		os.Exit(1)
