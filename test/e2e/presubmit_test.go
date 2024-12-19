@@ -47,6 +47,27 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
 		})
 
+		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix", func() {
+			prefix := "master-prefix"
+			resetPrefix := ""
+
+			BeforeEach(func() {
+				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
+			})
+
+			AfterEach(func() {
+				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
+			})
+
+			Context("and the instance type of index 3 is not as expected", func() {
+				BeforeEach(func() {
+					helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 3)
+				})
+
+				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 3)
+			})
+		})
+
 		Context("with the OnDelete update strategy", func() {
 			var originalStrategy machinev1.ControlPlaneMachineSetStrategyType
 
