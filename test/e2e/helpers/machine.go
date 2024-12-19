@@ -71,7 +71,7 @@ func CheckControlPlaneMachineRollingReplacement(testFramework framework.Framewor
 	cpms := &machinev1.ControlPlaneMachineSet{}
 	Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	currentFeatureGates, err := newFeatureGateFilter(ctx, testFramework)
+	currentFeatureGates, err := NewFeatureGateFilter(ctx, testFramework)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(currentFeatureGates).NotTo(BeNil())
 
@@ -120,7 +120,7 @@ func CheckControlPlaneMachineOnDeleteReplacement(testFramework framework.Framewo
 	cpms := &machinev1.ControlPlaneMachineSet{}
 	Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	currentFeatureGates, err := newFeatureGateFilter(ctx, testFramework)
+	currentFeatureGates, err := NewFeatureGateFilter(ctx, testFramework)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(currentFeatureGates).NotTo(BeNil())
 
@@ -292,7 +292,7 @@ func checkReplacementMachineName(machine *machinev1beta1.Machine, cpms *machinev
 
 	// If CPMSMachineNamePrefix featuregate is enabled and MachineNamePrefix is set,
 	// the replacement machine should follow prefixed naming convention.
-	allowMachineNamePrefix := fg.isEnabled(string(features.FeatureGateCPMSMachineNamePrefix))
+	allowMachineNamePrefix := fg.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix))
 	machineNamePrefix := cpms.Spec.MachineNamePrefix
 
 	if allowMachineNamePrefix && len(machineNamePrefix) > 0 {
