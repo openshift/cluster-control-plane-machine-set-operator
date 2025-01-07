@@ -17,10 +17,13 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 
+	"github.com/openshift/api/features"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
@@ -42,6 +45,37 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 
 			helpers.ItShouldPerformARollingUpdate(&helpers.RollingUpdatePeriodicTestOptions{
 				TestFramework: testFramework,
+			})
+		})
+
+		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix", func() {
+			prefix := "master-prefix"
+			resetPrefix := ""
+
+			BeforeEach(func() {
+				// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
+				// The TechPreview jobs should not skip the test.
+				featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), testFramework)
+				if err != nil {
+					Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
+				}
+				if !featureGateFilter.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix)) {
+					Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
+				}
+
+				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
+			})
+
+			AfterEach(func() {
+				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
+			})
+
+			Context("and the instance type of index 1 is not as expected", func() {
+				BeforeEach(func() {
+					helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+				})
+
+				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
 			})
 		})
 
