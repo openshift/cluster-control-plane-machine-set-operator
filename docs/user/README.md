@@ -88,14 +88,15 @@ Please ensure that you have 3 (or 5) control plane machines before creating the 
 The control plane machine set is currently supported for a number of platforms and OpenShift versions.
 The matrix shows in detail the support for each specific combination.
 
-| Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |      4.14           |      4.15           |
-|------------------------------|:---------------|:--------------------|:--------------------|:--------------------|:--------------------|
-| AWS                          |  Not Supported | Full                | Full                | Full                | Full                |
-| Azure                        |  Not Supported | Manual              | Full                | Full                | Full                |
-| GCP                          |  Not Supported | Not Supported       | Full                | Full                | Full                |
-| OpenStack                    |  Not Supported | Not Supported       | Not Supported       | Full                | Full                |
-| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)| Manual (Single Zone)| Manual, Full (Tech preview) |
-| Other Platforms              |  Not Supported | Not Supported       | Not Supported       | Not Supported       | Not Supported       |
+| Platform \ OpenShift version |      <=4.11    |      4.12           |      4.13           |      4.14           |      4.15                   | 4.16+               |
+|------------------------------|:---------------|:--------------------|:--------------------|:--------------------|:----------------------------|:--------------------|
+| AWS                          |  Not Supported | Full                | Full                | Full                | Full                        | Full                |
+| Azure                        |  Not Supported | Manual              | Full                | Full                | Full                        | Full                |
+| GCP                          |  Not Supported | Not Supported       | Full                | Full                | Full                        | Full                |
+| OpenStack                    |  Not Supported | Not Supported       | Not Supported       | Full                | Full                        | Full                |
+| VSphere                      |  Not Supported | Manual (Single Zone)| Manual (Single Zone)| Manual (Single Zone)| Manual, Full (Tech preview) | Full                |
+| Nutanix                      |  Not Supported | Not Supported       | Not Supported       | Manual (Single Zone)| Full                        | Full                |
+| Other Platforms              |  Not Supported | Not Supported       | Not Supported       | Not Supported       | Not Supported               | Not Supported       |
 
 #### Keys
 
