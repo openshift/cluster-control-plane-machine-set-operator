@@ -35,6 +35,7 @@ import (
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -164,7 +165,7 @@ func main() { //nolint:funlen,cyclop
 		desiredVersion, missingVersion,
 		configInformers.Config().V1().ClusterVersions(),
 		configInformers.Config().V1().FeatureGates(),
-		events.NewLoggingEventRecorder("controlplanemachineset"),
+		events.NewLoggingEventRecorder("controlplanemachineset", clock.RealClock{}),
 	)
 	go featureGateAccessor.Run(context.Background())
 	go configInformers.Start(context.Background().Done())
