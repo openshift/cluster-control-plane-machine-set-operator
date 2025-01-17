@@ -28,6 +28,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -68,7 +69,7 @@ func SetupFeatureGateAccessor(ctx context.Context, mgr manager.Manager) (feature
 		desiredVersion, missingVersion,
 		configInformers.Config().V1().ClusterVersions(),
 		configInformers.Config().V1().FeatureGates(),
-		events.NewLoggingEventRecorder("controlplanemachineset"),
+		events.NewLoggingEventRecorder("controlplanemachineset", clock.RealClock{}),
 	)
 	go featureGateAccessor.Run(ctx)
 	go configInformers.Start(ctx.Done())
