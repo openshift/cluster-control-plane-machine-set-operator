@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -28,7 +30,6 @@ import (
 	configv1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
 	machinev1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1"
 	machinev1beta1resourcebuilder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/machine/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func() {
@@ -59,6 +60,33 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 				Build()
 
 			Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
+		})
+	})
+
+	Context("when the failuredomain is vm-host zonal", func() {
+		BeforeEach(func() {
+			infrastructure := configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).WithVSphereVMHostZonal().Build()
+
+			machineProviderConfig := machinev1beta1resourcebuilder.VSphereProviderSpec().
+				WithInfrastructure(*infrastructure).
+				WithZone(usCentral1a).
+				Build()
+
+			providerConfig = VSphereProviderConfig{
+				providerConfig: *machineProviderConfig,
+				infrastructure: infrastructure,
+			}
+
+		})
+		Context("ExtractFailureDomain", func() {
+			It("returns the configured failure domain", func() {
+				expected := machinev1resourcebuilder.VSphereFailureDomain().
+					WithZone(usCentral1a).
+					Build()
+
+				Expect(providerConfig.ExtractFailureDomain()).To(Equal(expected))
+
+			})
 		})
 	})
 
