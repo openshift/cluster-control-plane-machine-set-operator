@@ -23,12 +23,15 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/utils/clock"
+
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
@@ -68,7 +71,7 @@ func SetupFeatureGateAccessor(ctx context.Context, mgr manager.Manager) (feature
 		desiredVersion, missingVersion,
 		configInformers.Config().V1().ClusterVersions(),
 		configInformers.Config().V1().FeatureGates(),
-		events.NewLoggingEventRecorder("controlplanemachineset"),
+		events.NewLoggingEventRecorder("controlplanemachineset", clock.RealClock{}),
 	)
 	go featureGateAccessor.Run(ctx)
 	go configInformers.Start(ctx.Done())
