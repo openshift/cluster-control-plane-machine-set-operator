@@ -27,6 +27,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -147,7 +148,7 @@ func (r *ControlPlaneMachineSetReconciler) patchClusterOperatorStatus(ctx contex
 		if !isStatusConditionPresentAndEqual(co.Status.Conditions, c.Type, c.Status, c.Message, c.Reason) {
 			needUpdate = true
 
-			v1helpers.SetStatusCondition(&co.Status.Conditions, c)
+			v1helpers.SetStatusCondition(&co.Status.Conditions, c, clock.RealClock{})
 		}
 	}
 
