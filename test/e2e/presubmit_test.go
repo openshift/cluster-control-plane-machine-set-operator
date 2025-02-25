@@ -42,9 +42,9 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		}, OncePerOrdered)
 
-		Context("and the instance type of index 1 is not as expected", func() {
+		Context("and the provider spec of index 1 is not as expected", func() {
 			BeforeEach(func() {
-				helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+				helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
 			})
 
 			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
@@ -72,9 +72,9 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
 			})
 
-			Context("and the instance type of index 1 is not as expected", func() {
+			Context("and the provider spec of index 1 is not as expected", func() {
 				BeforeEach(func() {
-					helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+					helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
 				})
 
 				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
@@ -92,11 +92,11 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
 			}, OncePerOrdered)
 
-			Context("and the instance type of index 2 is not as expected", Ordered, func() {
+			Context("and the provider spec of index 2 is not as expected", Ordered, func() {
 				var originalProviderSpec machinev1beta1.ProviderSpec
 
 				BeforeAll(func() {
-					originalProviderSpec, _ = helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 2)
+					originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 2)
 				})
 
 				AfterAll(func() {
@@ -180,7 +180,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				BeforeEach(func() {
 					opts.TestFramework = testFramework
 					opts.UID = helpers.GetControlPlaneMachineSetUID(testFramework)
-					opts.Index, opts.OriginalProviderSpec, opts.UpdatedProviderSpec = helpers.IncreaseNewestControlPlaneMachineInstanceSize(testFramework)
+					opts.Index, opts.OriginalProviderSpec, opts.UpdatedProviderSpec = helpers.ModifyNewestMachineProviderSpecToTriggerRollout(testFramework)
 				})
 
 				AfterEach(func() {

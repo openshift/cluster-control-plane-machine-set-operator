@@ -38,9 +38,9 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
 		})
 
-		Context("and the instance type is changed", func() {
+		Context("and the provider spec is changed", func() {
 			BeforeEach(func() {
-				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework)
+				helpers.ModifyControlPlaneMachineSetToTriggerRollout(testFramework)
 			})
 
 			helpers.ItShouldPerformARollingUpdate(&helpers.RollingUpdatePeriodicTestOptions{
@@ -70,9 +70,9 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
 			})
 
-			Context("and the instance type of index 1 is not as expected", func() {
+			Context("and the provider spec of index 1 is not as expected", func() {
 				BeforeEach(func() {
-					helpers.IncreaseControlPlaneMachineInstanceSize(testFramework, 1)
+					helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
 				})
 
 				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)

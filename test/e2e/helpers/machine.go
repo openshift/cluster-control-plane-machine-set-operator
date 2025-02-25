@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -30,7 +29,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -423,30 +421,18 @@ func ExpectControlPlaneMachinesOwned(testFramework framework.Framework) {
 	), "expected none of the control plane machines to not have an owner reference")
 }
 
-// IncreaseControlPlaneMachineInstanceSize increases the instance size of the control plane machine
-// in the given index. This should trigger the control plane machine set to update the machine in
-// this index based on the update strategy.
-func IncreaseControlPlaneMachineInstanceSize(testFramework framework.Framework, index int, gomegaArgs ...interface{}) (machinev1beta1.ProviderSpec, machinev1beta1.ProviderSpec) {
+// ModifyMachineProviderSpecToTriggerRollout alters the provider spec of the
+// control plane machine with the given index. This modification must trigger
+// the control plane machine set to update the machine in this index based on
+// the update strategy. An example would be changing the instance size.
+func ModifyMachineProviderSpecToTriggerRollout(testFramework framework.Framework, index int, gomegaArgs ...interface{}) (machinev1beta1.ProviderSpec, machinev1beta1.ProviderSpec) {
 	machine, err := machineForIndex(testFramework, index)
 	Expect(err).ToNot(HaveOccurred(), "control plane machine should exist")
 
 	originalProviderSpec := machine.Spec.ProviderSpec
-
 	updatedProviderSpec := originalProviderSpec.DeepCopy()
-	platformType := testFramework.GetPlatformType()
 
-	switch platformType {
-	case configv1.OpenStackPlatformType:
-		// OpenStack flavors are not predictable. So if OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE is set in the environment, we'll use it
-		// to change the instance flavor, otherwise we just tag the instance with a new tag, which will trigger the redeployment.
-		if os.Getenv("OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE") == "" {
-			Expect(testFramework.TagInstanceInProviderSpec(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with a new tag")
-		} else {
-			Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
-		}
-	default:
-		Expect(testFramework.IncreaseProviderSpecInstanceSize(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated with bigger instance size")
-	}
+	Expect(testFramework.ModifyProviderSpecToTriggerRollout(updatedProviderSpec.Value)).To(Succeed(), "provider spec should be updated")
 
 	By(fmt.Sprintf("Updating the provider spec of the control plane machine at index %d", index))
 
@@ -470,13 +456,15 @@ func UpdateControlPlaneMachineProviderSpec(testFramework framework.Framework, in
 	}), gomegaArgs...).Should(Succeed(), "control plane machine should be able to be updated")
 }
 
-// IncreaseNewestControlPlaneMachineInstanceSize increases the instance size of the the newest control plane machine
-// to match the provider spec given.
-func IncreaseNewestControlPlaneMachineInstanceSize(testFramework framework.Framework, gomegaArgs ...interface{}) (int, machinev1beta1.ProviderSpec, machinev1beta1.ProviderSpec) {
+// ModifyNewestMachineProviderSpecToTriggerRollout alters the provider spec of
+// the newest control plane machine. This modification must trigger the control
+// plane machine set to update the machine in this index based on the update
+// strategy. An example would be changing the instance size.
+func ModifyNewestMachineProviderSpecToTriggerRollout(testFramework framework.Framework, gomegaArgs ...interface{}) (int, machinev1beta1.ProviderSpec, machinev1beta1.ProviderSpec) {
 	index, err := newestMachineIndex(testFramework)
 	Expect(err).ToNot(HaveOccurred(), "control plane newest machine index should be found")
 
-	originalProviderSpec, updatedProviderSpec := IncreaseControlPlaneMachineInstanceSize(testFramework, index)
+	originalProviderSpec, updatedProviderSpec := ModifyMachineProviderSpecToTriggerRollout(testFramework, index)
 
 	return index, originalProviderSpec, updatedProviderSpec
 }
