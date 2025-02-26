@@ -173,7 +173,10 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 30*time.Minute, 30*time.Second)
+		// Double the timeout to 60 minutes as a temporary workaround for
+		// https://issues.redhat.com/browse/OCPBUGS-50587. Put this back to a
+		// more reasonable 30 minutes when this bug is fixed.
+		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 60*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
