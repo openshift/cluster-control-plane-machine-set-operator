@@ -1153,14 +1153,14 @@ var _ = Describe("With a running controller", func() {
 			)))
 		})
 
-		Context("and the instance size is changed", func() {
+		Context("and the provider spec is modified", func() {
 			var testOptions helpers.RollingUpdatePeriodicTestOptions
 
 			BeforeEach(func() {
 				// The CPMS is configured for AWS so use the AWS Platform Type.
 				testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
 
-				helpers.IncreaseControlPlaneMachineSetInstanceSize(testFramework, 10*time.Second, 1*time.Second)
+				helpers.ModifyControlPlaneMachineSetToTriggerRollout(testFramework, 10*time.Second, 1*time.Second)
 
 				testOptions.TestFramework = testFramework
 
@@ -1648,9 +1648,9 @@ var _ = Describe("With a running controller and machine name prefix", func() {
 				)))
 			})
 
-			Context("and the instance size is changed", func() {
+			Context("and the provider spec is modified", func() {
 				JustBeforeEach(func() {
-					helpers.IncreaseControlPlaneMachineSetInstanceSize(testOptions.TestFramework, 10*time.Second, 1*time.Second)
+					helpers.ModifyControlPlaneMachineSetToTriggerRollout(testOptions.TestFramework, 10*time.Second, 1*time.Second)
 				})
 
 				helpers.ItShouldPerformARollingUpdate(&testOptions)
@@ -1868,9 +1868,9 @@ var _ = Describe("With a running controller and machine name prefix", func() {
 				)))
 			})
 
-			Context("and the instance size is changed", func() {
+			Context("and the provider spec is modified", func() {
 				JustBeforeEach(func() {
-					helpers.IncreaseControlPlaneMachineSetInstanceSize(testOptions.TestFramework, 10*time.Second, 1*time.Second)
+					helpers.ModifyControlPlaneMachineSetToTriggerRollout(testOptions.TestFramework, 10*time.Second, 1*time.Second)
 				})
 
 				helpers.ItShouldPerformARollingUpdate(&testOptions)
