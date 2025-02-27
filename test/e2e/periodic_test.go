@@ -48,7 +48,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 			})
 		})
 
-		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix", func() {
+		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", func() {
 			prefix := "master-prefix"
 			resetPrefix := ""
 

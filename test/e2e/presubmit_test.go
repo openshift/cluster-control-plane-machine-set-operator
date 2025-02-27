@@ -50,7 +50,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
 		})
 
-		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix", func() {
+		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", func() {
 			prefix := "master-prefix"
 			resetPrefix := ""
 
