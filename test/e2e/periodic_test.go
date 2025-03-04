@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 
 	"github.com/openshift/api/features"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
@@ -31,7 +33,7 @@ import (
 var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func() {
 	BeforeEach(func() {
 		helpers.EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 10*time.Minute, 10*time.Second)
-	})
+	}, OncePerOrdered)
 
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
@@ -76,6 +78,57 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				})
 
 				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+			})
+		})
+
+		Context("with the OnDelete update strategy", func() {
+			var originalStrategy machinev1.ControlPlaneMachineSetStrategyType
+
+			BeforeEach(func() {
+				originalStrategy = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
+			}, OncePerOrdered)
+
+			AfterEach(func() {
+				helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
+			}, OncePerOrdered)
+
+			Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", Ordered, func() {
+				prefix := "master-prefix-on-delete"
+				resetPrefix := ""
+
+				BeforeEach(func() {
+					// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
+					// The TechPreview jobs should not skip the test.
+					featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), testFramework)
+					if err != nil {
+						Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
+					}
+					if !featureGateFilter.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix)) {
+						Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
+					}
+
+					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
+				}, OncePerOrdered)
+
+				AfterEach(func() {
+					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
+				}, OncePerOrdered)
+
+				Context("and the provider spec of index 2 is not as expected", Ordered, func() {
+					var originalProviderSpec machinev1beta1.ProviderSpec
+
+					BeforeAll(func() {
+						originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 2)
+					})
+
+					AfterAll(func() {
+						helpers.UpdateControlPlaneMachineProviderSpec(testFramework, 2, originalProviderSpec)
+					})
+
+					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
+
+					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
+				})
 			})
 		})
 

@@ -107,6 +107,45 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 
 				helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
 			})
+
+			Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", Ordered, func() {
+				prefix := "master-prefix-on-delete"
+				resetPrefix := ""
+
+				BeforeEach(func() {
+					// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
+					// The TechPreview jobs should not skip the test.
+					featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), testFramework)
+					if err != nil {
+						Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
+					}
+					if !featureGateFilter.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix)) {
+						Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
+					}
+
+					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
+				}, OncePerOrdered)
+
+				AfterEach(func() {
+					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
+				}, OncePerOrdered)
+
+				Context("and the provider spec of index 1 is not as expected", Ordered, func() {
+					var originalProviderSpec machinev1beta1.ProviderSpec
+
+					BeforeAll(func() {
+						originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+					})
+
+					AfterAll(func() {
+						helpers.UpdateControlPlaneMachineProviderSpec(testFramework, 1, originalProviderSpec)
+					})
+
+					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 1)
+
+					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 1)
+				})
+			})
 		})
 
 		Context("and the ControlPlaneMachineSet is up to date", Ordered, func() {
