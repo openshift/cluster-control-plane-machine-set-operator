@@ -372,7 +372,11 @@ func UpdateControlPlaneMachineSetProviderSpec(testFramework framework.Framework,
 
 // UpdateControlPlaneMachineSetMachineNamePrefix updates the machine name prefix of the control plane machine set to match the machineNamePrefix given.
 func UpdateControlPlaneMachineSetMachineNamePrefix(testFramework framework.Framework, machineNamePrefix string, gomegaArgs ...interface{}) {
-	By("Updating the machine name prefix of the control plane machine set")
+	if len(machineNamePrefix) > 0 {
+		By(fmt.Sprintf("Updating the machine name prefix of the control plane machine set to %q", machineNamePrefix))
+	} else {
+		By("Un-setting the machine name prefix of the control plane machine set")
+	}
 
 	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
 

@@ -282,6 +282,8 @@ func getOldAndNewMachineForIndex(ctx context.Context, testFramework framework.Fr
 
 // checkReplacementMachineName checks that the name of the replacement machine fits the expected format.
 func checkReplacementMachineName(machine *machinev1beta1.Machine, cpms *machinev1.ControlPlaneMachineSet, fg *featureGateFilter, idx int) bool {
+	By(fmt.Sprintf("Replacement machine name is %q", machine.ObjectMeta.Name))
+
 	if ok := Expect(machine.ObjectMeta.Labels).To(HaveKey(machineClusterIDLabel), "machine should have cluster label"); !ok {
 		return false
 	}
