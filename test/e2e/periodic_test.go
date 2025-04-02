@@ -66,18 +66,25 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 				}
 
 				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
-			})
+			}, OncePerOrdered)
 
-			AfterEach(func() {
-				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
-			})
-
-			Context("and the provider spec of index 1 is not as expected", func() {
-				BeforeEach(func() {
+			Context("and the provider spec of index 1 is not as expected", Ordered, func() {
+				BeforeAll(func() {
 					helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
 				})
 
+				// Machine name should follow prefixed naming convention
 				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+
+				Context("and again MachineNamePrefix is reset", Ordered, func() {
+					BeforeAll(func() {
+						helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
+						helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+					})
+
+					// Machine name should follow general naming convention
+					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+				})
 			})
 		})
 
@@ -110,10 +117,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
 				}, OncePerOrdered)
 
-				AfterEach(func() {
-					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
-				}, OncePerOrdered)
-
 				Context("and the provider spec of index 2 is not as expected", Ordered, func() {
 					var originalProviderSpec machinev1beta1.ProviderSpec
 
@@ -127,7 +130,20 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), func()
 
 					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
 
+					// Machine name should follow prefixed naming convention
 					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
+
+					Context("and again MachineNamePrefix is reset", Ordered, func() {
+						BeforeAll(func() {
+							helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
+							helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 2)
+						})
+
+						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
+
+						// Machine name should follow general naming convention
+						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
+					})
 				})
 			})
 		})
