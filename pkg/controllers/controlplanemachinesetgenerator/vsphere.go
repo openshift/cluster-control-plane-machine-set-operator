@@ -31,8 +31,8 @@ import (
 )
 
 // generateControlPlaneMachineSetVSphereSpec generates an VSphere flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetVSphereSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet, infrastructure *configv1.Infrastructure) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, infrastructure)
+func generateControlPlaneMachineSetVSphereSpec(logger logr.Logger, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machines, infrastructure)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's VSphere failure domains: %w", err)
 	}
