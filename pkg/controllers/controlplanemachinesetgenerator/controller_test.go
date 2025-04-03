@@ -637,7 +637,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 				}
 
 				logger = testutils.NewTestLogger()
-				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
+				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines)
 				Expect(generatedCPMS).To(BeNil())
 				Expect(err).To(MatchError(errUnsupportedPlatform))
 			})
@@ -1219,7 +1219,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 				}
 
 				logger = testutils.NewTestLogger()
-				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
+				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines)
 				Expect(generatedCPMS).To(BeNil())
 				Expect(err).To(MatchError(errUnsupportedPlatform))
 			})
@@ -1801,7 +1801,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 				}
 
 				logger = testutils.NewTestLogger()
-				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
+				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines)
 				Expect(generatedCPMS).To(BeNil())
 				Expect(err).To(MatchError(errUnsupportedPlatform))
 			})
@@ -2298,7 +2298,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 					}
 
 					logger = testutils.NewTestLogger()
-					generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
+					generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines)
 					Expect(generatedCPMS).To(BeNil())
 					Expect(err).To(MatchError(errUnsupportedPlatform))
 				})
@@ -2966,7 +2966,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 				}
 
 				logger = testutils.NewTestLogger()
-				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines, nil)
+				generatedCPMS, err := reconciler.generateControlPlaneMachineSet(logger.Logger(), infrastructure, *machines)
 				Expect(generatedCPMS).To(BeNil())
 				Expect(err).To(MatchError(errUnsupportedPlatform))
 			})

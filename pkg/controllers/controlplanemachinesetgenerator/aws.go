@@ -41,8 +41,8 @@ const (
 )
 
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetAWSSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
+func generateControlPlaneMachineSetAWSSpec(logger logr.Logger, machines []machinev1beta1.Machine) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machines, nil)
 	if errors.Is(err, errNoFailureDomains) {
 		// This is a special case where we don't have any failure domains.
 	} else if err != nil {
