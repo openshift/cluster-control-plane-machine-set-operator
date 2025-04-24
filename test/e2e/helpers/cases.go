@@ -105,7 +105,7 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 
 		By("Waiting for the cluster to stabilise after the rollout")
 
-		stabilisationTimeout := 30 * time.Minute
+		stabilisationTimeout := 32 * time.Minute
 
 		if opts.StabilisationTimeout.Seconds() != 0 {
 			stabilisationTimeout = opts.StabilisationTimeout
@@ -113,7 +113,7 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 
 		stabilisationInterval := stabilisationTimeout / 50
 
-		stabilisationMinimumAvailability := time.Minute
+		stabilisationMinimumAvailability := 2 * time.Minute
 		if opts.StabilisationMinimumAvailability != 0 {
 			stabilisationMinimumAvailability = opts.StabilisationMinimumAvailability
 		}
@@ -173,7 +173,10 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 30*time.Minute, 30*time.Second)
+		// 30 minutes for the rollout to complete, 2 minutes for the cluster to stabilise.
+		// Check every 30 seconds.
+		// The timeout includes the 2 minutes to stabilise, hence 32 minutes.
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
@@ -245,7 +248,10 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 20*time.Minute, 20*time.Second)
+		// 20 minutes for the rollout to complete, 2 minutes for the cluster to stabilise.
+		// Check every 20 seconds.
+		// The timeout includes the 2 minutes to stabilise, hence 22 minutes.
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 22*time.Minute, 20*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
