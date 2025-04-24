@@ -227,61 +227,6 @@ var _ = Describe("compareControlPlaneMachineSets tests", func() {
 	)
 })
 
-var _ = Describe("sortMachineSetsByCreationTimeDescending tests", func() {
-	type sortMachineSetsByCreationTimeAscendingTableInput struct {
-		input    []machinev1beta1.MachineSet
-		expected []machinev1beta1.MachineSet
-	}
-
-	timeFirst := metav1.NewTime(time.Now().Add(time.Hour * 1))
-	timeSecond := metav1.NewTime(time.Now().Add(time.Hour * 2))
-	timeThird := metav1.NewTime(time.Now().Add(time.Hour * 3))
-
-	DescribeTable("should sort (ascending) a slice of MachineSets by CreationTime,Name",
-		func(in sortMachineSetsByCreationTimeAscendingTableInput) {
-			output := sortMachineSetsByCreationTimeAscending(in.input)
-			Expect(output).To(Equal(in.expected))
-		},
-		Entry("when the input is not sorted by time", sortMachineSetsByCreationTimeAscendingTableInput{
-			input: []machinev1beta1.MachineSet{
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
-					WithCreationTimestamp(timeThird).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
-					WithCreationTimestamp(timeSecond).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
-					WithCreationTimestamp(timeFirst).Build(),
-			},
-			expected: []machinev1beta1.MachineSet{
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
-					WithCreationTimestamp(timeFirst).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
-					WithCreationTimestamp(timeSecond).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
-					WithCreationTimestamp(timeThird).Build(),
-			},
-		}),
-		Entry("when the time is the same, input is not sorted by name", sortMachineSetsByCreationTimeAscendingTableInput{
-			input: []machinev1beta1.MachineSet{
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
-					WithCreationTimestamp(timeFirst).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
-					WithCreationTimestamp(timeFirst).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
-					WithCreationTimestamp(timeFirst).Build(),
-			},
-			expected: []machinev1beta1.MachineSet{
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-1").
-					WithCreationTimestamp(timeFirst).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-3").
-					WithCreationTimestamp(timeFirst).Build(),
-				*machinev1beta1resourcebuilder.MachineSet().WithName("machine-6").
-					WithCreationTimestamp(timeFirst).Build(),
-			},
-		}),
-	)
-
-})
-
 var _ = Describe("sortMachineByCreationTimeDescending tests", func() {
 	type sortMachinesByCreationTimeDescendingTableInput struct {
 		input    []machinev1beta1.Machine
