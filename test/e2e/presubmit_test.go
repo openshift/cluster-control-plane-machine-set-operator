@@ -32,7 +32,7 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
 
-var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func() {
+var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Ordered, func() {
 	BeforeEach(func() {
 		helpers.EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 10*time.Minute, 10*time.Second)
 	}, OncePerOrdered)
@@ -202,7 +202,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 	Context("With an inactive ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			helpers.EnsureInactiveControlPlaneMachineSet(testFramework)
-		})
+		}, OncePerOrdered)
 
 		Context("and the ControlPlaneMachineSet is up to date", func() {
 			BeforeEach(func() {
