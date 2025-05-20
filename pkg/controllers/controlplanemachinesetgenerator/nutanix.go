@@ -35,8 +35,8 @@ import (
 var errInvalidFailureDomainName = errors.New("invalid failure domain name")
 
 // generateControlPlaneMachineSetNutanixSpec generates a Nutanix flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetNutanixSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet, infrastructure *configv1.Infrastructure) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, infrastructure)
+func generateControlPlaneMachineSetNutanixSpec(logger logr.Logger, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machines, infrastructure)
 	if err != nil {
 		if !errors.Is(err, errNoFailureDomains) {
 			return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's Nutanix failure domains: %w", err)
