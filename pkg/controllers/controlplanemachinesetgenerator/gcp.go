@@ -33,8 +33,8 @@ import (
 )
 
 // generateControlPlaneMachineSetGCPSpec generates an GCP flavored ControlPlaneMachineSet Spec.
-func generateControlPlaneMachineSetGCPSpec(logger logr.Logger, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machineSets, machines, nil)
+func generateControlPlaneMachineSetGCPSpec(logger logr.Logger, machines []machinev1beta1.Machine) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildFailureDomains(logger, machines, nil)
 	if errors.Is(err, errNoFailureDomains) {
 		// This is a special case where we don't have any failure domains.
 	} else if err != nil {

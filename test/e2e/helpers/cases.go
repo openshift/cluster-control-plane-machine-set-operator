@@ -283,7 +283,9 @@ func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework framewor
 
 		desiredReplicas := *cpms.Spec.Replicas
 
-		Expect(cpms).To(SatisfyAll(
+		// After CPMS deletion and recreation, the controller needs time to rediscover
+		// the control plane machines and update the status fields.
+		Eventually(komega.Object(cpms)).Should(SatisfyAll(
 			HaveField("Status.Replicas", Equal(desiredReplicas)),
 			HaveField("Status.UpdatedReplicas", Equal(desiredReplicas)),
 			HaveField("Status.ReadyReplicas", Equal(desiredReplicas)),
