@@ -153,7 +153,7 @@ func (r *integrationMachineManager) Reconcile(ctx context.Context, req reconcile
 }
 
 // addFinalizer sets the finalizer on the machine.
-func (r *integrationMachineManager) addFinalizer(ctx context.Context, logger logr.Logger, req reconcile.Request, machine *machinev1beta1.Machine) (reconcile.Result, error) {
+func (r *integrationMachineManager) addFinalizer(ctx context.Context, logger logr.Logger, req reconcile.Request, machine *machinev1beta1.Machine) (reconcile.Result, error) { //nolint:unparam
 	machine.SetFinalizers([]string{machineFinalizer})
 
 	logger.Info("Adding Finalizer")

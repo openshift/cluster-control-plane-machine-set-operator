@@ -270,7 +270,7 @@ func WaitForControlPlaneMachineSetRemovedOrRecreated(ctx context.Context, testFr
 	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
 	k8sClient := testFramework.GetClient()
 
-	if ok := Eventually(func() error {
+	if ok := Eventually(func() error { //nolint:contextcheck
 		newCPMS := &machinev1.ControlPlaneMachineSet{}
 		if err := k8sClient.Get(testFramework.GetContext(), testFramework.ControlPlaneMachineSetKey(), newCPMS); err != nil {
 			return fmt.Errorf("error getting control plane machine set: %w", err)
