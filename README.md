@@ -22,7 +22,7 @@ based on the update strategy.
 
 There are two update strategies supported by the ControlPlaneMachineSet, these are `RollingUpdate` and `OnDelete`.
 The `RollingUpdate` strategy is an automatic rolling update similar to that of a Deployment within Kubernetes.
-This option is suitable for most deployments of the ControlPlaneMachineSet.
+This option is suitable for most deployments of the ControlPlaneMachineSet. 
 
 The alternative, `OnDelete` is a semi-automated replacement which requires Admin intervention to trigger the replacement
 of each Machine. When a Control Plane Machine is deleted by the Admin, the ControlPlaneMachineSet will then replace it
