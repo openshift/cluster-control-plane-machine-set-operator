@@ -826,7 +826,9 @@ var _ = Describe("Webhooks", Ordered, func() {
 			It("with no machine template", func() {
 				cpms := builder.WithMachineTemplateBuilder(nil).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("spec.template.machineType: Required value")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring(
+					"ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: [spec.template.machineType: Unsupported value: \"\": supported values: \"machines_v1beta1_machine_openshift_io\", <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]",
+				)))
 			})
 
 			It("with no machine template value", func() {

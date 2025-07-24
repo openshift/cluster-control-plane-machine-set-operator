@@ -98,7 +98,7 @@ func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredoma
 
 	// Create a base mapping which account for the larger of the number of machines or
 	// the desired replica count.
-	if replicas > int32(machineIndexCount) {
+	if replicas > int32(machineIndexCount) { //nolint:gosec
 		machineIndexCount = int(replicas)
 	}
 
@@ -121,8 +121,8 @@ func createBaseFailureDomainMapping(replicas int32, failureDomains []failuredoma
 		return machineFailureDomains.Has(comparableFailureDomains[i]) && !machineFailureDomains.Has(comparableFailureDomains[j])
 	})
 
-	for i := int32(0); i < int32(machineIndexCount); i++ {
-		out[i] = comparableFailureDomains[i%int32(len(comparableFailureDomains))]
+	for i := int32(0); i < int32(machineIndexCount); i++ { //nolint:gosec
+		out[i] = comparableFailureDomains[i%int32(len(comparableFailureDomains))] //nolint:gosec
 	}
 
 	return out, nil
@@ -167,8 +167,8 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machin
 			continue
 		}
 
-		if fd, ok := out[int32(machineNameIndex)]; ok && fd.String() != failureDomain.String() {
-			oldMachine := indexToMachine[int32(machineNameIndex)]
+		if fd, ok := out[int32(machineNameIndex)]; ok && fd.String() != failureDomain.String() { //nolint:gosec
+			oldMachine := indexToMachine[int32(machineNameIndex)] //nolint:gosec
 
 			if oldMachine.CreationTimestamp.After(machine.CreationTimestamp.Time) {
 				continue
@@ -188,9 +188,9 @@ func mapIndexesToFailureDomainsForMachines(logger logr.Logger, machines []machin
 			)
 		}
 
-		out[int32(machineNameIndex)] = failureDomain
+		out[int32(machineNameIndex)] = failureDomain //nolint:gosec
 
-		indexToMachine[int32(machineNameIndex)] = machine
+		indexToMachine[int32(machineNameIndex)] = machine //nolint:gosec
 	}
 
 	return out, nil
@@ -209,7 +209,7 @@ func listDeletingIndexes(machines []machinev1beta1.Machine) sets.Set[int32] {
 				continue
 			}
 
-			indexes.Insert(int32(index))
+			indexes.Insert(int32(index)) //nolint:gosec
 		}
 	}
 
@@ -221,7 +221,7 @@ func listDeletingIndexes(machines []machinev1beta1.Machine) sets.Set[int32] {
 				continue
 			}
 
-			indexes.Delete(int32(index))
+			indexes.Delete(int32(index)) //nolint:gosec
 		}
 	}
 

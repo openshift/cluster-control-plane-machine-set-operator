@@ -218,7 +218,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 
 // generateControlPlaneMachineSet generates a control plane machine set based on the current cluster state.
 //
-//nolint:cyclop,funlen
+//nolint:cyclop
 func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineSet(logger logr.Logger, infrastructure *configv1.Infrastructure, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (*machinev1.ControlPlaneMachineSet, error) {
 	var (
 		cpmsSpecApplyConfig machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration

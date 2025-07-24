@@ -23,7 +23,6 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - forcetypeassert
     - funlen
     - gochecknoglobals

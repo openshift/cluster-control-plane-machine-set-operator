@@ -85,8 +85,7 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	// Tweak the warnings behaviour at a config level.
-	cfg.WarningHandler = logf.NewKubeAPIWarningLogger(
-		logf.Log.WithName("KubeAPIWarningLogger"),
+	cfg.WarningHandlerWithContext = logf.NewKubeAPIWarningLogger(
 		logf.KubeAPIWarningLoggerOptions{
 			Deduplicate: false,
 		},

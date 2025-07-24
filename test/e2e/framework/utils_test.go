@@ -35,7 +35,7 @@ var _ = Describe("Async utils", func() {
 
 			errs := []error{}
 			fail := func(message string, callerSkip ...int) {
-				errs = append(errs, fmt.Errorf(message)) //nolint:err113
+				errs = append(errs, fmt.Errorf("%s", message)) //nolint:err113
 			}
 
 			// Register a temporary fail handler so we can check what failures occur
@@ -67,7 +67,7 @@ var _ = Describe("Async utils", func() {
 
 			errs := []error{}
 			fail := func(message string, callerSkip ...int) {
-				errs = append(errs, fmt.Errorf(message)) //nolint:err113
+				errs = append(errs, fmt.Errorf("%s", message)) //nolint:err113
 			}
 
 			// Register a temporary fail handler so we can check what failures occur
@@ -104,7 +104,7 @@ var _ = Describe("Async utils", func() {
 
 			errs := []error{}
 			fail := func(message string, callerSkip ...int) {
-				errs = append(errs, fmt.Errorf(message)) //nolint:err113
+				errs = append(errs, fmt.Errorf("%s", message)) //nolint:err113
 			}
 
 			// Register a temporary fail handler so we can check what failures occur
@@ -142,7 +142,7 @@ var _ = Describe("Async utils", func() {
 
 			errs := []error{}
 			fail := func(message string, callerSkip ...int) {
-				errs = append(errs, fmt.Errorf(message)) //nolint:err113
+				errs = append(errs, fmt.Errorf("%s", message)) //nolint:err113
 			}
 
 			// Register a temporary fail handler so we can check what failures occur
