@@ -177,6 +177,11 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 		return warnings, errObjNotCPMS
 	}
 
+	// This prevents a race condition between an actor intending to activate outdated CPMS and controlplanemachinesetgenerator deleting the CPMS.
+	if cpms.DeletionTimestamp != nil && oldCpms.Spec.State != machinev1.ControlPlaneMachineSetStateActive && cpms.Spec.State == machinev1.ControlPlaneMachineSetStateActive {
+		return warnings, field.Forbidden(field.NewPath("spec", "state"), "control plane machine set with deletion timestamp cannot be activated")
+	}
+
 	if !shouldValidateSpecUpdate(oldCpms, cpms) {
 		return warnings, nil
 	}
