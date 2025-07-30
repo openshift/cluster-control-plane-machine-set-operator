@@ -32,22 +32,22 @@ import (
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/helpers"
 )
 
-var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func() {
+var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label("Disruptive"), Label("Serial"), func() {
 	BeforeEach(func() {
 		helpers.EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 10*time.Minute, 10*time.Second)
 	}, OncePerOrdered)
 
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
-			helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+			helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
 		}, OncePerOrdered)
 
 		Context("and the provider spec of index 1 is not as expected", func() {
 			BeforeEach(func() {
-				helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+				helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 			})
 
-			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
 		})
 
 		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", func() {
@@ -57,7 +57,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			BeforeEach(func() {
 				// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
 				// The TechPreview jobs should not skip the test.
-				featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), testFramework)
+				featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), framework.GlobalFramework)
 				if err != nil {
 					Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
 				}
@@ -65,25 +65,25 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 					Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
 				}
 
-				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
+				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(framework.GlobalFramework, prefix)
 			}, OncePerOrdered)
 
 			Context("and the provider spec of index 1 is not as expected", Ordered, func() {
 				BeforeAll(func() {
-					helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+					helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 				})
 
 				// Machine name should follow prefixed naming convention
-				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
 
 				Context("and again MachineNamePrefix is reset", Ordered, func() {
 					BeforeAll(func() {
-						helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
-						helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+						helpers.UpdateControlPlaneMachineSetMachineNamePrefix(framework.GlobalFramework, resetPrefix)
+						helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 					})
 
 					// Machine name should follow general naming convention
-					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework, 1)
+					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
 				})
 			})
 		})
@@ -92,27 +92,27 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			var originalStrategy machinev1.ControlPlaneMachineSetStrategyType
 
 			BeforeEach(func() {
-				originalStrategy = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
+				originalStrategy = helpers.EnsureControlPlaneMachineSetUpdateStrategy(framework.GlobalFramework, machinev1.OnDelete)
 			}, OncePerOrdered)
 
 			AfterEach(func() {
-				helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
+				helpers.EnsureControlPlaneMachineSetUpdateStrategy(framework.GlobalFramework, originalStrategy)
 			}, OncePerOrdered)
 
 			Context("and the provider spec of index 2 is not as expected", Ordered, func() {
 				var originalProviderSpec machinev1beta1.ProviderSpec
 
 				BeforeAll(func() {
-					originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 2)
+					originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 2)
 				})
 
 				AfterAll(func() {
-					helpers.UpdateControlPlaneMachineProviderSpec(testFramework, 2, originalProviderSpec)
+					helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 2, originalProviderSpec)
 				})
 
-				helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 2)
+				helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 2)
 
-				helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 2)
+				helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 2)
 			})
 
 			Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", Ordered, func() {
@@ -122,7 +122,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 				BeforeEach(func() {
 					// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
 					// The TechPreview jobs should not skip the test.
-					featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), testFramework)
+					featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), framework.GlobalFramework)
 					if err != nil {
 						Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
 					}
@@ -130,35 +130,35 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 						Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
 					}
 
-					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix)
+					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(framework.GlobalFramework, prefix)
 				}, OncePerOrdered)
 
 				Context("and the provider spec of index 1 is not as expected", Ordered, func() {
 					var originalProviderSpec machinev1beta1.ProviderSpec
 
 					BeforeAll(func() {
-						originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+						originalProviderSpec, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 					})
 
 					AfterAll(func() {
-						helpers.UpdateControlPlaneMachineProviderSpec(testFramework, 1, originalProviderSpec)
+						helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 1, originalProviderSpec)
 					})
 
-					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 1)
+					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
 
 					// Machine name should follow prefixed naming convention
-					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 1)
+					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 1)
 
 					Context("and again MachineNamePrefix is reset", Ordered, func() {
 						BeforeAll(func() {
-							helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, resetPrefix)
-							helpers.ModifyMachineProviderSpecToTriggerRollout(testFramework, 1)
+							helpers.UpdateControlPlaneMachineSetMachineNamePrefix(framework.GlobalFramework, resetPrefix)
+							helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 						})
 
-						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework, 1)
+						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
 
 						// Machine name should follow general naming convention
-						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework, 1)
+						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 1)
 					})
 				})
 			})
@@ -166,29 +166,29 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 
 		Context("and the ControlPlaneMachineSet is up to date", Ordered, func() {
 			BeforeEach(func() {
-				helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
+				helpers.EnsureControlPlaneMachineSetUpdated(framework.GlobalFramework)
 			})
 
 			Context("and the ControlPlaneMachineSet is deleted", func() {
 				BeforeEach(func() {
-					helpers.EnsureControlPlaneMachineSetDeleted(testFramework)
+					helpers.EnsureControlPlaneMachineSetDeleted(framework.GlobalFramework)
 				})
 
 				AfterEach(func() {
-					helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+					helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
 				})
 
-				helpers.ItShouldUninstallTheControlPlaneMachineSet(testFramework)
-				helpers.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework)
+				helpers.ItShouldUninstallTheControlPlaneMachineSet(framework.GlobalFramework)
+				helpers.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(framework.GlobalFramework)
 
 				Context("and the ControlPlaneMachineSet is reactivated", func() {
 					BeforeEach(func() {
-						helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
-						helpers.EnsureActiveControlPlaneMachineSet(testFramework)
+						helpers.EnsureControlPlaneMachineSetUpdated(framework.GlobalFramework)
+						helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
 					})
 
-					helpers.ItShouldNotCauseARollout(testFramework)
-					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramework)
+					helpers.ItShouldNotCauseARollout(framework.GlobalFramework)
+					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(framework.GlobalFramework)
 				})
 			})
 		})
@@ -197,49 +197,49 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), func(
 			var originalProviderSpec machinev1beta1.ProviderSpec
 			BeforeEach(func() {
 				// There is no defaulting webhook for the machines running on the following platforms.
-				switch testFramework.GetPlatformType() {
+				switch framework.GlobalFramework.GetPlatformType() {
 				case configv1.OpenStackPlatformType:
 					Skip("Skipping test on OpenStack platform")
 				}
 
-				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
-				originalProviderSpec = helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(testFramework)
+				_ = helpers.EnsureControlPlaneMachineSetUpdateStrategy(framework.GlobalFramework, machinev1.RollingUpdate)
+				originalProviderSpec = helpers.UpdateDefaultedValueFromControlPlaneMachineSetProviderConfig(framework.GlobalFramework)
 			})
 
 			AfterEach(func() {
-				helpers.EnsureActiveControlPlaneMachineSet(testFramework)
-				helpers.UpdateControlPlaneMachineSetProviderSpec(testFramework, originalProviderSpec)
+				helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
+				helpers.UpdateControlPlaneMachineSetProviderSpec(framework.GlobalFramework, originalProviderSpec)
 			})
 
-			helpers.ItShouldNotCauseARollout(testFramework)
+			helpers.ItShouldNotCauseARollout(framework.GlobalFramework)
 		})
 	})
 
 	Context("With an inactive ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
-			helpers.EnsureInactiveControlPlaneMachineSet(testFramework)
+			helpers.EnsureInactiveControlPlaneMachineSet(framework.GlobalFramework)
 		})
 
 		Context("and the ControlPlaneMachineSet is up to date", func() {
 			BeforeEach(func() {
-				helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
+				helpers.EnsureControlPlaneMachineSetUpdated(framework.GlobalFramework)
 			})
 
 			AfterEach(func() {
-				helpers.EnsureControlPlaneMachineSetUpdated(testFramework)
+				helpers.EnsureControlPlaneMachineSetUpdated(framework.GlobalFramework)
 			})
 
 			Context("and there is diff in the providerSpec of the newest, alphabetically last machine", func() {
 				var opts helpers.ControlPlaneMachineSetRegenerationTestOptions
 
 				BeforeEach(func() {
-					opts.TestFramework = testFramework
-					opts.UID = helpers.GetControlPlaneMachineSetUID(testFramework)
-					opts.Index, opts.OriginalProviderSpec, opts.UpdatedProviderSpec = helpers.ModifyNewestMachineProviderSpecToTriggerRollout(testFramework)
+					opts.TestFramework = framework.GlobalFramework
+					opts.UID = helpers.GetControlPlaneMachineSetUID(framework.GlobalFramework)
+					opts.Index, opts.OriginalProviderSpec, opts.UpdatedProviderSpec = helpers.ModifyNewestMachineProviderSpecToTriggerRollout(framework.GlobalFramework)
 				})
 
 				AfterEach(func() {
-					helpers.UpdateControlPlaneMachineProviderSpec(testFramework, opts.Index, opts.OriginalProviderSpec)
+					helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, opts.Index, opts.OriginalProviderSpec)
 				})
 
 				helpers.ItShouldPerformControlPlaneMachineSetRegeneration(&opts)

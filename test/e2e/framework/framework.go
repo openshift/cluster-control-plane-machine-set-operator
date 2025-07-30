@@ -130,34 +130,40 @@ type framework struct {
 
 var _ Framework = &framework{}
 
-// NewFramework initialises a new test framework for the E2E suite.
-func NewFramework() (Framework, error) {
+// GlobalFramework is a global variable to share state across e2e tests.
+var GlobalFramework Framework
+
+// InitFramework initialises a new test framework for the E2E suite.
+func InitFramework() error {
 	sch, err := loadScheme()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	client, err := loadClient(sch)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	supportLevel, platform, err := getPlatformSupportLevel(client)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	logger := textlogger.NewLogger(textlogger.NewConfig())
 	ctrl.SetLogger(logger)
 
-	return &framework{
+	fw := &framework{
 		client:       client,
 		logger:       logger,
 		platform:     platform,
 		supportLevel: supportLevel,
 		scheme:       sch,
 		namespace:    MachineAPINamespace,
-	}, nil
+	}
+	GlobalFramework = fw
+
+	return nil
 }
 
 // NewFrameworkWith initialises a new test framework for the E2E suite
@@ -787,7 +793,7 @@ func nextGCPMachineSize(current string) (string, error) {
 // setNextGCPMachineSize returns the new GCP machine size in the series
 // according to the family supported (e2, n1, n2).
 //
-//nolint:cyclop,funlen,gocognit,gocyclo
+//nolint:cyclop,funlen,gocognit
 func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, multiplier float64, multiplier2 int) (string, error) {
 	switch {
 	case strings.HasPrefix(subfamily, "custom"):
