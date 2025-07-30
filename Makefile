@@ -109,8 +109,13 @@ verify-%: ## Ensure no diff after running some other target
 ##@ Build
 
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
+build: operator tests-ext  ## Build all binaries
+
+operator:  ## Build main operator binary
 	go build -o bin/manager ./cmd/control-plane-machine-set-operator
+
+tests-ext:  ## Build tests extension binary
+	go build -o bin/control-plane-machine-set-tests-ext ./cmd/control-plane-machine-set-tests-ext
 
 .PHONY: images
 images: ## Create images
