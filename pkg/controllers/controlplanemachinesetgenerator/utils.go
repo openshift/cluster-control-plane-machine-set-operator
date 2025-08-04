@@ -121,6 +121,10 @@ func compareControlPlaneMachineSets(logger logr.Logger, a, b *machinev1.ControlP
 	bCopy := b.DeepCopy()
 	bCopy.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = nil
 
+	// Remove the AuthoritativeAPI from the comparison. It should not trigger a cpms update.
+	aCopy.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.AuthoritativeAPI = ""
+	bCopy.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.AuthoritativeAPI = ""
+
 	cpmsSpecDiff := deep.Equal(aCopy.Spec, bCopy.Spec)
 
 	// Combine the two diffs found.
