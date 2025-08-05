@@ -384,6 +384,19 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 		return &[]machinev1beta1.Machine{*machine0, *machine1, *machine2}
 	}
 
+	create3CPMachinesWithVaryingAuthoritativeAPI := func() *[]machinev1beta1.Machine {
+		machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+		machine0 = machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilderAWS).WithName("master-0").WithAuthoritativeAPI(machinev1beta1.MachineAuthorityMachineAPI).Build()
+		machine1 = machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilderAWS).WithName("master-1").WithAuthoritativeAPI(machinev1beta1.MachineAuthorityClusterAPI).Build()
+		machine2 = machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilderAWS).WithName("master-2").WithAuthoritativeAPI(machinev1beta1.MachineAuthorityClusterAPI).Build()
+
+		Expect(k8sClient.Create(ctx, machine0)).To(Succeed())
+		Expect(k8sClient.Create(ctx, machine1)).To(Succeed())
+		Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
+
+		return &[]machinev1beta1.Machine{*machine0, *machine1, *machine2}
+	}
+
 	createUsEast1dMachine := func() *machinev1beta1.Machine {
 		machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 		machine := machineBuilder.WithProviderSpecBuilder(usEast1dProviderSpecBuilderAWS.WithInstanceType("c5.xlarge")).WithName("master-3").Build()
@@ -502,6 +515,9 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 					awsMachineProviderConfig.Subnet = machinev1beta1.AWSResourceReference{}
 					awsMachineProviderConfig.Placement.AvailabilityZone = ""
 
+					// The ControlPlaneMachineSet should have the AuthoritativeAPI defaulted to MachineAPI.
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.AuthoritativeAPI).To(Equal(machinev1beta1.MachineAuthorityMachineAPI))
+
 					Expect(cpmsProviderSpec.AWS().Config()).To(Equal(awsMachineProviderConfig))
 				})
 
@@ -517,6 +533,25 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 
 						Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains).To(HaveValue(Equal(cpms5FailureDomainsBuilderAWS.BuildFailureDomains())))
 					})
+				})
+			})
+
+			Context("with 3 existing control plane machines with varying AuthoritativeAPI values", func() {
+				BeforeEach(func() {
+					By("Creating Control Plane Machines")
+					create3CPMachinesWithVaryingAuthoritativeAPI()
+				})
+
+				It("should create stable ControlPlaneMachineSet with the AuthoritativeAPI defaulted to MachineAPI", func() {
+					By("Checking the Control Plane Machine Set has been created")
+					Eventually(komega.Get(cpms)).Should(Succeed())
+
+					By("Checking the Control Plane Machine Set has the AuthoritativeAPI defaulted to MachineAPI")
+					Expect(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.AuthoritativeAPI).To(Equal(machinev1beta1.MachineAuthorityMachineAPI))
+
+					By("Checking the Control Plane Machine Set is stable")
+					cpmsUID := cpms.UID
+					Consistently(komega.Object(cpms)).Should(And(HaveField("UID", cpmsUID), HaveField("DeletionTimestamp", BeNil())))
 				})
 			})
 		})

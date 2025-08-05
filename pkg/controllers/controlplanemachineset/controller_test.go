@@ -311,6 +311,52 @@ var _ = Describe("With a running controller", func() {
 			})
 		})
 
+		Context("with updated and running machines with varying AuthoritativeAPI", func() {
+			BeforeEach(func() {
+				By("Creating Machines owned by the ControlPlaneMachineSet")
+				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithGenerateName("state-test-").WithNamespace(namespaceName)
+
+				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder).WithAuthoritativeAPI(machinev1beta1.MachineAuthorityMachineAPI),
+					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder).WithAuthoritativeAPI(machinev1beta1.MachineAuthorityClusterAPI),
+					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder).WithAuthoritativeAPI(machinev1beta1.MachineAuthorityClusterAPI),
+				}
+
+				for i := range machines {
+					nodeName := fmt.Sprintf("node-%d", i)
+					machineName := fmt.Sprintf("master-%d", i)
+
+					machine := machines[i].WithName(machineName).Build()
+
+					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
+
+					Eventually(komega.UpdateStatus(machine, func() {
+						machine.Status.Phase = &running
+						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
+					})).Should(Succeed())
+				}
+			})
+
+			It("should update the status and not replace machines", func() {
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+					HaveField("ObservedGeneration", Equal(int64(1))),
+					HaveField("Replicas", Equal(int32(3))),
+					HaveField("ReadyReplicas", Equal(int32(3))),
+					HaveField("UpdatedReplicas", Equal(int32(3))),
+					HaveField("UnavailableReplicas", Equal(int32(0))),
+				)))
+
+				machineList := &machinev1beta1.MachineList{}
+				Expect(k8sClient.List(ctx, machineList, client.InNamespace(namespaceName))).To(Succeed())
+				Expect(machineList.Items).To(HaveLen(3), "should not create replacement machines")
+			})
+
+			It("should add an owner reference to each machine", func() {
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", Not(ContainElement(HaveField("ObjectMeta.OwnerReferences", BeEmpty())))), "No machine should not have an owner reference")
+			})
+		})
+
 		Context("with machines indexed 0, 1, 2", func() {
 			BeforeEach(func() {
 				By("Creating Machines owned by the ControlPlaneMachineSet")
