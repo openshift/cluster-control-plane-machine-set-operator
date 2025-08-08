@@ -20,6 +20,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -89,6 +90,10 @@ var _ = BeforeSuite(func() {
 
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
+
+	// Increase default values for Consistently to ensure there is enough time for reconciliation of objects
+	SetDefaultConsistentlyDuration(500 * time.Millisecond)
+	SetDefaultConsistentlyPollingInterval(50 * time.Millisecond)
 })
 
 var _ = AfterSuite(func() {

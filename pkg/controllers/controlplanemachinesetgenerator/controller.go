@@ -160,8 +160,6 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) Reconcile(ctx context.Contex
 //
 // The cyclomatic complexity on this function is just above the allowed limit, we don't want to shake up the logic
 // and would like to keep it this way.
-//
-//nolint:cyclop
 func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Context, logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet) (ctrl.Result, error) {
 	machines, err := r.getControlPlaneMachines(ctx)
 	if err != nil {
@@ -172,18 +170,13 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 		return reconcile.Result{}, nil
 	}
 
-	machineSets, err := r.getMachineSets(ctx)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to get machinesets: %w", err)
-	}
-
 	infrastructure, err := util.GetInfrastructure(ctx, r.Client)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to get infrastructure object: %w", err)
 	}
 
 	// generate an up to date ControlPlaneMachineSet based on the current cluster state.
-	generatedCPMS, err := r.generateControlPlaneMachineSet(logger, infrastructure, machines, machineSets)
+	generatedCPMS, err := r.generateControlPlaneMachineSet(logger, infrastructure, machines)
 	if errors.Is(err, errUnsupportedPlatform) {
 		// Do not requeue if the platform is not supported.
 		// Nothing to do in this case.
@@ -219,7 +212,7 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) reconcile(ctx context.Contex
 // generateControlPlaneMachineSet generates a control plane machine set based on the current cluster state.
 //
 //nolint:cyclop
-func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineSet(logger logr.Logger, infrastructure *configv1.Infrastructure, machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (*machinev1.ControlPlaneMachineSet, error) {
+func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineSet(logger logr.Logger, infrastructure *configv1.Infrastructure, machines []machinev1beta1.Machine) (*machinev1.ControlPlaneMachineSet, error) {
 	var (
 		cpmsSpecApplyConfig machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration
 		err                 error
@@ -229,32 +222,32 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 
 	switch platformType {
 	case configv1.AWSPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAWSSpec(logger, machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAWSSpec(logger, machines)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.AzurePlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAzureSpec(logger, machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetAzureSpec(logger, machines)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.GCPPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetGCPSpec(logger, machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetGCPSpec(logger, machines)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.NutanixPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(logger, machines, machineSets, infrastructure)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetNutanixSpec(logger, machines, infrastructure)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.OpenStackPlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetOpenStackSpec(logger, machines, machineSets)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetOpenStackSpec(logger, machines)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
 	case configv1.VSpherePlatformType:
-		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetVSphereSpec(logger, machines, machineSets, infrastructure)
+		cpmsSpecApplyConfig, err = generateControlPlaneMachineSetVSphereSpec(logger, machines, infrastructure)
 		if err != nil {
 			return nil, fmt.Errorf("unable to generate control plane machine set spec: %w", err)
 		}
@@ -342,16 +335,6 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) getControlPlaneMachines(ctx 
 	machines := mergeMachineSlices(machinesLabeledMaster.Items, machinesLabeledControlPlane.Items)
 
 	return sortMachinesByCreationTimeDescending(machines), nil
-}
-
-// getMachineSets returns a sorted slice of MachineSets.
-func (r *ControlPlaneMachineSetGeneratorReconciler) getMachineSets(ctx context.Context) ([]machinev1beta1.MachineSet, error) {
-	machineSets := &machinev1beta1.MachineSetList{}
-	if err := r.List(ctx, machineSets, client.InNamespace(r.Namespace)); err != nil {
-		return nil, fmt.Errorf("unable to list control plane machines: %w", err)
-	}
-
-	return sortMachineSetsByCreationTimeAscending(machineSets.Items), nil
 }
 
 // isSupportedControlPlaneMachinesNumber checks if the number of control plane machines in the cluster is supported by the ControlPlaneMachineSet.

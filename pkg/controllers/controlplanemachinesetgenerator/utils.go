@@ -51,20 +51,6 @@ func sortMachinesByCreationTimeDescending(machines []machinev1beta1.Machine) []m
 	return machines
 }
 
-// sortMachineSetsByCreationTimeAscending sorts a slice of MachineSets by CreationTime, Name (ascending).
-func sortMachineSetsByCreationTimeAscending(machineSets []machinev1beta1.MachineSet) []machinev1beta1.MachineSet {
-	sort.Slice(machineSets, func(i, j int) bool {
-		first, second := machineSets[i].CreationTimestamp, machineSets[j].CreationTimestamp
-		if first != second {
-			return !second.Before(&first)
-		}
-
-		return machineSets[i].Name < machineSets[j].Name
-	})
-
-	return machineSets
-}
-
 // genericControlPlaneMachineSetSpec returns a generic ControlPlaneMachineSet spec, without provider specific details.
 //
 //nolint:unparam
@@ -213,35 +199,20 @@ func buildPlatformFailureDomains(logger logr.Logger, platformType configv1.Platf
 }
 
 // buildFailureDomains builds a flavored FailureDomain for the ControlPlaneMachineSet according to what platform we are on.
-func buildFailureDomains(logger logr.Logger, machineSets []machinev1beta1.MachineSet, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
+func buildFailureDomains(logger logr.Logger, machines []machinev1beta1.Machine, infrastructure *configv1.Infrastructure) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
 	// Fetch failure domains from the machines
 	machineFailureDomains, err := providerconfig.ExtractFailureDomainsFromMachines(logger, machines, infrastructure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract failure domains from machines: %w", err)
 	}
 
-	var machineSetFailureDomains []failuredomain.FailureDomain
-
-	platformType := machineFailureDomains[0].Type()
-
-	switch platformType {
-	case configv1.AzurePlatformType, configv1.NutanixPlatformType, configv1.VSpherePlatformType:
-		// On some platforms, failure domains from machineSets are not suitable for control plane machines.
-	default:
-		// Fetch failure domains from the machineSets
-		machineSetFailureDomains, err = providerconfig.ExtractFailureDomainsFromMachineSets(logger, machineSets, infrastructure)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract failure domains from machine sets: %w", err)
-		}
-	}
-
 	// We have to get rid of duplicates from the failure domains.
 	// We construct a set from the failure domains, since a set can't have duplicates.
 	failureDomains := failuredomain.NewSet(machineFailureDomains...)
-	// Construction of a union of failure domains of machines and machineSets.
-	failureDomains.Insert(machineSetFailureDomains...)
 
+	platformType := machineFailureDomains[0].Type()
 	cpmsFailureDomain, err := buildPlatformFailureDomains(logger, platformType, failureDomains, infrastructure)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to build platform specific failure domains: %w", err)
 	}
