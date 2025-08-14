@@ -110,3 +110,11 @@ issues:
         - gosec
         - gochecknoglobals
         - goerr113
+    #  Exclude some linters from running within the 'test/e2e/' directory.
+    - path: test/e2e/.*
+      linters:
+        - gocyclo
+        - dupl 
+        - gosec
+        - gochecknoglobals
+        - goerr113
