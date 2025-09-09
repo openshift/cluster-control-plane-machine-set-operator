@@ -118,4 +118,34 @@ var _ = Describe("Azure Provider Config", func() {
 			Expect(providerConfig.Azure().Config()).To(Equal(expectedAzureConfig))
 		})
 	})
+
+	Context("Diff", func() {
+		type diffTableInput struct {
+			baseConfig    AzureProviderConfig
+			compareConfig machinev1beta1.AzureMachineProviderSpec
+			expectedDiff  []string
+		}
+
+		DescribeTable("should return correct diff", func(in diffTableInput) {
+			diff := in.baseConfig.Diff(in.compareConfig)
+
+			Expect(diff).To(Equal(in.expectedDiff))
+		},
+			Entry("with different images", diffTableInput{
+				baseConfig: AzureProviderConfig{
+					providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithImage(machinev1beta1.Image{Publisher: "RedHat", Offer: "RHEL", SKU: "8-LVM", Version: "8.4.2021040911"}).Build(),
+				},
+				compareConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithImage(machinev1beta1.Image{Publisher: "RedHat", Offer: "RHEL", SKU: "8-LVM", Version: "8.5.2021111016"}).Build(),
+				// expectedDiff is nil because Image fields are ignored in diff comparison
+				expectedDiff: nil,
+			}),
+			Entry("with different VM sizes", diffTableInput{
+				baseConfig: AzureProviderConfig{
+					providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v4").Build(),
+				},
+				compareConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v3").Build(),
+				expectedDiff:  []string{"VMSize: Standard_D8s_v4 != Standard_D8s_v3"},
+			}),
+		)
+	})
 })
