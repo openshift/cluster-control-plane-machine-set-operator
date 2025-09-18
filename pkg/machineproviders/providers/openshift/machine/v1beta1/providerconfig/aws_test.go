@@ -246,4 +246,34 @@ var _ = Describe("AWS Provider Config", func() {
 		)
 
 	})
+
+	Context("Diff", func() {
+		type diffTableInput struct {
+			baseConfig    AWSProviderConfig
+			compareConfig machinev1beta1.AWSMachineProviderConfig
+			expectedDiff  []string
+		}
+
+		DescribeTable("should return correct diff", func(in diffTableInput) {
+			diff := in.baseConfig.Diff(in.compareConfig)
+
+			Expect(diff).To(Equal(in.expectedDiff))
+		},
+			Entry("with different AWS AMIs", diffTableInput{
+				baseConfig: AWSProviderConfig{
+					providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAMI(machinev1beta1.AWSResourceReference{ID: stringPtr("ami-12345678")}).Build(),
+				},
+				compareConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAMI(machinev1beta1.AWSResourceReference{ID: stringPtr("ami-87654321")}).Build(),
+				// expectedDiff is nil because AMI fields are ignored in diff comparison
+				expectedDiff: nil,
+			}),
+			Entry("with different AWS instance types", diffTableInput{
+				baseConfig: AWSProviderConfig{
+					providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.large").Build(),
+				},
+				compareConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.xlarge").Build(),
+				expectedDiff:  []string{"InstanceType: m5.large != m5.xlarge"},
+			}),
+		)
+	})
 })

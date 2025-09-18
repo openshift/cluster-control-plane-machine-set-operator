@@ -234,11 +234,11 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 
 	switch p.platformType {
 	case configv1.AWSPlatformType:
-		return deep.Equal(p.aws.providerConfig, other.AWS().providerConfig), nil
+		return p.aws.Diff(other.AWS().providerConfig), nil
 	case configv1.AzurePlatformType:
-		return deep.Equal(p.azure.providerConfig, other.Azure().providerConfig), nil
+		return p.azure.Diff(other.Azure().providerConfig), nil
 	case configv1.GCPPlatformType:
-		return deep.Equal(p.gcp.providerConfig, other.GCP().providerConfig), nil
+		return p.gcp.Diff(other.GCP().providerConfig), nil
 	case configv1.NutanixPlatformType:
 		return deep.Equal(p.nutanix.providerConfig, other.Nutanix().providerConfig), nil
 	case configv1.OpenStackPlatformType:

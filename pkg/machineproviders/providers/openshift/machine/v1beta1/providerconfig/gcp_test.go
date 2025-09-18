@@ -110,4 +110,67 @@ var _ = Describe("GCP Provider Config", func() {
 			Expect(providerConfig.GCP().Config()).To(Equal(expectedGCPConfig))
 		})
 	})
+
+	Context("Diff", func() {
+		type diffTableInput struct {
+			baseConfig    GCPProviderConfig
+			compareConfig machinev1beta1.GCPMachineProviderSpec
+			expectedDiff  []string
+		}
+
+		DescribeTable("should return correct diff", func(in diffTableInput) {
+			diff := in.baseConfig.Diff(in.compareConfig)
+
+			Expect(diff).To(Equal(in.expectedDiff))
+		},
+			Entry("with different GCP disks.images values", diffTableInput{
+				baseConfig: GCPProviderConfig{
+					providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+						{
+							AutoDelete: true,
+							Boot:       true,
+							SizeGB:     100,
+							Type:       "pd-standard",
+							Image:      "projects/rhcos-cloud/global/images/rhcos-416-92-202301311551-0-gcp-x86-64",
+						},
+					}).Build(),
+				},
+				compareConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+					{
+						AutoDelete: true,
+						Boot:       true,
+						SizeGB:     100,
+						Type:       "pd-standard",
+						Image:      "projects/rhcos-cloud/global/images/rhcos-417-92-202302090245-0-gcp-x86-64",
+					},
+				}).Build(),
+				// expectedDiff is nil because disk Image fields are ignored in diff comparison
+				expectedDiff: nil,
+			}),
+
+			Entry("with different GCP disks.SizeGB values", diffTableInput{
+				baseConfig: GCPProviderConfig{
+					providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+						{
+							AutoDelete: true,
+							Boot:       true,
+							SizeGB:     100,
+							Type:       "pd-standard",
+							Image:      "projects/rhcos-cloud/global/images/rhcos-417-92-202302090245-0-gcp-x86-64",
+						},
+					}).Build(),
+				},
+				compareConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+					{
+						AutoDelete: true,
+						Boot:       true,
+						SizeGB:     200,
+						Type:       "pd-standard",
+						Image:      "projects/rhcos-cloud/global/images/rhcos-417-92-202302090245-0-gcp-x86-64",
+					},
+				}).Build(),
+				expectedDiff: []string{"Disks.slice[0].SizeGB: 100 != 200"},
+			}),
+		)
+	})
 })

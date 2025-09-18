@@ -968,6 +968,232 @@ var _ = Describe("Provider Config", func() {
 		)
 	})
 
+	Context("Diff", func() {
+		type diffTableInput struct {
+			basePC        ProviderConfig
+			comparePC     ProviderConfig
+			expectedDiff  []string
+			expectedError error
+		}
+
+		DescribeTable("should return correct diff for provider configs", func(in diffTableInput) {
+			diff, err := in.basePC.Diff(in.comparePC)
+			if in.expectedError != nil {
+				Expect(err).To(MatchError(in.expectedError))
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(diff).To(Equal(in.expectedDiff))
+			}
+		},
+			Entry("with nil provider config", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.large").Build(),
+					},
+				},
+				comparePC: nil,
+			}),
+			Entry("with mismatched platform types", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.large").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v4").Build(),
+					},
+				},
+				expectedError: errMismatchedPlatformTypes,
+			}),
+			Entry("with identical AWS configs", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.large").WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.large").WithAvailabilityZone("us-east-1a").Build(),
+					},
+				},
+			}),
+			Entry("with different AWS instance types", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.large").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithInstanceType("m5.xlarge").Build(),
+					},
+				},
+				expectedDiff: []string{"InstanceType: m5.large != m5.xlarge"},
+			}),
+			Entry("with different AWS AMIs", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAMI(machinev1beta1.AWSResourceReference{ID: stringPtr("ami-12345678")}).Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AWSPlatformType,
+					aws: AWSProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AWSProviderSpec().WithAMI(machinev1beta1.AWSResourceReference{ID: stringPtr("ami-87654321")}).Build(),
+					},
+				},
+				// expectedDiff is nil because AMI fields are ignored in diff comparison
+				expectedDiff: nil,
+			}),
+			Entry("with identical Azure configs", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v4").WithZone("1").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v4").WithZone("1").Build(),
+					},
+				},
+			}),
+			Entry("with different Azure VM sizes", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v4").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithVMSize("Standard_D8s_v3").Build(),
+					},
+				},
+				expectedDiff: []string{"VMSize: Standard_D8s_v4 != Standard_D8s_v3"},
+			}),
+			Entry("with different Azure images", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithImage(machinev1beta1.Image{Publisher: "RedHat", Offer: "RHEL", SKU: "8-LVM", Version: "8.4.2021040911"}).Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.AzurePlatformType,
+					azure: AzureProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.AzureProviderSpec().WithImage(machinev1beta1.Image{Publisher: "RedHat", Offer: "RHEL", SKU: "8-LVM", Version: "8.5.2021111016"}).Build(),
+					},
+				},
+				// expectedDiff is nil because Image fields are ignored in diff comparison
+				expectedDiff: nil,
+			}),
+			Entry("with identical GCP configs", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithMachineType("n1-standard-4").WithZone("us-central1-a").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithMachineType("n1-standard-4").WithZone("us-central1-a").Build(),
+					},
+				},
+			}),
+			Entry("with different GCP machine types", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithMachineType("n1-standard-4").Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithMachineType("n1-standard-8").Build(),
+					},
+				},
+				expectedDiff: []string{"MachineType: n1-standard-4 != n1-standard-8"},
+			}),
+			Entry("with different GCP disk images", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+							{
+								AutoDelete: true,
+								Boot:       true,
+								SizeGB:     100,
+								Type:       "pd-standard",
+								Image:      "projects/rhcos-cloud/global/images/rhcos-416-92-202301311551-0-gcp-x86-64",
+							},
+						}).Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+							{
+								AutoDelete: true,
+								Boot:       true,
+								SizeGB:     100,
+								Type:       "pd-standard",
+								Image:      "projects/rhcos-cloud/global/images/rhcos-417-92-202302090245-0-gcp-x86-64",
+							},
+						}).Build(),
+					},
+				},
+				// expectedDiff is nil because disk Image fields are ignored in diff comparison
+				expectedDiff: nil,
+			}),
+			Entry("with different GCP disk sizes", diffTableInput{
+				basePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+							{
+								AutoDelete: true,
+								Boot:       true,
+								SizeGB:     100,
+								Type:       "pd-standard",
+								Image:      "projects/rhcos-cloud/global/images/rhcos-417-92-202302090245-0-gcp-x86-64",
+							},
+						}).Build(),
+					},
+				},
+				comparePC: &providerConfig{
+					platformType: configv1.GCPPlatformType,
+					gcp: GCPProviderConfig{
+						providerConfig: *machinev1beta1resourcebuilder.GCPProviderSpec().WithDisks([]*machinev1beta1.GCPDisk{
+							{
+								AutoDelete: true,
+								Boot:       true,
+								SizeGB:     200,
+								Type:       "pd-standard",
+								Image:      "projects/rhcos-cloud/global/images/rhcos-417-92-202302090245-0-gcp-x86-64",
+							},
+						}).Build(),
+					},
+				},
+				expectedDiff: []string{"Disks.slice[0].SizeGB: 100 != 200"},
+			}),
+		)
+	})
+
 	Context("RawConfig", func() {
 		type rawConfigTableInput struct {
 			providerConfig ProviderConfig
