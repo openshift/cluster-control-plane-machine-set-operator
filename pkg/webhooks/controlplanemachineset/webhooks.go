@@ -623,7 +623,7 @@ func checkOpenShiftProviderSpecFailureDomainMatchesMachines(logger logr.Logger, 
 
 	for _, failureDomain := range failureDomains {
 		if !templateProviderSpecFailureDomain.Equal(failureDomain) {
-			errs = append(errs, field.Invalid(parentPath, templateProviderSpecFailureDomain, "Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
+			errs = append(errs, field.Invalid(parentPath, templateProviderSpecFailureDomain.String(), "Failure domain extracted from machine template providerSpec does not match failure domain of all control plane machines"))
 		}
 	}
 
