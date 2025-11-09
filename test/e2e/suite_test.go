@@ -33,22 +33,17 @@ func TestE2E(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	// Set up the test framework.
-	var err error
-	testFramework, err = framework.NewFramework()
+	err := framework.InitFramework()
 	g.Expect(err).NotTo(HaveOccurred(), "failed to set up test framework")
 
 	RunSpecs(t, "E2E Suite")
 }
 
-var (
-	testFramework framework.Framework
-)
-
 var _ = BeforeSuite(func() {
-	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	Expect(framework.GlobalFramework).ToNot(BeNil(), "test framework should not be nil")
 
-	komega.SetClient(testFramework.GetClient())
-	komega.SetContext(testFramework.GetContext())
+	komega.SetClient(framework.GlobalFramework.GetClient())
+	komega.SetContext(framework.GlobalFramework.GetContext())
 
 	SetDefaultEventuallyTimeout(framework.DefaultTimeout)
 	SetDefaultEventuallyPollingInterval(framework.DefaultInterval)

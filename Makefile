@@ -109,8 +109,17 @@ verify-%: ## Ensure no diff after running some other target
 ##@ Build
 
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
+build: generate fmt vet operator tests-ext  ## Build all binaries
+
+operator:  ## Build main operator binary
 	go build -o bin/manager ./cmd/control-plane-machine-set-operator
+
+tests-ext:  ## Build tests extension binary
+	cd openshift-tests-extension && GOWORK=off go build -mod=mod -o ../bin/cluster-control-plane-machine-set-operator-ext ./cmd
+
+.PHONY: update-tests-ext-vendor
+update-tests-ext-vendor:  ## Update tests-ext vendor directory
+	cd openshift-tests-extension && go mod tidy && go mod vendor && go mod verify
 
 .PHONY: images
 images: ## Create images
