@@ -21,3 +21,12 @@ status:
   - group: machine.openshift.io
     name: ""
     resource: machines
+  - group: rbac.authorization.k8s.io
+    name: control-plane-machine-set-operator
+    resource: clusterroles
+  - group: rbac.authorization.k8s.io
+    name: control-plane-machine-set-operator
+    resource: clusterrolebindings
+  - group: admissionregistration.k8s.io
+    name: controlplanemachineset.machine.openshift.io
+    resource: validatingwebhookconfigurations
