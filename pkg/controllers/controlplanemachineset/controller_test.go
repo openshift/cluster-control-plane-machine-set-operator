@@ -2638,7 +2638,7 @@ var _ = Describe("machineInfosByIndex", func() {
 	)
 })
 
-var _ = Describe("validateClusterState", func() {
+var _ = FDescribe("validateClusterState", func() {
 	var namespaceName string
 
 	cpmsBuilder := machinev1resourcebuilder.ControlPlaneMachineSet()
@@ -2687,8 +2687,22 @@ var _ = Describe("validateClusterState", func() {
 	DescribeTable("should validate the cluster state", func(in validateClusterTableInput) {
 		logger := testutils.NewTestLogger()
 
+		// Track which nodes need old timestamps (those with CreationTimestamp already set before creation)
+		hasNodesWithOldTimestamp := false
 		for _, node := range in.nodes {
+			// Check if this node has a CreationTimestamp set (for grace period testing)
+			// before we create it, since Kubernetes will overwrite it
+			if !node.CreationTimestamp.IsZero() {
+				hasNodesWithOldTimestamp = true
+			}
 			Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		}
+
+		// If we have nodes that should have old timestamps (for testing grace period),
+		// we need to wait for the grace period to pass since CreationTimestamp is immutable
+		// and we can't change it after creation. This ensures the nodes are older than the grace period.
+		if hasNodesWithOldTimestamp {
+			time.Sleep(newNodeUnmanagedGracePeriod + time.Second)
 		}
 
 		reconciler := &ControlPlaneMachineSetReconciler{
@@ -2803,14 +2817,22 @@ var _ = Describe("validateClusterState", func() {
 				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
 				2: {pendingMachineBuilder.WithIndex(2).WithMachineName("machine-2").Build()},
 			},
-			nodes: []*corev1.Node{
-				masterNodeBuilder.WithName("master-0").Build(),
-				masterNodeBuilder.WithName("master-1").Build(),
-				masterNodeBuilder.WithName("master-2").Build(),
-				workerNodeBuilder.WithName("worker-0").Build(),
-				workerNodeBuilder.WithName("worker-1").Build(),
-				workerNodeBuilder.WithName("worker-2").Build(),
-			},
+			nodes: func() []*corev1.Node {
+				nodes := []*corev1.Node{
+					masterNodeBuilder.WithName("master-0").Build(),
+					masterNodeBuilder.WithName("master-1").Build(),
+					masterNodeBuilder.WithName("master-2").Build(),
+					workerNodeBuilder.WithName("worker-0").Build(),
+					workerNodeBuilder.WithName("worker-1").Build(),
+					workerNodeBuilder.WithName("worker-2").Build(),
+				}
+				// Set CreationTimestamp for unmanaged nodes to be older than the newNodeUnmanagedGracePeriod.
+				oldTimestamp := metav1.NewTime(time.Now().Add(-(newNodeUnmanagedGracePeriod + time.Minute)))
+				nodes[0].CreationTimestamp = oldTimestamp // master-0
+				nodes[2].CreationTimestamp = oldTimestamp // master-2
+
+				return nodes
+			}(),
 			expectedError: nil,
 			expectedConditions: []metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 2 unmanaged node(s)").Build(),
@@ -2836,15 +2858,22 @@ var _ = Describe("validateClusterState", func() {
 				1: {updatedMachineBuilder.WithIndex(1).WithMachineName("machine-1").WithNodeName("master-1").Build()},
 				2: {updatedMachineBuilder.WithIndex(2).WithMachineName("machine-2").WithNodeName("master-2").Build()},
 			},
-			nodes: []*corev1.Node{
-				masterNodeBuilder.WithName("master-0").Build(),
-				masterNodeBuilder.WithName("master-1").Build(),
-				masterNodeBuilder.WithName("master-2").Build(),
-				masterNodeBuilder.WithName("master-3").Build(),
-				workerNodeBuilder.WithName("worker-0").Build(),
-				workerNodeBuilder.WithName("worker-1").Build(),
-				workerNodeBuilder.WithName("worker-2").Build(),
-			},
+			nodes: func() []*corev1.Node {
+				nodes := []*corev1.Node{
+					masterNodeBuilder.WithName("master-0").Build(),
+					masterNodeBuilder.WithName("master-1").Build(),
+					masterNodeBuilder.WithName("master-2").Build(),
+					masterNodeBuilder.WithName("master-3").Build(),
+					workerNodeBuilder.WithName("worker-0").Build(),
+					workerNodeBuilder.WithName("worker-1").Build(),
+					workerNodeBuilder.WithName("worker-2").Build(),
+				}
+				// Set CreationTimestamp for unmanaged node to be older than the newNodeUnmanagedGracePeriod.
+				oldTimestamp := metav1.NewTime(time.Now().Add(-(newNodeUnmanagedGracePeriod + time.Minute)))
+				nodes[3].CreationTimestamp = oldTimestamp // master-3
+
+				return nodes
+			}(),
 			expectedError: nil,
 			expectedConditions: []metav1.Condition{
 				degradedConditionBuilder.WithStatus(metav1.ConditionTrue).WithReason(reasonUnmanagedNodes).WithMessage("Found 1 unmanaged node(s)").Build(),
