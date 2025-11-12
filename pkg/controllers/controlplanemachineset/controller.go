@@ -116,6 +116,15 @@ type ControlPlaneMachineSetReconciler struct {
 
 	// FeatureGateAccessor enables checking of enabled featuregates
 	FeatureGateAccessor featuregates.FeatureGateAccess
+
+	// Clock allows for injecting fake or real clocks for testing.
+	// If nil, uses time.Now() directly.
+	Clock ClockInterface
+}
+
+// ClockInterface allows for injecting fake or real clocks for testing.
+type ClockInterface interface {
+	Now() time.Time
 }
 
 // lastErrorTracker tracks the last error that occurred during reconciliation.
@@ -686,8 +695,14 @@ func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappi
 
 	var unmanagedNodeNamesAfterGracePeriod []string
 
+	// Use the injected "fake" clock if available, otherwise use time.Now().
+	now := time.Now()
+	if r.Clock != nil {
+		now = r.Clock.Now()
+	}
+
 	for _, unmanagedNode := range unmanagedNodes {
-		if unmanagedNode.CreationTimestamp.Add(newNodeUnmanagedGracePeriod).Before(time.Now()) {
+		if unmanagedNode.CreationTimestamp.Add(newNodeUnmanagedGracePeriod).Before(now) {
 			unmanagedNodeNamesAfterGracePeriod = append(unmanagedNodeNamesAfterGracePeriod, unmanagedNode.Name)
 		}
 	}
