@@ -21,3 +21,6 @@ status:
   - group: machine.openshift.io
     name: ""
     resource: machines
+  - group: rbac.authorization.k8s.io
+    name: control-plane-machine-set-operator
+    resource: clusterroles
