@@ -5,7 +5,6 @@ go 1.24.3
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-test/deep v1.1.1
-	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.2
@@ -15,6 +14,7 @@ require (
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20250910145856-21d03d30056d
 	github.com/openshift/library-go v0.0.0-20251027092748-1a3af44c9cd0
 	github.com/spf13/pflag v1.0.9
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
