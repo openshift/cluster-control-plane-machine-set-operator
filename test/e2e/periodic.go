@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -48,6 +49,43 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 			helpers.ItShouldPerformARollingUpdate(&helpers.RollingUpdatePeriodicTestOptions{
 				TestFramework: framework.GlobalFramework,
 			})
+		})
+
+		// Migrated from openshift-tests-private OCP-55485
+		Context("and a failureDomain is removed and added back", Ordered, func() {
+			var (
+				platform               configv1.PlatformType
+				zoneToRemove           string
+				machineInZone          string
+				failureDomainToRestore string
+			)
+
+			BeforeAll(func() {
+				var err error
+				platform, zoneToRemove, machineInZone, err = helpers.CheckFailureDomainTestPrerequisites(framework.GlobalFramework)
+				if err != nil {
+					Skip(err.Error())
+				}
+
+				By("Removing the failureDomain: " + zoneToRemove)
+				failureDomainToRestore = helpers.RemoveFailureDomainFromCPMS(platform, zoneToRemove)
+			})
+
+			helpers.ItShouldReplaceMachineInRemovedZone(framework.GlobalFramework, &zoneToRemove, &machineInZone)
+
+			Context("and the failureDomain is restored", Ordered, func() {
+				BeforeAll(func() {
+					By("Restoring the failureDomain")
+					helpers.RestoreFailureDomainToCPMS(platform, failureDomainToRestore)
+				})
+
+				helpers.ItShouldStabilizeAfterFailureDomainRestoration(framework.GlobalFramework)
+			})
+		})
+
+		// Migrated from openshift-tests-private OCP-55631
+		Context("and a master machine is deleted", func() {
+			helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 0)
 		})
 
 		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", func() {
@@ -144,6 +182,41 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 						// Machine name should follow general naming convention
 						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 2)
 					})
+				})
+			})
+
+			// Migrated from openshift-tests-private OCP-55724
+			Context("and a failureDomain is removed and machine is deleted", Ordered, func() {
+				var (
+					platform               configv1.PlatformType
+					zoneToRemove           string
+					machineInZone          string
+					failureDomainToRestore string
+				)
+
+				BeforeAll(func() {
+					var err error
+					platform, zoneToRemove, machineInZone, err = helpers.CheckFailureDomainTestPrerequisites(framework.GlobalFramework)
+					if err != nil {
+						Skip(err.Error())
+					}
+
+					By("Removing the failureDomain: " + zoneToRemove)
+					failureDomainToRestore = helpers.RemoveFailureDomainFromCPMS(platform, zoneToRemove)
+				})
+
+				helpers.ItShouldDeleteMachineAndVerifyReplacementInOnDeleteMode(framework.GlobalFramework, &zoneToRemove, &machineInZone)
+
+				Context("and the failureDomain is restored", Ordered, func() {
+					BeforeAll(func() {
+						By("Restoring the failureDomain")
+						helpers.RestoreFailureDomainToCPMS(platform, failureDomainToRestore)
+
+						By("Changing update strategy back to RollingUpdate")
+						helpers.EnsureControlPlaneMachineSetUpdateStrategy(framework.GlobalFramework, machinev1.RollingUpdate)
+					})
+
+					helpers.ItShouldStabilizeAfterFailureDomainRestoration(framework.GlobalFramework)
 				})
 			})
 		})
