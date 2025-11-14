@@ -18,6 +18,7 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -373,4 +375,590 @@ func ItShouldPerformControlPlaneMachineSetRegeneration(opts *ControlPlaneMachine
 				MatchJSON(rawExtension.Raw)),
 		)
 	})
+}
+
+// ItShouldHaveValidClusterOperatorStatus checks that the control-plane-machine-set ClusterOperator
+// reports the correct status and version information.
+// Migrated from openshift-tests-private OCP-53610.
+func ItShouldHaveValidClusterOperatorStatus(testFramework framework.Framework) {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	By("Getting the control-plane-machine-set ClusterOperator")
+	co := &configv1.ClusterOperator{}
+	key := runtimeclient.ObjectKey{Name: "control-plane-machine-set"}
+
+	Eventually(func(g Gomega) {
+		err := k8sClient.Get(ctx, key, co)
+		g.Expect(err).NotTo(HaveOccurred())
+	}).WithTimeout(1 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+
+	By("Verifying ClusterOperator conditions")
+	var available, progressing, degraded *configv1.ClusterOperatorStatusCondition
+	for i := range co.Status.Conditions {
+		cond := &co.Status.Conditions[i]
+		switch cond.Type {
+		case configv1.OperatorAvailable:
+			available = cond
+		case configv1.OperatorProgressing:
+			progressing = cond
+		case configv1.OperatorDegraded:
+			degraded = cond
+		}
+	}
+
+	Expect(available).NotTo(BeNil(), "Available condition should be present")
+	Expect(available.Status).To(Equal(configv1.ConditionTrue), "ClusterOperator should be Available")
+
+	Expect(progressing).NotTo(BeNil(), "Progressing condition should be present")
+	Expect(progressing.Status).To(Equal(configv1.ConditionFalse), "ClusterOperator should not be Progressing")
+
+	Expect(degraded).NotTo(BeNil(), "Degraded condition should be present")
+	Expect(degraded.Status).To(Equal(configv1.ConditionFalse), "ClusterOperator should not be Degraded")
+
+	By("Verifying version information is reported")
+	Expect(co.Status.Versions).NotTo(BeEmpty(), "ClusterOperator should report version information")
+	Expect(co.Status.Versions[0].Version).To(MatchRegexp(`^4\.`), "Version should be a valid OpenShift version")
+}
+
+// ItShouldRejectInvalidMachineNamePrefix checks that invalid machine name prefix formats are rejected.
+// Migrated from openshift-tests-private OCP-78773.
+func ItShouldRejectInvalidMachineNamePrefix(testFramework framework.Framework) {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	By("Getting the current ControlPlaneMachineSet")
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	key := runtimeclient.ObjectKey{
+		Name:      framework.ControlPlaneMachineSetName,
+		Namespace: framework.MachineAPINamespace,
+	}
+
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Attempting to set an invalid machine name prefix with underscore")
+	cpmsUpdate := cpms.DeepCopy()
+	cpmsUpdate.Spec.MachineNamePrefix = "abcd_0"
+
+	err = k8sClient.Update(ctx, cpmsUpdate)
+	Expect(err).To(HaveOccurred(), "Should reject invalid machine name prefix")
+	Expect(err.Error()).To(ContainSubstring("lowercase RFC 1123"),
+		"Error should mention RFC 1123 validation")
+
+	By("Attempting to set an invalid prefix with uppercase letters")
+	err = k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	cpmsUpdate = cpms.DeepCopy()
+	cpmsUpdate.Spec.MachineNamePrefix = "Master-Node"
+
+	err = k8sClient.Update(ctx, cpmsUpdate)
+	Expect(err).To(HaveOccurred(), "Should reject uppercase letters in prefix")
+}
+
+// ItShouldHandleFailureDomainChangesInRollingUpdate checks that removing and adding a failureDomain
+// triggers a rolling update and properly rebalances machines across zones.
+// Migrated from openshift-tests-private OCP-55485.
+func ItShouldHandleFailureDomainChangesInRollingUpdate(testFramework framework.Framework) {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	// Skip for platforms without failureDomain support
+	platform := testFramework.GetPlatformType()
+	if platform != configv1.AWSPlatformType &&
+		platform != configv1.AzurePlatformType &&
+		platform != configv1.GCPPlatformType {
+		Skip("Test only applicable to AWS, Azure, and GCP platforms")
+	}
+
+	timeout := 30 * time.Minute
+
+	By("Getting the current ControlPlaneMachineSet")
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	key := runtimeclient.ObjectKey{
+		Name:      framework.ControlPlaneMachineSetName,
+		Namespace: framework.MachineAPINamespace,
+	}
+
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Get failureDomains count
+	failureDomains := getFailureDomainsFromCPMS(cpms, platform)
+	if len(failureDomains) <= 1 {
+		Skip("Test requires multiple failure domains")
+	}
+
+	By("Finding a zone with only one machine")
+	zoneToRemove, machineInZone := findZoneWithSingleMachine(ctx, k8sClient, failureDomains)
+	if zoneToRemove == "" {
+		Skip("Could not find a zone with exactly one machine")
+	}
+
+	machineSuffix := getMachineSuffixFromName(machineInZone)
+
+	By("Removing the failureDomain: " + zoneToRemove)
+	failureDomainToRestore := removeFailureDomainFromCPMS(ctx, k8sClient, cpms, platform, zoneToRemove)
+
+	defer func() {
+		By("Restoring the failureDomain")
+		restoreFailureDomainToCPMS(ctx, k8sClient, platform, failureDomainToRestore)
+
+		By("Waiting for machines to be updated after restoring failureDomain")
+		restoreCtx, restoreCancel := context.WithTimeout(ctx, timeout)
+		defer restoreCancel()
+		WaitForControlPlaneMachineSetDesiredReplicas(restoreCtx, cpms.DeepCopy())
+
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
+	}()
+
+	By("Verifying the machine in removed zone is replaced in another zone")
+	Eventually(func(g Gomega) {
+		machineList := &machinev1beta1.MachineList{}
+		machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+		err := k8sClient.List(ctx, machineList, machineSelector, runtimeclient.InNamespace(framework.MachineAPINamespace))
+		g.Expect(err).NotTo(HaveOccurred())
+
+		// Find machine with same suffix in a different zone
+		found := false
+		for _, machine := range machineList.Items {
+			if suffix := getMachineSuffixFromName(machine.Name); suffix == machineSuffix {
+				if zone, ok := machine.Labels["machine.openshift.io/zone"]; ok {
+					g.Expect(zone).NotTo(Equal(zoneToRemove), "Machine should be in a different zone")
+					found = true
+				}
+			}
+		}
+		g.Expect(found).To(BeTrue(), "Should find replacement machine with same suffix")
+	}).WithTimeout(timeout).WithPolling(30 * time.Second).Should(Succeed())
+
+	By("Waiting for cluster to stabilize")
+	EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
+}
+
+// ItShouldHandleFailureDomainChangesInOnDeleteMode checks that in OnDelete mode,
+// removing a failureDomain and deleting a machine triggers proper rebalancing.
+// Migrated from openshift-tests-private OCP-55724.
+func ItShouldHandleFailureDomainChangesInOnDeleteMode(testFramework framework.Framework) {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	// Skip for platforms without failureDomain support
+	platform := testFramework.GetPlatformType()
+	if platform != configv1.AWSPlatformType &&
+		platform != configv1.AzurePlatformType &&
+		platform != configv1.GCPPlatformType {
+		Skip("Test only applicable to AWS, Azure, and GCP platforms")
+	}
+
+	timeout := 30 * time.Minute
+
+	By("Getting the current ControlPlaneMachineSet")
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	key := runtimeclient.ObjectKey{
+		Name:      framework.ControlPlaneMachineSetName,
+		Namespace: framework.MachineAPINamespace,
+	}
+
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	failureDomains := getFailureDomainsFromCPMS(cpms, platform)
+	if len(failureDomains) <= 1 {
+		Skip("Test requires multiple failure domains")
+	}
+
+	By("Finding a zone with only one machine")
+	zoneToRemove, machineInZone := findZoneWithSingleMachine(ctx, k8sClient, failureDomains)
+	if zoneToRemove == "" {
+		Skip("Could not find a zone with exactly one machine")
+	}
+
+	machineSuffix := getMachineSuffixFromName(machineInZone)
+
+	By("Removing the failureDomain: " + zoneToRemove)
+	failureDomainToRestore := removeFailureDomainFromCPMS(ctx, k8sClient, cpms, platform, zoneToRemove)
+
+	defer func() {
+		By("Restoring the failureDomain")
+		restoreFailureDomainToCPMS(ctx, k8sClient, platform, failureDomainToRestore)
+
+		By("Waiting for machines to be updated after restoring failureDomain")
+		restoreCtx, restoreCancel := context.WithTimeout(ctx, timeout)
+		defer restoreCancel()
+		WaitForControlPlaneMachineSetDesiredReplicas(restoreCtx, cpms.DeepCopy())
+
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
+	}()
+
+	By("Deleting the machine in the removed zone: " + machineInZone)
+	machine := &machinev1beta1.Machine{}
+	machineKey := runtimeclient.ObjectKey{Name: machineInZone, Namespace: framework.MachineAPINamespace}
+	err = k8sClient.Get(ctx, machineKey, machine)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Delete(ctx, machine)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Verifying replacement machine is created in another zone")
+	Eventually(func(g Gomega) {
+		machineList := &machinev1beta1.MachineList{}
+		machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+		err := k8sClient.List(ctx, machineList, machineSelector, runtimeclient.InNamespace(framework.MachineAPINamespace))
+		g.Expect(err).NotTo(HaveOccurred())
+
+		// Should have 3 machines
+		g.Expect(machineList.Items).To(HaveLen(3))
+
+		// Find machine with same suffix in a different zone
+		found := false
+		for _, m := range machineList.Items {
+			if suffix := getMachineSuffixFromName(m.Name); suffix == machineSuffix {
+				if zone, ok := m.Labels["machine.openshift.io/zone"]; ok {
+					g.Expect(zone).NotTo(Equal(zoneToRemove), "Machine should be in a different zone")
+					if m.Status.Phase != nil {
+						g.Expect(*m.Status.Phase).To(Equal("Running"), "Machine should be running")
+					}
+					found = true
+				}
+			}
+		}
+		g.Expect(found).To(BeTrue(), "Should find replacement machine")
+	}).WithTimeout(timeout).WithPolling(30 * time.Second).Should(Succeed())
+
+	By("Waiting for cluster to stabilize")
+	EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
+}
+
+// ItShouldNotRolloutWhenFailureDomainOrderChanges checks that changing the order of
+// failureDomains without changing the zones themselves does not trigger a rollout.
+// Migrated from openshift-tests-private OCP-53328.
+func ItShouldNotRolloutWhenFailureDomainOrderChanges(testFramework framework.Framework) {
+	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+	ctx := testFramework.GetContext()
+	k8sClient := testFramework.GetClient()
+
+	// Skip for platforms without failureDomain support
+	platform := testFramework.GetPlatformType()
+	if platform != configv1.AWSPlatformType &&
+		platform != configv1.AzurePlatformType &&
+		platform != configv1.GCPPlatformType {
+		Skip("Test only applicable to AWS, Azure, and GCP platforms")
+	}
+
+	By("Getting the current ControlPlaneMachineSet")
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	key := runtimeclient.ObjectKey{
+		Name:      framework.ControlPlaneMachineSetName,
+		Namespace: framework.MachineAPINamespace,
+	}
+
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	failureDomains := getFailureDomainsFromCPMS(cpms, platform)
+	if len(failureDomains) <= 1 {
+		Skip("Test requires multiple failure domains")
+	}
+
+	By("Recording current machine names")
+	initialMachineList := &machinev1beta1.MachineList{}
+	machineSelector := runtimeclient.MatchingLabels(framework.ControlPlaneMachineSetSelectorLabels())
+
+	err = k8sClient.List(ctx, initialMachineList, machineSelector, runtimeclient.InNamespace(framework.MachineAPINamespace))
+	Expect(err).NotTo(HaveOccurred())
+
+	initialMachineNames := make(map[string]bool)
+	for _, machine := range initialMachineList.Items {
+		initialMachineNames[machine.Name] = true
+	}
+
+	By("Temporarily switching to OnDelete to prevent automatic rollout")
+	originalStrategy := EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
+	defer EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
+
+	By("Changing the order of failure domains")
+	changeFailureDomainsOrderInCPMS(ctx, k8sClient, cpms, platform)
+
+	By("Switching back to RollingUpdate after a brief pause")
+	time.Sleep(10 * time.Second)
+	EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
+
+	By("Verifying that no machines are replaced (names remain the same)")
+	Consistently(func(g Gomega) {
+		machineList := &machinev1beta1.MachineList{}
+		err := k8sClient.List(ctx, machineList, machineSelector, runtimeclient.InNamespace(framework.MachineAPINamespace))
+		g.Expect(err).NotTo(HaveOccurred())
+
+		// All machine names should still be in the initial set
+		for _, machine := range machineList.Items {
+			g.Expect(initialMachineNames).To(HaveKey(machine.Name),
+				"Machine %s should be from the original set", machine.Name)
+		}
+	}).WithTimeout(1 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+
+	By("Verifying ControlPlaneMachineSet remains up to date")
+	EnsureControlPlaneMachineSetUpdated(testFramework)
+}
+
+// Helper functions for FailureDomain operations
+
+// getFailureDomainsFromCPMS extracts the list of zone names from a ControlPlaneMachineSet
+// for the specified platform (AWS, Azure, or GCP).
+func getFailureDomainsFromCPMS(cpms *machinev1.ControlPlaneMachineSet, platform configv1.PlatformType) []string {
+	var zones []string
+
+	if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine == nil ||
+		cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains == nil {
+		return zones
+	}
+
+	switch platform {
+	case configv1.AWSPlatformType:
+		if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS != nil {
+			for _, fd := range *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS {
+				if fd.Placement.AvailabilityZone != "" {
+					zones = append(zones, fd.Placement.AvailabilityZone)
+				}
+			}
+		}
+	case configv1.AzurePlatformType:
+		if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure != nil {
+			for _, fd := range *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure {
+				zones = append(zones, fd.Zone)
+			}
+		}
+	case configv1.GCPPlatformType:
+		if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP != nil {
+			for _, fd := range *cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP {
+				zones = append(zones, fd.Zone)
+			}
+		}
+	}
+
+	return zones
+}
+
+// findZoneWithSingleMachine finds a zone that contains exactly one master machine.
+// Returns the zone name and the machine name, or empty strings if no such zone is found.
+func findZoneWithSingleMachine(ctx context.Context, k8sClient runtimeclient.Client, zones []string) (string, string) {
+	for _, zone := range zones {
+		machineList := &machinev1beta1.MachineList{}
+		labelSelector := runtimeclient.MatchingLabels{
+			"machine.openshift.io/cluster-api-machine-type": "master",
+			"machine.openshift.io/zone":                     zone,
+		}
+
+		err := k8sClient.List(ctx, machineList, labelSelector, runtimeclient.InNamespace(framework.MachineAPINamespace))
+		if err != nil {
+			continue
+		}
+
+		if len(machineList.Items) == 1 {
+			return zone, machineList.Items[0].Name
+		}
+	}
+
+	return "", ""
+}
+
+// getMachineSuffixFromName extracts the suffix (index) from a machine name.
+// Machine names are in format: <prefix>-<random-id>-<index> or <prefix>-<index>
+// We want to extract the index (including the dash) after the last dash.
+// For example: "cluster-master-abc12-1" returns "-1", "cluster-master-0" returns "-0"
+func getMachineSuffixFromName(machineName string) string {
+	parts := []rune(machineName)
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == '-' {
+			return string(parts[i:])
+		}
+	}
+	return ""
+}
+
+// swapFirstTwoFailureDomains is a generic helper that swaps the first two elements of a slice.
+// This is used to change the order of failure domains without changing the zones themselves.
+// If the slice has fewer than 2 elements, it returns the slice unchanged.
+func swapFirstTwoFailureDomains[T any](slice []T) []T {
+	if len(slice) < 2 {
+		return slice
+	}
+	// Swap first and second elements
+	slice[0], slice[1] = slice[1], slice[0]
+	return slice
+}
+
+// removeFailureDomainByZone is a generic helper that removes a failure domain from a slice by zone name.
+// The getZone function is used to extract the zone name from each failure domain element.
+// Returns the modified slice and the removed failure domain as a JSON string.
+// If no matching zone is found, returns the original slice and an empty string.
+func removeFailureDomainByZone[T any](fds []T, zone string, getZone func(T) string) ([]T, string) {
+	for i, fd := range fds {
+		if getZone(fd) == zone {
+			// Store the FD for restoration
+			rawFD, _ := json.Marshal(fd)
+			// Remove this FD
+			newFDs := append(fds[:i], fds[i+1:]...)
+			return newFDs, string(rawFD)
+		}
+	}
+	return fds, ""
+}
+
+// prependFailureDomain is a generic helper that prepends a failure domain to the beginning of a slice.
+// If the slice pointer is nil, it creates a new slice with the single element.
+func prependFailureDomain[T any](fds *[]T, fd T) []T {
+	if fds != nil {
+		return append([]T{fd}, *fds...)
+	}
+	return []T{fd}
+}
+
+// changeFailureDomainsOrderInCPMS changes the order of failure domains in a ControlPlaneMachineSet
+// by swapping the first two elements. This is used to verify that changing only the order of
+// failure domains (without changing the zones themselves) does not trigger a machine rollout.
+func changeFailureDomainsOrderInCPMS(ctx context.Context, k8sClient runtimeclient.Client, cpms *machinev1.ControlPlaneMachineSet, platform configv1.PlatformType) {
+	// Re-get the latest CPMS
+	key := runtimeclient.ObjectKey{
+		Name:      cpms.Name,
+		Namespace: cpms.Namespace,
+	}
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	cpmsUpdate := cpms.DeepCopy()
+
+	if cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine == nil ||
+		cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains == nil {
+		return
+	}
+
+	switch platform {
+	case configv1.AWSPlatformType:
+		if fds := cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS; fds != nil {
+			swappedFDs := swapFirstTwoFailureDomains(*fds)
+			cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &swappedFDs
+		}
+	case configv1.AzurePlatformType:
+		if fds := cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure; fds != nil {
+			swappedFDs := swapFirstTwoFailureDomains(*fds)
+			cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &swappedFDs
+		}
+	case configv1.GCPPlatformType:
+		if fds := cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP; fds != nil {
+			swappedFDs := swapFirstTwoFailureDomains(*fds)
+			cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP = &swappedFDs
+		}
+	}
+
+	err = k8sClient.Update(ctx, cpmsUpdate)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+// removeFailureDomainFromCPMS removes a failure domain with the specified zone from the ControlPlaneMachineSet.
+// It returns the removed failure domain as a JSON string, which can be used to restore it later.
+func removeFailureDomainFromCPMS(ctx context.Context, k8sClient runtimeclient.Client, cpms *machinev1.ControlPlaneMachineSet, platform configv1.PlatformType, zone string) string {
+	// Re-get the latest CPMS
+	key := runtimeclient.ObjectKey{
+		Name:      cpms.Name,
+		Namespace: cpms.Namespace,
+	}
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	var removedFD string
+	cpmsUpdate := cpms.DeepCopy()
+
+	if cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine == nil ||
+		cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains == nil {
+		return ""
+	}
+
+	switch platform {
+	case configv1.AWSPlatformType:
+		if fds := cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS; fds != nil {
+			newFDs, removedJSON := removeFailureDomainByZone(*fds, zone, func(fd machinev1.AWSFailureDomain) string {
+				return fd.Placement.AvailabilityZone
+			})
+			cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &newFDs
+			removedFD = removedJSON
+		}
+	case configv1.AzurePlatformType:
+		if fds := cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure; fds != nil {
+			newFDs, removedJSON := removeFailureDomainByZone(*fds, zone, func(fd machinev1.AzureFailureDomain) string {
+				return fd.Zone
+			})
+			cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &newFDs
+			removedFD = removedJSON
+		}
+	case configv1.GCPPlatformType:
+		if fds := cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP; fds != nil {
+			newFDs, removedJSON := removeFailureDomainByZone(*fds, zone, func(fd machinev1.GCPFailureDomain) string {
+				return fd.Zone
+			})
+			cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP = &newFDs
+			removedFD = removedJSON
+		}
+	}
+
+	err = k8sClient.Update(ctx, cpmsUpdate)
+	Expect(err).NotTo(HaveOccurred())
+
+	return removedFD
+}
+
+// restoreFailureDomainToCPMS restores a previously removed failure domain to the ControlPlaneMachineSet.
+// The failure domain is prepended to the beginning of the list. The fdJSON parameter should be the
+// JSON string returned by removeFailureDomainFromCPMS.
+func restoreFailureDomainToCPMS(ctx context.Context, k8sClient runtimeclient.Client, platform configv1.PlatformType, fdJSON string) {
+	if fdJSON == "" {
+		return
+	}
+
+	cpms := &machinev1.ControlPlaneMachineSet{}
+	key := runtimeclient.ObjectKey{
+		Name:      framework.ControlPlaneMachineSetName,
+		Namespace: framework.MachineAPINamespace,
+	}
+
+	err := k8sClient.Get(ctx, key, cpms)
+	Expect(err).NotTo(HaveOccurred())
+
+	cpmsUpdate := cpms.DeepCopy()
+
+	if cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine == nil ||
+		cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains == nil {
+		return
+	}
+
+	switch platform {
+	case configv1.AWSPlatformType:
+		var fd machinev1.AWSFailureDomain
+		err := json.Unmarshal([]byte(fdJSON), &fd)
+		Expect(err).NotTo(HaveOccurred())
+		newFDs := prependFailureDomain(cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS, fd)
+		cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.AWS = &newFDs
+
+	case configv1.AzurePlatformType:
+		var fd machinev1.AzureFailureDomain
+		err := json.Unmarshal([]byte(fdJSON), &fd)
+		Expect(err).NotTo(HaveOccurred())
+		newFDs := prependFailureDomain(cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure, fd)
+		cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Azure = &newFDs
+
+	case configv1.GCPPlatformType:
+		var fd machinev1.GCPFailureDomain
+		err := json.Unmarshal([]byte(fdJSON), &fd)
+		Expect(err).NotTo(HaveOccurred())
+		newFDs := prependFailureDomain(cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP, fd)
+		cpmsUpdate.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.GCP = &newFDs
+	}
+
+	err = k8sClient.Update(ctx, cpmsUpdate)
+	Expect(err).NotTo(HaveOccurred())
 }
