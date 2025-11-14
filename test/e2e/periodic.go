@@ -50,6 +50,18 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 			})
 		})
 
+		// Migrated from openshift-tests-private OCP-55485
+		Context("and a failureDomain is removed and added back", func() {
+			It("should perform rolling update and rebalance machines", func() {
+				helpers.ItShouldHandleFailureDomainChangesInRollingUpdate(framework.GlobalFramework)
+			})
+		})
+
+		// Migrated from openshift-tests-private OCP-55631
+		Context("and a master machine is deleted", func() {
+			helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 0)
+		})
+
 		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", func() {
 			prefix := "master-prefix"
 			resetPrefix := ""
@@ -144,6 +156,13 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 						// Machine name should follow general naming convention
 						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 2)
 					})
+				})
+			})
+
+			// Migrated from openshift-tests-private OCP-55724
+			Context("and a failureDomain is removed and machine is deleted", func() {
+				It("should create replacement in another zone and rebalance", func() {
+					helpers.ItShouldHandleFailureDomainChangesInOnDeleteMode(framework.GlobalFramework)
 				})
 			})
 		})
