@@ -9,7 +9,7 @@ REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
 OPENSHIFT_CI=${OPENSHIFT_CI:-""}
 ARTIFACT_DIR=${ARTIFACT_DIR:-""}
 GINKGO=${GINKGO:-"go run -mod=vendor ${REPO_ROOT}/vendor/github.com/onsi/ginkgo/v2/ginkgo"}
-GINKGO_ARGS=${GINKGO_ARGS:-"-r -v --fail-fast --trace --timeout=4h"}
+GINKGO_ARGS=${GINKGO_ARGS:-"-r -v --fail-fast --trace --timeout=7h"}
 GINKGO_EXTRA_ARGS=${GINKGO_EXTRA_ARGS:-""}
 
 if [ "$OPENSHIFT_CI" == "true" ] && [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then # detect ci environment there

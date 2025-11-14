@@ -37,6 +37,13 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 		helpers.EventuallyClusterOperatorsShouldStabilise(1*time.Minute, 10*time.Minute, 10*time.Second)
 	}, OncePerOrdered)
 
+	// Migrated from openshift-tests-private OCP-53610
+	Context("ClusterOperator validation", func() {
+		It("should report Available status and version information", func() {
+			helpers.ItShouldHaveValidClusterOperatorStatus(framework.GlobalFramework)
+		})
+	})
+
 	Context("With an active ControlPlaneMachineSet", func() {
 		BeforeEach(func() {
 			helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
@@ -212,6 +219,20 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 			})
 
 			helpers.ItShouldNotCauseARollout(framework.GlobalFramework)
+		})
+
+		// Migrated from openshift-tests-private OCP-78773
+		Context("and MachineNamePrefix is set to an invalid value", func() {
+			It("should reject invalid prefix formats", func() {
+				helpers.ItShouldRejectInvalidMachineNamePrefix(framework.GlobalFramework)
+			})
+		})
+
+		// Migrated from openshift-tests-private OCP-53328
+		Context("and failureDomain order is changed", func() {
+			It("should not trigger a rollout", func() {
+				helpers.ItShouldNotRolloutWhenFailureDomainOrderChanges(framework.GlobalFramework)
+			})
 		})
 	})
 
