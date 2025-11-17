@@ -14,7 +14,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20250910145856-21d03d30056d
 	github.com/openshift/library-go v0.0.0-20251027092748-1a3af44c9cd0
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/pflag v1.0.9
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
@@ -190,7 +190,7 @@ require (
 	github.com/sourcegraph/go-diff v0.7.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/cobra v1.9.1 // indirect
+	github.com/spf13/cobra v1.10.1 // indirect
 	github.com/spf13/viper v1.20.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/stbenjam/no-sprintf-host-port v0.2.0 // indirect

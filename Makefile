@@ -15,10 +15,10 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-CONTROLLER_GEN = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen
-ENVTEST = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-runtime/tools/setup-envtest
-GINKGO = go run ${PROJECT_DIR}/vendor/github.com/onsi/ginkgo/v2/ginkgo
-GOLANGCI_LINT = go run ${PROJECT_DIR}/vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
+CONTROLLER_GEN = go run -mod=vendor ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen
+ENVTEST = go run -mod=vendor ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-runtime/tools/setup-envtest
+GINKGO = go run -mod=vendor ${PROJECT_DIR}/vendor/github.com/onsi/ginkgo/v2/ginkgo
+GOLANGCI_LINT = go run -mod=vendor ${PROJECT_DIR}/vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
 
 VERSION     ?= $(shell git describe --always --abbrev=7)
 MUTABLE_TAG ?= latest
@@ -65,15 +65,15 @@ manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefin
 .PHONY: generate
 generate: manifests ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-	go generate ./...
+	go generate -mod=readonly ./...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	go fmt ./...
+	go fmt -mod=readonly ./...
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	go vet ./...
+	go vet -mod=readonly ./...
 
 .PHONY: vendor
 vendor: ## Ensure the vendor directory is up to date.
