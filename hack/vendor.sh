@@ -29,9 +29,3 @@ go work sync
 # Create unified vendor directory
 echo "Creating unified vendor directory..."
 go work vendor -v
-
-# Also update submodule vendor for isolated builds
-echo "Updating submodule vendor..."
-(cd openshift-tests-extension && GOWORK=off go mod vendor)
-
-echo "Done! All dependencies updated."

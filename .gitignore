@@ -20,3 +20,6 @@ testbin/*
 *~
 
 .vscode/
+
+# Submodule vendor directories (not tracked, use go work vendor instead)
+openshift-tests-extension/vendor/
