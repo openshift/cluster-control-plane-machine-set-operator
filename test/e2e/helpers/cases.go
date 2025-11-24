@@ -541,14 +541,13 @@ func ItShouldReplaceMachineInRemovedZone(testFramework framework.Framework, zone
 
 // ItShouldStabilizeAfterFailureDomainRestoration verifies that the cluster stabilizes
 // after the failureDomain is restored to the ControlPlaneMachineSet.
-// It waits for the ControlPlaneMachineSet to reach desired replicas and for cluster operators to stabilize.
+// It first ensures the controller has observed the spec change, then waits for any rollout
+// to complete (if needed), and finally waits for cluster operators to stabilize.
 func ItShouldStabilizeAfterFailureDomainRestoration(testFramework framework.Framework) {
 	It("should stabilize after failureDomain restoration", func() {
 		ctx := testFramework.GetContext()
 		k8sClient := testFramework.GetClient()
 		timeout := 30 * time.Minute
-
-		By("Waiting for rollout to complete after failureDomain restoration")
 
 		rolloutCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
@@ -556,6 +555,20 @@ func ItShouldStabilizeAfterFailureDomainRestoration(testFramework framework.Fram
 		cpms := &machinev1.ControlPlaneMachineSet{}
 		Expect(k8sClient.Get(rolloutCtx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed())
 
+		// Capture the current generation to ensure we wait for the controller to observe the change
+		currentGeneration := cpms.Generation
+
+		By("Waiting for controller to observe the failureDomain restoration")
+		// Wait for ObservedGeneration to match the current Generation, ensuring the controller
+		// has processed the spec change and updated the status accordingly.
+		// Use a 3 minute timeout for this check - the controller should reconcile within seconds,
+		// but we allow extra time for slow environments.
+		Eventually(komega.Object(cpms), 3*time.Minute).WithContext(rolloutCtx).Should(
+			HaveField("Status.ObservedGeneration", Equal(currentGeneration)),
+			"controller should observe the spec change",
+		)
+
+		By("Waiting for rollout to complete after failureDomain restoration")
 		WaitForControlPlaneMachineSetDesiredReplicas(rolloutCtx, cpms)
 
 		By("Waiting for cluster to stabilize")
