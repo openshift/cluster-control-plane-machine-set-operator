@@ -326,13 +326,7 @@ func CheckFailureDomainTestPrerequisites(testFramework framework.Framework) (pla
 	}
 
 	cpms := &machinev1.ControlPlaneMachineSet{}
-	key := runtimeclient.ObjectKey{
-		Name:      framework.ControlPlaneMachineSetName,
-		Namespace: framework.MachineAPINamespace,
-	}
-
-	err = k8sClient.Get(ctx, key, cpms)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
 	// Get failureDomains count
 	failureDomains := getFailureDomainsFromCPMS(cpms, platform)

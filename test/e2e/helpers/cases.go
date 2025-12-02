@@ -376,148 +376,89 @@ func ItShouldPerformControlPlaneMachineSetRegeneration(opts *ControlPlaneMachine
 	})
 }
 
-// ItShouldHaveValidClusterOperatorStatus checks that the control-plane-machine-set ClusterOperator
-// reports the correct status and version information.
-// Migrated from openshift-tests-private OCP-53610.
-func ItShouldHaveValidClusterOperatorStatus(testFramework framework.Framework) {
-	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
-	ctx := testFramework.GetContext()
-	k8sClient := testFramework.GetClient()
-
-	By("Getting the control-plane-machine-set ClusterOperator")
-
-	co := &configv1.ClusterOperator{}
-	key := runtimeclient.ObjectKey{Name: "control-plane-machine-set"}
-
-	Eventually(func(g Gomega) {
-		err := k8sClient.Get(ctx, key, co)
-		g.Expect(err).NotTo(HaveOccurred())
-	}).WithTimeout(1 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
-
-	By("Verifying ClusterOperator conditions")
-
-	var available, progressing, degraded *configv1.ClusterOperatorStatusCondition
-
-	for i := range co.Status.Conditions {
-		cond := &co.Status.Conditions[i]
-		//nolint:exhaustive // We only need to check these three core conditions
-		switch cond.Type {
-		case configv1.OperatorAvailable:
-			available = cond
-		case configv1.OperatorProgressing:
-			progressing = cond
-		case configv1.OperatorDegraded:
-			degraded = cond
-		}
-	}
-
-	Expect(available).NotTo(BeNil(), "Available condition should be present")
-	Expect(available.Status).To(Equal(configv1.ConditionTrue), "ClusterOperator should be Available")
-
-	Expect(progressing).NotTo(BeNil(), "Progressing condition should be present")
-	Expect(progressing.Status).To(Equal(configv1.ConditionFalse), "ClusterOperator should not be Progressing")
-
-	Expect(degraded).NotTo(BeNil(), "Degraded condition should be present")
-	Expect(degraded.Status).To(Equal(configv1.ConditionFalse), "ClusterOperator should not be Degraded")
-
-	By("Verifying version information is reported")
-	Expect(co.Status.Versions).NotTo(BeEmpty(), "ClusterOperator should report version information")
-	Expect(co.Status.Versions[0].Version).To(MatchRegexp(`^4\.`), "Version should be a valid OpenShift version")
-}
-
 // ItShouldRejectInvalidMachineNamePrefix checks that invalid machine name prefix formats are rejected.
 // Migrated from openshift-tests-private OCP-78773.
 func ItShouldRejectInvalidMachineNamePrefix(testFramework framework.Framework) {
-	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
-	ctx := testFramework.GetContext()
-	k8sClient := testFramework.GetClient()
+	It("should reject invalid prefix formats", func() {
+		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
 
-	By("Getting the current ControlPlaneMachineSet")
+		By("Getting the current ControlPlaneMachineSet")
 
-	cpms := &machinev1.ControlPlaneMachineSet{}
-	key := runtimeclient.ObjectKey{
-		Name:      framework.ControlPlaneMachineSetName,
-		Namespace: framework.MachineAPINamespace,
-	}
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	err := k8sClient.Get(ctx, key, cpms)
-	Expect(err).NotTo(HaveOccurred())
+		By("Attempting to set an invalid machine name prefix with underscore")
 
-	By("Attempting to set an invalid machine name prefix with underscore")
+		cpmsUpdate := cpms.DeepCopy()
+		cpmsUpdate.Spec.MachineNamePrefix = "abcd_0"
 
-	cpmsUpdate := cpms.DeepCopy()
-	cpmsUpdate.Spec.MachineNamePrefix = "abcd_0"
+		err := k8sClient.Update(ctx, cpmsUpdate)
+		Expect(err).To(HaveOccurred(), "Should reject invalid machine name prefix")
+		Expect(err.Error()).To(ContainSubstring("lowercase RFC 1123"),
+			"Error should mention RFC 1123 validation")
 
-	err = k8sClient.Update(ctx, cpmsUpdate)
-	Expect(err).To(HaveOccurred(), "Should reject invalid machine name prefix")
-	Expect(err.Error()).To(ContainSubstring("lowercase RFC 1123"),
-		"Error should mention RFC 1123 validation")
+		By("Attempting to set an invalid prefix with uppercase letters")
 
-	By("Attempting to set an invalid prefix with uppercase letters")
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	err = k8sClient.Get(ctx, key, cpms)
-	Expect(err).NotTo(HaveOccurred())
+		cpmsUpdate = cpms.DeepCopy()
+		cpmsUpdate.Spec.MachineNamePrefix = "Master-Node"
 
-	cpmsUpdate = cpms.DeepCopy()
-	cpmsUpdate.Spec.MachineNamePrefix = "Master-Node"
-
-	err = k8sClient.Update(ctx, cpmsUpdate)
-	Expect(err).To(HaveOccurred(), "Should reject uppercase letters in prefix")
+		Expect(k8sClient.Update(ctx, cpmsUpdate)).To(HaveOccurred(), "Should reject uppercase letters in prefix")
+	})
 }
 
 // ItShouldNotRolloutWhenFailureDomainOrderChanges checks that changing the order of
 // failureDomains without changing the zones themselves does not trigger a rollout.
 // Migrated from openshift-tests-private OCP-53328.
 func ItShouldNotRolloutWhenFailureDomainOrderChanges(testFramework framework.Framework) {
-	Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
-	ctx := testFramework.GetContext()
-	k8sClient := testFramework.GetClient()
+	It("should not trigger a rollout", func() {
+		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
 
-	// Skip for platforms without failureDomain support
-	platform := testFramework.GetPlatformType()
-	if platform != configv1.AWSPlatformType &&
-		platform != configv1.AzurePlatformType &&
-		platform != configv1.GCPPlatformType {
-		Skip("Test only applicable to AWS, Azure, and GCP platforms")
-	}
+		// Skip for platforms without failureDomain support
+		platform := testFramework.GetPlatformType()
+		if platform != configv1.AWSPlatformType &&
+			platform != configv1.AzurePlatformType &&
+			platform != configv1.GCPPlatformType {
+			Skip("Test only applicable to AWS, Azure, and GCP platforms")
+		}
 
-	By("Getting the current ControlPlaneMachineSet")
+		By("Getting the current ControlPlaneMachineSet")
 
-	cpms := &machinev1.ControlPlaneMachineSet{}
-	key := runtimeclient.ObjectKey{
-		Name:      framework.ControlPlaneMachineSetName,
-		Namespace: framework.MachineAPINamespace,
-	}
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	err := k8sClient.Get(ctx, key, cpms)
-	Expect(err).NotTo(HaveOccurred())
+		failureDomains := getFailureDomainsFromCPMS(cpms, platform)
+		if len(failureDomains) <= 1 {
+			Skip("Test requires multiple failure domains")
+		}
 
-	failureDomains := getFailureDomainsFromCPMS(cpms, platform)
-	if len(failureDomains) <= 1 {
-		Skip("Test requires multiple failure domains")
-	}
+		By("Recording current machine names")
 
-	By("Recording current machine names")
+		initialMachineNames := recordInitialMachineNames(ctx, k8sClient)
 
-	initialMachineNames := recordInitialMachineNames(ctx, k8sClient)
+		By("Temporarily switching to OnDelete to prevent automatic rollout")
 
-	By("Temporarily switching to OnDelete to prevent automatic rollout")
+		originalStrategy := EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
+		defer EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
 
-	originalStrategy := EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
-	defer EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
+		By("Changing the order of failure domains")
+		changeFailureDomainsOrderInCPMS(cpms, platform)
 
-	By("Changing the order of failure domains")
-	changeFailureDomainsOrderInCPMS(cpms, platform)
+		By("Switching back to RollingUpdate after a brief pause")
+		time.Sleep(10 * time.Second)
+		EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
 
-	By("Switching back to RollingUpdate after a brief pause")
-	time.Sleep(10 * time.Second)
-	EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
+		By("Verifying that no machines are replaced (names remain the same)")
+		verifyMachinesNotReplaced(ctx, k8sClient, initialMachineNames)
 
-	By("Verifying that no machines are replaced (names remain the same)")
-	verifyMachinesNotReplaced(ctx, k8sClient, initialMachineNames)
-
-	By("Verifying ControlPlaneMachineSet remains up to date")
-	EnsureControlPlaneMachineSetUpdated(testFramework)
+		By("Verifying ControlPlaneMachineSet remains up to date")
+		EnsureControlPlaneMachineSetUpdated(testFramework)
+	})
 }
 
 // ItShouldReplaceMachineInRemovedZone verifies that a machine with the same suffix as the given machine
@@ -591,11 +532,9 @@ func ItShouldDeleteMachineAndVerifyReplacementInOnDeleteMode(testFramework frame
 
 		machine := &machinev1beta1.Machine{}
 		machineKey := runtimeclient.ObjectKey{Name: *machineInZone, Namespace: framework.MachineAPINamespace}
-		err := k8sClient.Get(ctx, machineKey, machine)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(k8sClient.Get(ctx, machineKey, machine)).NotTo(HaveOccurred())
 
-		err = k8sClient.Delete(ctx, machine)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(k8sClient.Delete(ctx, machine)).NotTo(HaveOccurred())
 
 		By("Verifying replacement machine is created in another zone and old machine is deleted")
 		WaitForMachineReplacedInDifferentZone(ctx, k8sClient, machineSuffix, *zoneToRemove, timeout)
