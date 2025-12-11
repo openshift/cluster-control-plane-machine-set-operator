@@ -1,6 +1,6 @@
 module github.com/openshift/cluster-control-plane-machine-set-operator
 
-go 1.24.0
+go 1.24.3
 
 require (
 	github.com/go-logr/logr v1.4.3
