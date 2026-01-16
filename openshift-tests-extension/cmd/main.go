@@ -20,7 +20,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
+	localcmd "github.com/openshift/cluster-control-plane-machine-set-operator/openshift-tests-extension/pkg/cmd"
+
+	vendorcmdimages "github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdimages"
+	vendorcmdinfo "github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdinfo"
+	vendorcmdlist "github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdlist"
+	vendorcmdupdate "github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdupdate"
+
 	e "github.com/openshift-eng/openshift-tests-extension/pkg/extension"
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 	"github.com/spf13/cobra"
@@ -68,7 +74,16 @@ func main() {
 		Long: "cluster-control-plane-machine-set-operator tests extension for OpenShift",
 	}
 
-	root.AddCommand(cmd.DefaultExtensionCommands(extensionRegistry)...)
+	// Use custom commands with sharding support for run-suite and run-test
+	// Use vendored commands for others
+	root.AddCommand(
+		localcmd.NewRunSuiteCommand(extensionRegistry),      // Custom with sharding
+		localcmd.NewRunTestCommand(extensionRegistry),       // Custom with sharding
+		vendorcmdlist.NewListCommand(extensionRegistry),     // Vendored
+		vendorcmdinfo.NewInfoCommand(extensionRegistry),     // Vendored
+		vendorcmdupdate.NewUpdateCommand(extensionRegistry), // Vendored
+		vendorcmdimages.NewImagesCommand(extensionRegistry), // Vendored
+	)
 
 	if err := func() error {
 		return root.Execute()
