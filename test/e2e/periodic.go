@@ -99,6 +99,10 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 				helpers.EnsureControlPlaneMachineSetUpdateStrategy(framework.GlobalFramework, originalStrategy)
 			}, OncePerOrdered)
 
+			Context("and all three master machines are deleted simultaneously", Ordered, func() {
+				helpers.ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously(framework.GlobalFramework)
+			})
+
 			Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", Ordered, func() {
 				prefix := "master-prefix-on-delete"
 				resetPrefix := ""
