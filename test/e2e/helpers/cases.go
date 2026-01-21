@@ -256,10 +256,11 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 	})
 }
 
-// ItShouldOnDeleteReplaceAllThreeMastersWhenDeleted checks that the control plane machine set replaces all three
-// master machines when the update strategy is OnDelete and all three machines are deleted simultaneously.
-func ItShouldOnDeleteReplaceAllThreeMastersWhenDeleted(testFramework framework.Framework) {
-	PIt("should replace all three masters when deleted simultaneously", func() {
+// ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously checks that the control plane machine set replaces
+// all three master machines when the update strategy is OnDelete and all three machines are deleted simultaneously.
+func ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously(testFramework framework.Framework) {
+	// TODO: https://issues.redhat.com/browse/OCPBUGS-74151
+	It("should replace all three masters when deleted simultaneously", func() {
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 

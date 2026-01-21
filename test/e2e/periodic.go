@@ -100,23 +100,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 			}, OncePerOrdered)
 
 			Context("and all three master machines are deleted simultaneously", Ordered, func() {
-				var originalProviderSpec0, originalProviderSpec1, originalProviderSpec2 machinev1beta1.ProviderSpec
-
-				BeforeAll(func() {
-					// Modify all three machines to trigger updates
-					originalProviderSpec0, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 0)
-					originalProviderSpec1, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
-					originalProviderSpec2, _ = helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 2)
-				})
-
-				AfterAll(func() {
-					// Restore original provider specs
-					helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 0, originalProviderSpec0)
-					helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 1, originalProviderSpec1)
-					helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 2, originalProviderSpec2)
-				})
-
-				helpers.ItShouldOnDeleteReplaceAllThreeMastersWhenDeleted(framework.GlobalFramework)
+				helpers.ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously(framework.GlobalFramework)
 			})
 
 			Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", Ordered, func() {
