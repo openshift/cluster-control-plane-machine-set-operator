@@ -46,20 +46,18 @@ func main() {
 		Qualifiers: []string{`labels.exists(l, l == "PreSubmit")`},
 	})
 
+	// Initialize framework before running tests
+	if err := framework.InitFramework(); err != nil {
+		panic(fmt.Sprintf("failed to initialize framework: %v", err))
+	}
+
+	komega.SetClient(framework.GlobalFramework.GetClient())
+	komega.SetContext(framework.GlobalFramework.GetContext())
+
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
 	if err != nil {
 		panic(fmt.Sprintf("couldn't build extension test specs from ginkgo: %+v", err.Error()))
 	}
-
-	// Initialize framework before running tests
-	specs.AddBeforeAll(func() {
-		if err := framework.InitFramework(); err != nil {
-			panic(fmt.Sprintf("failed to initialize framework: %v", err))
-		}
-
-		komega.SetClient(framework.GlobalFramework.GetClient())
-		komega.SetContext(framework.GlobalFramework.GetContext())
-	})
 
 	ext.AddSpecs(specs)
 	extensionRegistry.Register(ext)
