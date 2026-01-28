@@ -10,8 +10,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
-	github.com/openshift/api v0.0.0-20251027215121-243758deaab1
-	github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235
+	github.com/openshift/api v0.0.0-20260126183958-606bd613f9f7
+	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20250910145856-21d03d30056d
 	github.com/openshift/library-go v0.0.0-20251027092748-1a3af44c9cd0
 	github.com/spf13/pflag v1.0.9

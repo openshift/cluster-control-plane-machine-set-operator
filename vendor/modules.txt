@@ -728,10 +728,12 @@ github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo
 github.com/openshift-eng/openshift-tests-extension/pkg/junit
 github.com/openshift-eng/openshift-tests-extension/pkg/util/sets
 github.com/openshift-eng/openshift-tests-extension/pkg/version
-# github.com/openshift/api v0.0.0-20251027215121-243758deaab1
+# github.com/openshift/api v0.0.0-20260126183958-606bd613f9f7
 ## explicit; go 1.24.0
 github.com/openshift/api
 github.com/openshift/api/annotations
+github.com/openshift/api/apiextensions
+github.com/openshift/api/apiextensions/v1alpha1
 github.com/openshift/api/apiserver
 github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps
@@ -749,6 +751,8 @@ github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/config/v1alpha2
 github.com/openshift/api/console
 github.com/openshift/api/console/v1
+github.com/openshift/api/etcd
+github.com/openshift/api/etcd/v1alpha1
 github.com/openshift/api/features
 github.com/openshift/api/helm
 github.com/openshift/api/helm/v1beta1
@@ -804,7 +808,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235
+# github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
 ## explicit; go 1.24.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
