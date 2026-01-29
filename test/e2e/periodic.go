@@ -17,13 +17,10 @@ limitations under the License.
 package e2e
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 
-	"github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
@@ -55,16 +52,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 			resetPrefix := ""
 
 			BeforeEach(func() {
-				// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
-				// The TechPreview jobs should not skip the test.
-				featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), framework.GlobalFramework)
-				if err != nil {
-					Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
-				}
-				if !featureGateFilter.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix)) {
-					Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
-				}
-
 				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(framework.GlobalFramework, prefix)
 			}, OncePerOrdered)
 
@@ -104,16 +91,6 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 				resetPrefix := ""
 
 				BeforeEach(func() {
-					// Check if CPMSMachineNamePrefix gate is enabled, skip otherwise.
-					// The TechPreview jobs should not skip the test.
-					featureGateFilter, err := helpers.NewFeatureGateFilter(context.TODO(), framework.GlobalFramework)
-					if err != nil {
-						Fail(fmt.Sprintf("failed to get featuregate filter: %v", err))
-					}
-					if !featureGateFilter.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix)) {
-						Skip(fmt.Sprintf("Skipping test because %q featuregate is not enabled", features.FeatureGateCPMSMachineNamePrefix))
-					}
-
 					helpers.UpdateControlPlaneMachineSetMachineNamePrefix(framework.GlobalFramework, prefix)
 				}, OncePerOrdered)
 

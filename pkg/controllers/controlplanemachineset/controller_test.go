@@ -194,11 +194,7 @@ var _ = Describe("With a running controller", func() {
 
 		createFeatureGate(
 			releaseVersion,
-			[]configv1.FeatureGateAttributes{ // enabled
-				{
-					Name: "CPMSMachineNamePrefix",
-				},
-			},
+			[]configv1.FeatureGateAttributes{}, // enabled
 			[]configv1.FeatureGateAttributes{}, // disabled
 		)
 
@@ -1497,485 +1493,256 @@ var _ = Describe("With a running controller", func() {
 
 var _ = Describe("With a running controller and machine name prefix", func() {
 
-	Context("When CPMSMachineNamePrefix feature gate is disabled", func() {
+	var mgrCancel, fgCancel context.CancelFunc
+	var mgrDone, fgDone chan struct{}
+	var mgr ctrl.Manager
 
-		var mgrCancel, fgCancel context.CancelFunc
-		var mgrDone, fgDone chan struct{}
-		var mgr ctrl.Manager
+	var namespaceName string
 
-		var namespaceName string
+	var co *configv1.ClusterOperator
 
-		var co *configv1.ClusterOperator
+	BeforeEach(func() {
+		By("Setting up a namespace for the test")
+		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		namespaceName = ns.GetName()
 
-		BeforeEach(func() {
-			By("Setting up a namespace for the test")
-			ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
-			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
-			namespaceName = ns.GetName()
-
-			By("Setting up a manager and controller")
-			var err error
-			mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-				Scheme: testScheme,
-				Metrics: server.Options{
-					BindAddress: "0",
-				},
-				WebhookServer: webhook.NewServer(webhook.Options{
-					Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-					Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-					CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-				}),
-				Controller: config.Controller{
-					SkipNameValidation: ptr.To(true),
-				},
-			})
-			Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
-
-			By("Setting up a featureGateAccessor")
-			var fgCtx context.Context
-			fgCtx, fgCancel = context.WithCancel(context.Background())
-			fgDone = make(chan struct{})
-
-			createFeatureGate(releaseVersion,
-				[]configv1.FeatureGateAttributes{}, // enabled
-
-				[]configv1.FeatureGateAttributes{ // disabled
-					{
-						Name: "CPMSMachineNamePrefix",
-					},
-				},
-			)
-
-			featureGateAccessor, err := util.SetupFeatureGateAccessor(fgCtx, mgr)
-			Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
-
-			reconciler := &ControlPlaneMachineSetReconciler{
-				Client:              mgr.GetClient(),
-				UncachedClient:      mgr.GetClient(),
-				Namespace:           namespaceName,
-				OperatorName:        operatorName,
-				FeatureGateAccessor: featureGateAccessor,
-			}
-			Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
-
-			By("Starting the manager")
-			var mgrCtx context.Context
-			mgrCtx, mgrCancel = context.WithCancel(context.Background())
-			mgrDone = make(chan struct{})
-
-			go func() {
-				defer GinkgoRecover()
-				defer close(mgrDone)
-				defer close(fgDone)
-
-				Expect(mgr.Start(mgrCtx)).To(Succeed())
-			}()
-
-			// CVO will create a blank cluster operator for us before the operator starts.
-			co = configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
-			Expect(k8sClient.Create(ctx, co)).To(Succeed())
+		By("Setting up a manager and controller")
+		var err error
+		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
+			Scheme: testScheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			WebhookServer: webhook.NewServer(webhook.Options{
+				Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+				Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+				CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			}),
+			Controller: config.Controller{
+				SkipNameValidation: ptr.To(true),
+			},
 		})
+		Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
 
-		AfterEach(func() {
-			By("Stopping the manager")
-			mgrCancel()
-			// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-			<-mgrDone
+		By("Setting up a featureGateAccessor")
+		var fgCtx context.Context
+		fgCtx, fgCancel = context.WithCancel(context.Background())
+		fgDone = make(chan struct{})
 
-			By("Stopping the featureGateAccessor")
-			fgCancel()
-			<-fgDone
+		createFeatureGate(releaseVersion,
+			[]configv1.FeatureGateAttributes{}, // enabled
+			[]configv1.FeatureGateAttributes{}, // disabled
+		)
 
-			// Remove Featuregate
-			testutils.CleanupResources(Default, ctx, cfg, k8sClient, "", &configv1.FeatureGate{})
+		featureGateAccessor, err := util.SetupFeatureGateAccessor(fgCtx, mgr)
+		Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
 
-			testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
-				&corev1.Node{},
-				&configv1.ClusterOperator{},
-				&machinev1beta1.Machine{},
-				&machinev1.ControlPlaneMachineSet{},
-			)
-		})
+		reconciler := &ControlPlaneMachineSetReconciler{
+			Client:              mgr.GetClient(),
+			UncachedClient:      mgr.GetClient(),
+			Namespace:           namespaceName,
+			OperatorName:        operatorName,
+			FeatureGateAccessor: featureGateAccessor,
+		}
+		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
-		Context("when Control Plane Machine Set is updated to set MachineNamePrefix", func() {
-			var cpms *machinev1.ControlPlaneMachineSet
-			testOptions := helpers.RollingUpdatePeriodicTestOptions{}
-			prefix := "control-plane-prefix"
+		By("Starting the manager")
+		var mgrCtx context.Context
+		mgrCtx, mgrCancel = context.WithCancel(context.Background())
+		mgrDone = make(chan struct{})
 
-			BeforeEach(func() {
-				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
+		go func() {
+			defer GinkgoRecover()
+			defer close(mgrDone)
+			defer close(fgDone)
 
-				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
-					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
-					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
-					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
-				}
+			Expect(mgr.Start(mgrCtx)).To(Succeed())
+		}()
 
-				for i := range machines {
-					nodeName := fmt.Sprintf("node-%d", i)
-					machineName := fmt.Sprintf("master-%d", i)
-
-					machine := machines[i].WithName(machineName).Build()
-
-					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
-					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
-
-					Eventually(komega.UpdateStatus(machine, func() {
-						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
-					})).Should(Succeed())
-				}
-
-				By("Registering the integration machine manager")
-
-				// The machine manager is a dummy implementation that moves machines from zero, through the expected
-				// phases and then eventually to the Running phase.
-				// This allows the CPMS to react to the changes in the machine status and run through its own logic.
-				// We use it here so that we can simulate a full rolling replacement of the control plane which needs
-				// machines to be able to move through the phases to the Running phase.
-
-				machineManager := integration.NewIntegrationMachineManager(integration.MachineManagerOptions{
-					ActionDelay: 500 * time.Millisecond,
-				})
-				Expect(machineManager.SetupWithManager(mgr)).To(Succeed())
-
-				// Wait for the machines to all report running before creating the CPMS.
-				By("Waiting for the machines to become ready")
-				Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
-					HaveField("Status.Phase", HaveValue(Equal("Running"))),
-				)))
-
-				// The default CPMS should be sufficient for this test.
-				By("Creating the ControlPlaneMachineSet")
-				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
-				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
-
-				By("Waiting for the ControlPlaneMachineSet to report a stable status")
-				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-					HaveField("ObservedGeneration", Equal(int64(1))),
-					HaveField("Replicas", Equal(int32(3))),
-					HaveField("UpdatedReplicas", Equal(int32(3))),
-					HaveField("ReadyReplicas", Equal(int32(3))),
-					HaveField("UnavailableReplicas", Equal(int32(0))),
-				)))
-			})
-
-			// Update the CPMS to set MachineNamePrefix
-			JustBeforeEach(func() {
-				// The CPMS is configured for AWS so use the AWS Platform Type.
-				testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
-
-				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix, 10*time.Second, 1*time.Second)
-
-				testOptions.TestFramework = testFramework
-
-				testOptions.RolloutTimeout = 10 * time.Second
-				testOptions.StabilisationTimeout = 1 * time.Second
-				testOptions.StabilisationMinimumAvailability = 500 * time.Millisecond
-			})
-
-			It("should keep the machine names unchanged consistently", func() {
-				machineList := &machinev1beta1.MachineList{}
-				Consistently(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
-					SatisfyAll(
-						ContainElement(HaveField("ObjectMeta.Name", Equal("master-0"))),
-						ContainElement(HaveField("ObjectMeta.Name", Equal("master-1"))),
-						ContainElement(HaveField("ObjectMeta.Name", Equal("master-2"))),
-					),
-				))
-			})
-
-			It("should keep the status unchanged consistently", func() {
-				Consistently(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-					HaveField("Replicas", Equal(int32(3))),
-					HaveField("ReadyReplicas", Equal(int32(3))),
-					HaveField("UpdatedReplicas", Equal(int32(3))),
-					HaveField("UnavailableReplicas", Equal(int32(0))),
-				)))
-			})
-
-			Context("and the provider spec is modified", func() {
-				JustBeforeEach(func() {
-					helpers.ModifyControlPlaneMachineSetToTriggerRollout(testOptions.TestFramework, 10*time.Second, 1*time.Second)
-				})
-
-				helpers.ItShouldPerformARollingUpdate(&testOptions)
-
-				It("should not create machines with prefixed name consistently", func() {
-					nameMatcherWithPrefix := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-\\d", prefix))
-
-					machineList := &machinev1beta1.MachineList{}
-
-					Consistently(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
-						SatisfyAll(
-							Not(ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix))),
-							Not(ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix))),
-							Not(ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix))),
-						),
-					))
-				})
-			})
-		})
+		// CVO will create a blank cluster operator for us before the operator starts.
+		co = configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
+		Expect(k8sClient.Create(ctx, co)).To(Succeed())
 	})
 
-	Context("When CPMSMachineNamePrefix feature gate is enabled", func() {
+	AfterEach(func() {
+		By("Stopping the manager")
+		mgrCancel()
+		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
+		<-mgrDone
 
-		var mgrCancel, fgCancel context.CancelFunc
-		var mgrDone, fgDone chan struct{}
-		var mgr ctrl.Manager
+		By("Stopping the featureGateAccessor")
+		fgCancel()
+		<-fgDone
 
-		var namespaceName string
+		// Remove Featuregate
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, "", &configv1.FeatureGate{})
 
-		var co *configv1.ClusterOperator
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			&corev1.Node{},
+			&configv1.ClusterOperator{},
+			&machinev1beta1.Machine{},
+			&machinev1.ControlPlaneMachineSet{},
+		)
+	})
+
+	Context("when Control Plane Machine Set is updated to set MachineNamePrefix", func() {
+		var cpms *machinev1.ControlPlaneMachineSet
+		testOptions := helpers.RollingUpdatePeriodicTestOptions{}
+		prefix := "control-plane-prefix"
 
 		BeforeEach(func() {
-			By("Setting up a namespace for the test")
-			ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
-			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
-			namespaceName = ns.GetName()
+			By("Creating Machines owned by the ControlPlaneMachineSet")
+			machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
 
-			By("Setting up a manager and controller")
-			var err error
-			mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-				Scheme: testScheme,
-				Metrics: server.Options{
-					BindAddress: "0",
-				},
-				WebhookServer: webhook.NewServer(webhook.Options{
-					Port:    testEnv.WebhookInstallOptions.LocalServingPort,
-					Host:    testEnv.WebhookInstallOptions.LocalServingHost,
-					CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
-				}),
-				Controller: config.Controller{
-					SkipNameValidation: ptr.To(true),
-				},
-			})
-			Expect(err).ToNot(HaveOccurred(), "Manager should be able to be created")
-
-			By("Setting up a featureGateAccessor")
-			var fgCtx context.Context
-			fgCtx, fgCancel = context.WithCancel(context.Background())
-			fgDone = make(chan struct{})
-
-			createFeatureGate(releaseVersion,
-				[]configv1.FeatureGateAttributes{ // enabled
-					{
-						Name: "CPMSMachineNamePrefix",
-					},
-				},
-				[]configv1.FeatureGateAttributes{}, // disabled
-			)
-
-			featureGateAccessor, err := util.SetupFeatureGateAccessor(fgCtx, mgr)
-			Expect(err).ToNot(HaveOccurred(), "Feature gate accessor should be created")
-
-			reconciler := &ControlPlaneMachineSetReconciler{
-				Client:              mgr.GetClient(),
-				UncachedClient:      mgr.GetClient(),
-				Namespace:           namespaceName,
-				OperatorName:        operatorName,
-				FeatureGateAccessor: featureGateAccessor,
+			machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
+				0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
+				1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
+				2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
 			}
-			Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
-			By("Starting the manager")
-			var mgrCtx context.Context
-			mgrCtx, mgrCancel = context.WithCancel(context.Background())
-			mgrDone = make(chan struct{})
+			for i := range machines {
+				nodeName := fmt.Sprintf("node-%d", i)
+				machineName := fmt.Sprintf("master-%d", i)
 
-			go func() {
-				defer GinkgoRecover()
-				defer close(mgrDone)
-				defer close(fgDone)
+				machine := machines[i].WithName(machineName).Build()
 
-				Expect(mgr.Start(mgrCtx)).To(Succeed())
-			}()
+				Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+				Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
 
-			// CVO will create a blank cluster operator for us before the operator starts.
-			co = configv1resourcebuilder.ClusterOperator().WithName(operatorName).Build()
-			Expect(k8sClient.Create(ctx, co)).To(Succeed())
-		})
+				Eventually(komega.UpdateStatus(machine, func() {
+					machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
+				})).Should(Succeed())
+			}
 
-		AfterEach(func() {
-			By("Stopping the manager")
-			mgrCancel()
-			// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-			<-mgrDone
+			By("Registering the integration machine manager")
 
-			By("Stopping the featureGateAccessor")
-			fgCancel()
-			<-fgDone
+			// The machine manager is a dummy implementation that moves machines from zero, through the expected
+			// phases and then eventually to the Running phase.
+			// This allows the CPMS to react to the changes in the machine status and run through its own logic.
+			// We use it here so that we can simulate a full rolling replacement of the control plane which needs
+			// machines to be able to move through the phases to the Running phase.
 
-			// Remove Featuregate
-			testutils.CleanupResources(Default, ctx, cfg, k8sClient, "", &configv1.FeatureGate{})
-
-			testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
-				&corev1.Node{},
-				&configv1.ClusterOperator{},
-				&machinev1beta1.Machine{},
-				&machinev1.ControlPlaneMachineSet{},
-			)
-		})
-
-		Context("when Control Plane Machine Set is updated to set MachineNamePrefix", func() {
-			var cpms *machinev1.ControlPlaneMachineSet
-			testOptions := helpers.RollingUpdatePeriodicTestOptions{}
-			prefix := "control-plane-prefix"
-
-			BeforeEach(func() {
-				By("Creating Machines owned by the ControlPlaneMachineSet")
-				machineBuilder := machinev1beta1resourcebuilder.Machine().AsMaster().WithNamespace(namespaceName)
-
-				machines := map[int]machinev1beta1resourcebuilder.MachineBuilder{
-					0: machineBuilder.WithProviderSpecBuilder(usEast1aProviderSpecBuilder),
-					1: machineBuilder.WithProviderSpecBuilder(usEast1bProviderSpecBuilder),
-					2: machineBuilder.WithProviderSpecBuilder(usEast1cProviderSpecBuilder),
-				}
-
-				for i := range machines {
-					nodeName := fmt.Sprintf("node-%d", i)
-					machineName := fmt.Sprintf("master-%d", i)
-
-					machine := machines[i].WithName(machineName).Build()
-
-					Expect(k8sClient.Create(ctx, machine)).To(Succeed())
-					Expect(k8sClient.Create(ctx, masterNodeBuilder.WithName(nodeName).AsReady().Build())).To(Succeed())
-
-					Eventually(komega.UpdateStatus(machine, func() {
-						machine.Status.NodeRef = &corev1.ObjectReference{Name: nodeName}
-					})).Should(Succeed())
-				}
-
-				By("Registering the integration machine manager")
-
-				// The machine manager is a dummy implementation that moves machines from zero, through the expected
-				// phases and then eventually to the Running phase.
-				// This allows the CPMS to react to the changes in the machine status and run through its own logic.
-				// We use it here so that we can simulate a full rolling replacement of the control plane which needs
-				// machines to be able to move through the phases to the Running phase.
-
-				machineManager := integration.NewIntegrationMachineManager(integration.MachineManagerOptions{
-					ActionDelay: 500 * time.Millisecond,
-				})
-				Expect(machineManager.SetupWithManager(mgr)).To(Succeed())
-
-				// Wait for the machines to all report running before creating the CPMS.
-				By("Waiting for the machines to become ready")
-				Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
-					HaveField("Status.Phase", HaveValue(Equal("Running"))),
-				)))
-
-				// The default CPMS should be sufficient for this test.
-				By("Creating the ControlPlaneMachineSet")
-				cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
-				Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
-
-				By("Waiting for the ControlPlaneMachineSet to report a stable status")
-				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-					HaveField("ObservedGeneration", Equal(int64(1))),
-					HaveField("Replicas", Equal(int32(3))),
-					HaveField("UpdatedReplicas", Equal(int32(3))),
-					HaveField("ReadyReplicas", Equal(int32(3))),
-					HaveField("UnavailableReplicas", Equal(int32(0))),
-				)))
+			machineManager := integration.NewIntegrationMachineManager(integration.MachineManagerOptions{
+				ActionDelay: 500 * time.Millisecond,
 			})
+			Expect(machineManager.SetupWithManager(mgr)).To(Succeed())
 
-			// Update the CPMS to set MachineNamePrefix
+			// Wait for the machines to all report running before creating the CPMS.
+			By("Waiting for the machines to become ready")
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+				HaveField("Status.Phase", HaveValue(Equal("Running"))),
+			)))
+
+			// The default CPMS should be sufficient for this test.
+			By("Creating the ControlPlaneMachineSet")
+			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
+			Expect(k8sClient.Create(ctx, cpms)).Should(Succeed())
+
+			By("Waiting for the ControlPlaneMachineSet to report a stable status")
+			Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+				HaveField("ObservedGeneration", Equal(int64(1))),
+				HaveField("Replicas", Equal(int32(3))),
+				HaveField("UpdatedReplicas", Equal(int32(3))),
+				HaveField("ReadyReplicas", Equal(int32(3))),
+				HaveField("UnavailableReplicas", Equal(int32(0))),
+			)))
+		})
+
+		// Update the CPMS to set MachineNamePrefix
+		JustBeforeEach(func() {
+			// The CPMS is configured for AWS so use the AWS Platform Type.
+			testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
+
+			helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix, 10*time.Second, 1*time.Second)
+
+			testOptions.TestFramework = testFramework
+
+			testOptions.RolloutTimeout = 10 * time.Second
+			testOptions.StabilisationTimeout = 1 * time.Second
+			testOptions.StabilisationMinimumAvailability = 500 * time.Millisecond
+		})
+
+		It("machine name should remain unchanged consistently", func() {
+			machineList := &machinev1beta1.MachineList{}
+			Consistently(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
+				SatisfyAll(
+					ContainElement(HaveField("ObjectMeta.Name", Equal("master-0"))),
+					ContainElement(HaveField("ObjectMeta.Name", Equal("master-1"))),
+					ContainElement(HaveField("ObjectMeta.Name", Equal("master-2"))),
+				),
+			))
+		})
+
+		It("should keep the status unchanged consistently", func() {
+			Consistently(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
+				HaveField("Replicas", Equal(int32(3))),
+				HaveField("ReadyReplicas", Equal(int32(3))),
+				HaveField("UpdatedReplicas", Equal(int32(3))),
+				HaveField("UnavailableReplicas", Equal(int32(0))),
+			)))
+		})
+
+		Context("and the provider spec is modified", func() {
 			JustBeforeEach(func() {
-				// The CPMS is configured for AWS so use the AWS Platform Type.
-				testFramework := framework.NewFrameworkWith(testScheme, k8sClient, configv1.AWSPlatformType, framework.Full, namespaceName)
-
-				helpers.UpdateControlPlaneMachineSetMachineNamePrefix(testFramework, prefix, 10*time.Second, 1*time.Second)
-
-				testOptions.TestFramework = testFramework
-
-				testOptions.RolloutTimeout = 10 * time.Second
-				testOptions.StabilisationTimeout = 1 * time.Second
-				testOptions.StabilisationMinimumAvailability = 500 * time.Millisecond
+				helpers.ModifyControlPlaneMachineSetToTriggerRollout(testOptions.TestFramework, 10*time.Second, 1*time.Second)
 			})
 
-			It("machine name should remain unchanged consistently", func() {
+			helpers.ItShouldPerformARollingUpdate(&testOptions)
+
+			It("creates machines only with prefixed name", func() {
+				nameMatcherWithPrefix := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-\\d", prefix))
+
 				machineList := &machinev1beta1.MachineList{}
-				Consistently(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
+
+				Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items", HaveLen(3))) // Should have 3 machines
+
+				Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
 					SatisfyAll(
-						ContainElement(HaveField("ObjectMeta.Name", Equal("master-0"))),
-						ContainElement(HaveField("ObjectMeta.Name", Equal("master-1"))),
-						ContainElement(HaveField("ObjectMeta.Name", Equal("master-2"))),
+						ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
+						ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
+						ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
 					),
 				))
 			})
-
-			It("should keep the status unchanged consistently", func() {
-				Consistently(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
-					HaveField("Replicas", Equal(int32(3))),
-					HaveField("ReadyReplicas", Equal(int32(3))),
-					HaveField("UpdatedReplicas", Equal(int32(3))),
-					HaveField("UnavailableReplicas", Equal(int32(0))),
-				)))
-			})
-
-			Context("and the provider spec is modified", func() {
-				JustBeforeEach(func() {
-					helpers.ModifyControlPlaneMachineSetToTriggerRollout(testOptions.TestFramework, 10*time.Second, 1*time.Second)
-				})
-
-				helpers.ItShouldPerformARollingUpdate(&testOptions)
-
-				It("creates machines only with prefixed name", func() {
-					nameMatcherWithPrefix := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-\\d", prefix))
-
-					machineList := &machinev1beta1.MachineList{}
-
-					Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items", HaveLen(3))) // Should have 3 machines
-
-					Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
-						SatisfyAll(
-							ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
-							ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
-							ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
-						),
-					))
-				})
-			})
-
-			Context("and a machine is deleted", func() {
-				index := 1
-
-				JustBeforeEach(func() {
-					machine := &machinev1beta1.Machine{}
-					machineName := fmt.Sprintf("master-%d", index)
-					machineKey := client.ObjectKey{Namespace: namespaceName, Name: machineName}
-
-					By(fmt.Sprintf("Deleting machine in index %d", index))
-
-					Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
-					Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
-				})
-
-				It("should create a replacement machine for the correct index", func() {
-					helpers.EventuallyIndexIsBeingReplaced(ctx, testOptions.TestFramework, index)
-				})
-
-				It("should only name the replacement machine with prefix", func() {
-					nameMatcherWithPrefix := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-%d", prefix, index)) // For the prefixed machine
-
-					nameWithoutPrefix1 := "master-0" // Index 0 should follow old name
-					nameWithoutPrefix2 := "master-2" // Index 2 should follow old name
-
-					machineList := &machinev1beta1.MachineList{}
-					Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items", HaveLen(3))) // Should have 3 machines
-
-					Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
-						SatisfyAll(
-							ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
-							ContainElement(HaveField("ObjectMeta.Name", Equal(nameWithoutPrefix1))),
-							ContainElement(HaveField("ObjectMeta.Name", Equal(nameWithoutPrefix2))),
-						),
-					))
-				})
-			})
 		})
 
+		Context("and a machine is deleted", func() {
+			index := 1
+
+			JustBeforeEach(func() {
+				machine := &machinev1beta1.Machine{}
+				machineName := fmt.Sprintf("master-%d", index)
+				machineKey := client.ObjectKey{Namespace: namespaceName, Name: machineName}
+
+				By(fmt.Sprintf("Deleting machine in index %d", index))
+
+				Expect(k8sClient.Get(ctx, machineKey, machine)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
+			})
+
+			It("should create a replacement machine for the correct index", func() {
+				helpers.EventuallyIndexIsBeingReplaced(ctx, testOptions.TestFramework, index)
+			})
+
+			It("should only name the replacement machine with prefix", func() {
+				nameMatcherWithPrefix := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-%d", prefix, index)) // For the prefixed machine
+
+				nameWithoutPrefix1 := "master-0" // Index 0 should follow old name
+				nameWithoutPrefix2 := "master-2" // Index 2 should follow old name
+
+				machineList := &machinev1beta1.MachineList{}
+				Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items", HaveLen(3))) // Should have 3 machines
+
+				Eventually(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
+					SatisfyAll(
+						ContainElement(HaveField("ObjectMeta.Name", nameMatcherWithPrefix)),
+						ContainElement(HaveField("ObjectMeta.Name", Equal(nameWithoutPrefix1))),
+						ContainElement(HaveField("ObjectMeta.Name", Equal(nameWithoutPrefix2))),
+					),
+				))
+			})
+		})
 	})
 })
 

@@ -38,21 +38,12 @@ var (
 	errUnexpectedMachineType = errors.New("unexpected value for spec.template.machineType")
 )
 
-// MachineProviderOptions holds configuration options for the machine provider.
-type MachineProviderOptions struct {
-	// AllowMachineNamePrefix option is set when the CPMSMachineNamePrefix
-	// feature gate is enabled.
-	AllowMachineNamePrefix bool
-}
-
 // NewMachineProvider constructs a MachineProvider based on the machine type passed.
 // This can then be used to access and manipulate machines within the cluster.
-func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, recorder record.EventRecorder, cpms *machinev1.ControlPlaneMachineSet, opts MachineProviderOptions) (machineproviders.MachineProvider, error) {
+func NewMachineProvider(ctx context.Context, logger logr.Logger, cl client.Client, recorder record.EventRecorder, cpms *machinev1.ControlPlaneMachineSet) (machineproviders.MachineProvider, error) {
 	switch cpms.Spec.Template.MachineType {
 	case machinev1.OpenShiftMachineV1Beta1MachineType:
-		provider, err := openshiftmachinev1beta1.NewMachineProvider(ctx, logger, cl, recorder, cpms, openshiftmachinev1beta1.OpenshiftMachineProviderOptions{
-			AllowMachineNamePrefix: opts.AllowMachineNamePrefix,
-		})
+		provider, err := openshiftmachinev1beta1.NewMachineProvider(ctx, logger, cl, recorder, cpms)
 		if err != nil {
 			return nil, fmt.Errorf("error constructing %s machine provider: %w", machinev1.OpenShiftMachineV1Beta1MachineType, err)
 		}

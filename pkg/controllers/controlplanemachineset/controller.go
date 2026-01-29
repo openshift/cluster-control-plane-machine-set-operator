@@ -24,7 +24,6 @@ import (
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders"
@@ -248,16 +247,7 @@ func (r *ControlPlaneMachineSetReconciler) reconcile(ctx context.Context, logger
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	currentFeatureGates, err := r.FeatureGateAccessor.CurrentFeatureGates()
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("unable to retrieve current feature gates: %w", err)
-	}
-
-	opts := providers.MachineProviderOptions{
-		AllowMachineNamePrefix: currentFeatureGates.Enabled(features.FeatureGateCPMSMachineNamePrefix),
-	}
-
-	machineProvider, err := providers.NewMachineProvider(ctx, logger, r.Client, r.Recorder, cpms, opts)
+	machineProvider, err := providers.NewMachineProvider(ctx, logger, r.Client, r.Recorder, cpms)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error constructing machine provider: %w", err)
 	}
