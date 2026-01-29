@@ -19,13 +19,13 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	ote "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	"sync"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -163,7 +163,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.RollingUpdate)
+			return CheckRolloutForIndex(testFramework, rolloutCtx, index, machinev1.RollingUpdate)
 		})
 
 		wg.Wait()
@@ -260,7 +260,7 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 // all three master machines when the update strategy is OnDelete and all three machines are deleted simultaneously.
 func ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously(testFramework framework.Framework) {
 	// TODO: https://issues.redhat.com/browse/OCPBUGS-74151
-	It("should replace all three masters when deleted simultaneously", func() {
+	It("should replace all three masters when deleted simultaneously", ote.Informing(), func() {
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
