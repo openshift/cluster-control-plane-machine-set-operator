@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate go run ../../vendor/github.com/golang/mock/mockgen --destination mock/zz_generated_machine_provider_mock.go --package mock . MachineProvider
+//go:generate go run ../../vendor/go.uber.org/mock/mockgen --destination mock/zz_generated_machine_provider_mock.go --package mock . MachineProvider
 
 package machineproviders
