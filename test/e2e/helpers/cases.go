@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -163,7 +164,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.RollingUpdate)
+			return CheckRolloutForIndex(testFramework, rolloutCtx, index, machinev1.RollingUpdate)
 		})
 
 		wg.Wait()
@@ -372,5 +373,173 @@ func ItShouldPerformControlPlaneMachineSetRegeneration(opts *ControlPlaneMachine
 			HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw",
 				MatchJSON(rawExtension.Raw)),
 		)
+	})
+}
+
+// ItShouldRejectInvalidMachineNamePrefix checks that invalid machine name prefix formats are rejected.
+// Migrated from openshift-tests-private OCP-78773.
+func ItShouldRejectInvalidMachineNamePrefix(testFramework framework.Framework) {
+	It("should reject invalid prefix formats", func() {
+		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
+
+		By("Getting the current ControlPlaneMachineSet")
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		By("Attempting to set an invalid machine name prefix with underscore")
+
+		cpmsUpdate := cpms.DeepCopy()
+		cpmsUpdate.Spec.MachineNamePrefix = "abcd_0"
+
+		err := k8sClient.Update(ctx, cpmsUpdate)
+		Expect(err).To(HaveOccurred(), "Should reject invalid machine name prefix")
+		Expect(err.Error()).To(ContainSubstring("lowercase RFC 1123"),
+			"Error should mention RFC 1123 validation")
+
+		By("Attempting to set an invalid prefix with uppercase letters")
+
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		cpmsUpdate = cpms.DeepCopy()
+		cpmsUpdate.Spec.MachineNamePrefix = "Master-Node"
+
+		Expect(k8sClient.Update(ctx, cpmsUpdate)).To(HaveOccurred(), "Should reject uppercase letters in prefix")
+	})
+}
+
+// ItShouldNotRolloutWhenFailureDomainOrderChanges checks that changing the order of
+// failureDomains without changing the zones themselves does not trigger a rollout.
+// Migrated from openshift-tests-private OCP-53328.
+func ItShouldNotRolloutWhenFailureDomainOrderChanges(testFramework framework.Framework) {
+	It("should not trigger a rollout", func() {
+		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
+
+		// Skip for platforms without failureDomain support
+		platform := testFramework.GetPlatformType()
+		if platform != configv1.AWSPlatformType &&
+			platform != configv1.AzurePlatformType &&
+			platform != configv1.GCPPlatformType {
+			Skip("Test only applicable to AWS, Azure, and GCP platforms")
+		}
+
+		By("Getting the current ControlPlaneMachineSet")
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		failureDomains := getFailureDomainsFromCPMS(cpms, platform)
+		if len(failureDomains) <= 1 {
+			Skip("Test requires multiple failure domains")
+		}
+
+		By("Recording current machine names")
+
+		initialMachineNames := recordInitialMachineNames(ctx, k8sClient)
+
+		By("Temporarily switching to OnDelete to prevent automatic rollout")
+
+		originalStrategy := EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.OnDelete)
+		defer EnsureControlPlaneMachineSetUpdateStrategy(testFramework, originalStrategy)
+
+		By("Changing the order of failure domains")
+		changeFailureDomainsOrderInCPMS(cpms, platform)
+
+		By("Switching back to RollingUpdate after a brief pause")
+		time.Sleep(10 * time.Second)
+		EnsureControlPlaneMachineSetUpdateStrategy(testFramework, machinev1.RollingUpdate)
+
+		By("Verifying that no machines are replaced (names remain the same)")
+		verifyMachinesNotReplaced(ctx, k8sClient, initialMachineNames)
+
+		By("Verifying ControlPlaneMachineSet remains up to date")
+		EnsureControlPlaneMachineSetUpdated(testFramework)
+	})
+}
+
+// ItShouldReplaceMachineInRemovedZone verifies that a machine with the same suffix as the given machine
+// has been moved to a different zone after the zone was removed from the ControlPlaneMachineSet.
+// It ensures the old machine is deleted and only the new machine in a different zone remains.
+func ItShouldReplaceMachineInRemovedZone(testFramework framework.Framework, zoneToRemove *string, machineInZone *string) {
+	It("should replace the machine in removed zone with one in another zone", func() {
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
+		timeout := 30 * time.Minute
+
+		machineSuffix := getMachineSuffixFromName(*machineInZone)
+
+		By("Verifying the machine in removed zone is replaced in another zone and old machine is deleted")
+		WaitForMachineReplacedInDifferentZone(ctx, k8sClient, machineSuffix, *zoneToRemove, timeout)
+
+		By("Waiting for cluster to stabilize")
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
+	})
+}
+
+// ItShouldStabilizeAfterFailureDomainRestoration verifies that the cluster stabilizes
+// after the failureDomain is restored to the ControlPlaneMachineSet.
+// It first ensures the controller has observed the spec change, then waits for any rollout
+// to complete (if needed), and finally waits for cluster operators to stabilize.
+func ItShouldStabilizeAfterFailureDomainRestoration(testFramework framework.Framework) {
+	It("should stabilize after failureDomain restoration", func() {
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
+		timeout := 30 * time.Minute
+
+		rolloutCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(rolloutCtx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed())
+
+		// Capture the current generation to ensure we wait for the controller to observe the change
+		currentGeneration := cpms.Generation
+
+		By("Waiting for controller to observe the failureDomain restoration")
+		// Wait for ObservedGeneration to match the current Generation, ensuring the controller
+		// has processed the spec change and updated the status accordingly.
+		// Use a 3 minute timeout for this check - the controller should reconcile within seconds,
+		// but we allow extra time for slow environments.
+		Eventually(komega.Object(cpms), 3*time.Minute).WithContext(rolloutCtx).Should(
+			HaveField("Status.ObservedGeneration", Equal(currentGeneration)),
+			"controller should observe the spec change",
+		)
+
+		By("Waiting for rollout to complete after failureDomain restoration")
+		WaitForControlPlaneMachineSetDesiredReplicas(rolloutCtx, cpms)
+
+		By("Waiting for cluster to stabilize")
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
+	})
+}
+
+// ItShouldDeleteMachineAndVerifyReplacementInOnDeleteMode deletes a machine in the removed zone
+// and verifies that a replacement machine is created in another zone in OnDelete mode.
+// It ensures the old machine is deleted and only the new machine in a different zone remains.
+func ItShouldDeleteMachineAndVerifyReplacementInOnDeleteMode(testFramework framework.Framework, zoneToRemove *string, machineInZone *string) {
+	It("should create replacement in another zone after machine deletion", func() {
+		ctx := testFramework.GetContext()
+		k8sClient := testFramework.GetClient()
+		timeout := 30 * time.Minute
+
+		machineSuffix := getMachineSuffixFromName(*machineInZone)
+
+		By("Deleting the machine in the removed zone: " + *machineInZone)
+
+		machine := &machinev1beta1.Machine{}
+		machineKey := runtimeclient.ObjectKey{Name: *machineInZone, Namespace: framework.MachineAPINamespace}
+		Expect(k8sClient.Get(ctx, machineKey, machine)).NotTo(HaveOccurred())
+
+		Expect(k8sClient.Delete(ctx, machine)).NotTo(HaveOccurred())
+
+		By("Verifying replacement machine is created in another zone and old machine is deleted")
+		WaitForMachineReplacedInDifferentZone(ctx, k8sClient, machineSuffix, *zoneToRemove, timeout)
+
+		By("Waiting for cluster to stabilize")
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
 	})
 }

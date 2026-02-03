@@ -213,6 +213,16 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 
 			helpers.ItShouldNotCauseARollout(framework.GlobalFramework)
 		})
+
+		// Migrated from openshift-tests-private OCP-78773
+		Context("and MachineNamePrefix is set to an invalid value", func() {
+			helpers.ItShouldRejectInvalidMachineNamePrefix(framework.GlobalFramework)
+		})
+
+		// Migrated from openshift-tests-private OCP-53328
+		Context("and failureDomain order is changed", func() {
+			helpers.ItShouldNotRolloutWhenFailureDomainOrderChanges(framework.GlobalFramework)
+		})
 	})
 
 	Context("With an inactive ControlPlaneMachineSet", func() {
