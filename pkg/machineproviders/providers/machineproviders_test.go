@@ -148,7 +148,6 @@ var _ = Describe("MachineProviders", func() {
 		var logger testutils.TestLogger
 		var namespaceName string
 		var recorder *record.FakeRecorder
-		var opts MachineProviderOptions
 
 		const invalidCPMSType = machinev1.ControlPlaneMachineSetMachineType("invalid")
 
@@ -163,10 +162,6 @@ var _ = Describe("MachineProviders", func() {
 			logger = testutils.NewTestLogger()
 
 			recorder = record.NewFakeRecorder(100)
-
-			opts = MachineProviderOptions{
-				AllowMachineNamePrefix: false,
-			}
 		})
 
 		AfterEach(func() {
@@ -183,7 +178,7 @@ var _ = Describe("MachineProviders", func() {
 				cpms := cpmsBuilder.Build()
 				cpms.Spec.Template.MachineType = invalidCPMSType
 
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 			})
 
 			It("returns an error", func() {
@@ -199,16 +194,15 @@ var _ = Describe("MachineProviders", func() {
 			})
 		})
 
-		Context("With allowed machine name prefix", func() {
+		Context("With machine name prefix", func() {
 			var provider machineproviders.MachineProvider
 			var err error
 
 			BeforeEach(func() {
 				cpms := cpmsBuilder.Build()
 				cpms.Spec.MachineNamePrefix = "machine-prefix"
-				opts.AllowMachineNamePrefix = true
 
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 			})
 
 			It("does not return an error", func() {
@@ -252,7 +246,7 @@ var _ = Describe("MachineProviders", func() {
 				var err error
 
 				BeforeEach(func() {
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build(), opts)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build())
 				})
 
 				It("does not error", func() {
@@ -313,8 +307,7 @@ var _ = Describe("MachineProviders", func() {
 				var err error
 
 				BeforeEach(func() {
-
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build(), opts)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpmsBuilder.Build())
 				})
 
 				It("does not error", func() {
@@ -343,15 +336,14 @@ var _ = Describe("MachineProviders", func() {
 				})
 			})
 
-			Context("with a valid template and allowed machine name prefix", func() {
+			Context("with a valid template and machine name prefix", func() {
 				var provider machineproviders.MachineProvider
 				var err error
 
 				BeforeEach(func() {
 					cpms := cpmsBuilder.Build()
 					cpms.Spec.MachineNamePrefix = "machine-prefix"
-					opts.AllowMachineNamePrefix = true
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 				})
 
 				It("does not error", func() {
@@ -388,7 +380,7 @@ var _ = Describe("MachineProviders", func() {
 					cpms := cpmsBuilder.Build()
 					cpms.Spec.Template.OpenShiftMachineV1Beta1Machine = nil
 
-					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+					provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 				})
 
 				It("returns an error", func() {

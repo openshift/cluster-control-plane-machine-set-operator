@@ -176,7 +176,6 @@ var _ = Describe("MachineProvider", func() {
 
 	Context("NewProvider", func() {
 		var cpms *machinev1.ControlPlaneMachineSet
-		var opts OpenshiftMachineProviderOptions
 
 		masterMachineName := func(suffix string) string {
 			return fmt.Sprintf("%s-master-%s", resourcebuilder.TestClusterIDValue, suffix)
@@ -184,7 +183,6 @@ var _ = Describe("MachineProvider", func() {
 
 		BeforeEach(func() {
 			cpms = machinev1resourcebuilder.ControlPlaneMachineSet().WithNamespace(namespaceName).WithMachineTemplateBuilder(tmplBuilder).Build()
-			opts = OpenshiftMachineProviderOptions{AllowMachineNamePrefix: false}
 		}, OncePerOrdered)
 
 		Context("with a collection of unbalanced Machines", Ordered, func() {
@@ -216,7 +214,7 @@ var _ = Describe("MachineProvider", func() {
 				recorder := record.NewFakeRecorder(10)
 
 				var err error
-				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+				provider, err = NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(provider).ToNot(BeNil())
 
@@ -231,7 +229,6 @@ var _ = Describe("MachineProvider", func() {
 
 			It("should not set machine name prefix", func() {
 				Expect(machineProvider.machineNamePrefix).To(BeEmpty())
-				Expect(machineProvider.allowMachineNamePrefix).To(BeFalse())
 			})
 
 			It("should have cached a list of machines", func() {
@@ -309,16 +306,15 @@ var _ = Describe("MachineProvider", func() {
 			})
 		})
 
-		Context("when machine name prefix is provided and allowed", func() {
+		Context("when machine name prefix is provided", func() {
 			BeforeEach(func() {
 				cpms.Spec.MachineNamePrefix = "master-node"
-				opts.AllowMachineNamePrefix = true
 			})
 
 			It("should set the machine name prefix", func() {
 				recorder := record.NewFakeRecorder(10)
 
-				provider, err := NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms, opts)
+				provider, err := NewMachineProvider(ctx, logger.Logger(), k8sClient, recorder, cpms)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(provider).ToNot(BeNil())
 
@@ -326,7 +322,6 @@ var _ = Describe("MachineProvider", func() {
 				machineProvider, _ := provider.(*openshiftMachineProvider)
 
 				Expect(machineProvider.machineNamePrefix).To(Equal("master-node"))
-				Expect(machineProvider.allowMachineNamePrefix).To(BeTrue())
 			})
 		})
 	})
@@ -1906,11 +1901,10 @@ var _ = Describe("MachineProvider", func() {
 					Expect(ok).To(BeTrue())
 				})
 
-				Context("prefix is set and feature gate is on", func() {
+				Context("prefix is set", func() {
 					BeforeEach(func() {
 						machinePrefix = "machine-prefix"
 						p.machineNamePrefix = machinePrefix
-						p.allowMachineNamePrefix = true
 
 						Expect(p.CreateMachine(ctx, logger.Logger(), 0)).To(Succeed())
 					})
@@ -1924,24 +1918,14 @@ var _ = Describe("MachineProvider", func() {
 					})
 				})
 
-				Context("prefix is set but feature gate is off", func() {
+				Context("prefix is not set", func() {
 					BeforeEach(func() {
-						machinePrefix = "machine-prefix"
-						p.machineNamePrefix = machinePrefix
-						p.allowMachineNamePrefix = false
+						p.machineNamePrefix = ""
 
 						Expect(p.CreateMachine(ctx, logger.Logger(), 0)).To(Succeed())
 					})
 
-					It("does not create machine with the prefixed name", func() {
-						nameMatcher := MatchRegexp(fmt.Sprintf("%s-[a-z0-9]{5}-%d", machinePrefix, 0))
-
-						machineList := &machinev1beta1.MachineList{}
-						Consistently(komega.ObjectList(machineList, client.InNamespace(namespaceName))).Should(HaveField("Items",
-							Not(ContainElement(HaveField("ObjectMeta.Name", nameMatcher)))))
-					})
-
-					It("rather creates machine with normal format", func() {
+					It("creates machine with normal format", func() {
 						nameMatcher := MatchRegexp(fmt.Sprintf("%s-master-[a-z0-9]{5}-%d", "cpms-aws-cluster-id", 0))
 
 						machineList := &machinev1beta1.MachineList{}

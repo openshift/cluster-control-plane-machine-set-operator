@@ -29,7 +29,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
@@ -69,11 +68,7 @@ func CheckControlPlaneMachineRollingReplacement(testFramework framework.Framewor
 	cpms := &machinev1.ControlPlaneMachineSet{}
 	Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	currentFeatureGates, err := NewFeatureGateFilter(ctx, testFramework)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(currentFeatureGates).NotTo(BeNil())
-
-	if ok := checkReplacementMachineName(newMachine, cpms, currentFeatureGates, idx); !ok {
+	if ok := checkReplacementMachineName(newMachine, cpms, idx); !ok {
 		return false
 	}
 
@@ -118,11 +113,7 @@ func CheckControlPlaneMachineOnDeleteReplacement(testFramework framework.Framewo
 	cpms := &machinev1.ControlPlaneMachineSet{}
 	Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-	currentFeatureGates, err := NewFeatureGateFilter(ctx, testFramework)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(currentFeatureGates).NotTo(BeNil())
-
-	if ok := checkReplacementMachineName(newMachine, cpms, currentFeatureGates, idx); !ok {
+	if ok := checkReplacementMachineName(newMachine, cpms, idx); !ok {
 		return false
 	}
 
@@ -281,7 +272,7 @@ func getOldAndNewMachineForIndex(ctx context.Context, testFramework framework.Fr
 }
 
 // checkReplacementMachineName checks that the name of the replacement machine fits the expected format.
-func checkReplacementMachineName(machine *machinev1beta1.Machine, cpms *machinev1.ControlPlaneMachineSet, fg *featureGateFilter, idx int) bool {
+func checkReplacementMachineName(machine *machinev1beta1.Machine, cpms *machinev1.ControlPlaneMachineSet, idx int) bool {
 	By(fmt.Sprintf("Replacement machine name is %q", machine.ObjectMeta.Name))
 
 	if ok := Expect(machine.ObjectMeta.Labels).To(HaveKey(machineClusterIDLabel), "machine should have cluster label"); !ok {
@@ -290,12 +281,10 @@ func checkReplacementMachineName(machine *machinev1beta1.Machine, cpms *machinev
 
 	clusterID := machine.ObjectMeta.Labels[machineClusterIDLabel]
 
-	// If CPMSMachineNamePrefix featuregate is enabled and MachineNamePrefix is set,
-	// the replacement machine should follow prefixed naming convention.
-	allowMachineNamePrefix := fg.IsEnabled(string(features.FeatureGateCPMSMachineNamePrefix))
+	// If MachineNamePrefix is set, the replacement machine should follow prefixed naming convention.
 	machineNamePrefix := cpms.Spec.MachineNamePrefix
 
-	if allowMachineNamePrefix && len(machineNamePrefix) > 0 {
+	if len(machineNamePrefix) > 0 {
 		return Expect(machine.ObjectMeta.Name).To(MatchRegexp("%s-[a-z0-9]{5}-%d", machineNamePrefix, idx), "replacement machine name should match the expected prefixed format")
 	}
 
