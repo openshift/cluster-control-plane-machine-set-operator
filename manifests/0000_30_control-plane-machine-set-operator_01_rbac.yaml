@@ -98,9 +98,10 @@ rules:
   - apiGroups:
       - config.openshift.io
     resources:
+      - apiservers
       - infrastructures
       - clusterversions
-      - featuregates      
+      - featuregates
     verbs:
       - get
       - list
@@ -124,6 +125,20 @@ rules:
       - get
       - list
       - watch
+
+  # Metrics authentication and authorization
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
+    verbs:
+    - create
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

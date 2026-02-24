@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -54,6 +55,7 @@ import (
 	cpmsgeneratorcontroller "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/controllers/controlplanemachinesetgenerator"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
 	cpmswebhook "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/webhooks/controlplanemachineset"
+	utiltls "github.com/openshift/controller-runtime-common/pkg/tls"
 
 	//+kubebuilder:scaffold:imports
 
@@ -114,19 +116,43 @@ func main() { //nolint:funlen,cyclop
 		LeaseDuration: leaderElectionConfig.LeaseDuration,
 	})
 
+	k8sClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to create Kubernetes client")
+		os.Exit(1)
+	}
+
+	// Fetch the TLS profile from the APIServer resource.
+	tlsSecurityProfileSpec, err := utiltls.FetchAPIServerTLSProfile(context.Background(), k8sClient)
+	if err != nil {
+		setupLog.Error(err, "unable to get TLS profile from API server")
+		os.Exit(1)
+	}
+
+	// Create the TLS configuration function for the server endpoints.
+	tlsConfig, unsupportedCiphers := utiltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if len(unsupportedCiphers) > 0 {
+		setupLog.Info("TLS configuration contains unsupported ciphers that will be ignored",
+			"unsupportedCiphers", unsupportedCiphers,
+		)
+	}
+
+	// Create a context that can be cancelled when there is a need to shut down the manager	.
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	// Ensure the context is cancelled when the program exits.
+	defer cancel()
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
-			BindAddress: metricsAddr,
+			BindAddress:    metricsAddr,
+			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			SecureServing:  true,
+			TLSOpts:        []func(*tls.Config){tlsConfig},
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: webhookPort,
-			TLSOpts: []func(*tls.Config){
-				func(t *tls.Config) {
-					t.MinVersion = tls.VersionTLS12
-					t.CipherSuites = util.GetAllowedTLSCipherSuites()
-				},
-			},
+			Port:    webhookPort,
+			TLSOpts: []func(*tls.Config){tlsConfig},
 		}),
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElectionNamespace:       leaderElectionConfig.ResourceNamespace,
@@ -217,6 +243,23 @@ func main() { //nolint:funlen,cyclop
 		}
 	}
 
+	// Set up the TLS security profile watcher controller.
+	// This will trigger a graceful shutdown when the TLS profile changes.
+	if err := (&utiltls.SecurityProfileWatcher{
+		Client:                mgr.GetClient(),
+		InitialTLSProfileSpec: tlsSecurityProfileSpec,
+		OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+			klog.Infof("TLS profile has changed, initiating a shutdown to reload it. %q: %+v, %q: %+v ",
+				"old profile", oldTLSProfileSpec,
+				"new profile", newTLSProfileSpec,
+			)
+			cancel()
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TLSSecurityProfileWatcher")
+		os.Exit(1)
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -231,7 +274,7 @@ func main() { //nolint:funlen,cyclop
 
 	setupLog.Info("starting manager")
 
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
