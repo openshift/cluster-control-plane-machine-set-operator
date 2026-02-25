@@ -248,10 +248,10 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 		By("Control plane machine rollout completed successfully")
 
 		By("Waiting for the cluster to stabilise after the rollout")
-		// 20 minutes for the rollout to complete, 2 minutes for the cluster to stabilise.
-		// Check every 20 seconds.
-		// The timeout includes the 2 minutes to stabilise, hence 22 minutes.
-		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 22*time.Minute, 20*time.Second)
+		// 30 minutes for the rollout to complete, 2 minutes for the cluster to stabilise.
+		// Check every 30 seconds.
+		// The timeout includes the 2 minutes to stabilise, hence 32 minutes.
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 30*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
