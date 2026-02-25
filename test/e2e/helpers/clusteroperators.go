@@ -31,7 +31,7 @@ import (
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
 func EventuallyClusterOperatorsShouldStabilise(minimumAvailability, timeout, interval time.Duration) {
-	key := format.RegisterCustomFormatter(formatClusterOperatorsCondtions)
+	key := format.RegisterCustomFormatter(formatClusterOperatorsConditions)
 	defer format.UnregisterCustomFormatter(key)
 
 	// The following assertion checks:
@@ -65,7 +65,7 @@ func EventuallyClusterOperatorsShouldStabilise(minimumAvailability, timeout, int
 				),
 			),
 		),
-	))), "cluster operators should all be available, not progressing and not degraded")
+	))), "cluster operators should all be available, not progressing and not degraded, for at least "+minimumAvailability.String())
 }
 
 // millisecondsSince returns a transform matcher that transforms a time.Time into an int64 representing a duration in milliseconds.
