@@ -51,7 +51,7 @@ type filteredClusterOperatorConditions struct {
 // It filters any cluster operators that are available, not progressing and not degraded
 // as these are the expected conditions. Handles both *configv1.ClusterOperatorList (as
 // returned by Eventually(komega.ObjectList(...))) and []configv1.ClusterOperator.
-func formatClusterOperatorsConditions(in interface{}) (string, bool) {
+func formatClusterOperatorsConditions(in interface{}, minimumAvailability time.Duration) (string, bool) {
 	var clusterOperators []configv1.ClusterOperator
 	switch v := in.(type) {
 	case *configv1.ClusterOperatorList:
@@ -66,7 +66,7 @@ func formatClusterOperatorsConditions(in interface{}) (string, bool) {
 	coNames := []string{}
 
 	for _, co := range clusterOperators {
-		coStatus := getClusterOperatorStatus(co)
+		coStatus := getClusterOperatorStatus(co, minimumAvailability)
 
 		// Only list the cluster operators that are not available, progressing or degraded.
 		// These are the ones we expect to fail the test.
@@ -87,7 +87,7 @@ func formatClusterOperatorsConditions(in interface{}) (string, bool) {
 	if len(coConditions) == 0 {
 		// No COs failed the availability/progressing/degraded filter; failure may be due to
 		// conditions not being stable long enough. Show all COs so the user can see current state.
-		msg = "Some cluster operators did not met the required conditions stability criteria (i.e. conditions not stable for the required minimumAvailability duration)."
+		msg = "Some cluster operators did not met the required conditions stability criteria (i.e. conditions not stable for the required minimumAvailability: " + minimumAvailability.String() + ")."
 
 		// Show all COs so the user can see last transition times for the conditions of each CO.
 		for _, co := range clusterOperators {
@@ -107,13 +107,13 @@ func formatClusterOperatorsConditions(in interface{}) (string, bool) {
 
 // getClusterOperatorStatus returns the status of a cluster operator in terms of it's
 // available, progressing and degraded conditions.
-func getClusterOperatorStatus(co configv1.ClusterOperator) clusterOperatorStatus {
+func getClusterOperatorStatus(co configv1.ClusterOperator, minimumAvailability time.Duration) clusterOperatorStatus {
 	coStatus := clusterOperatorStatus{
 		Name: co.Name,
 	}
 
-	// Operators that transitioned more recently than the stabilisationWindow are considered not yet stabilised.
-	stabilisationWindow := 1 * time.Minute
+	// Operators that transitioned more recently than the minimumAvailability are considered not yet stabilised.
+	stabilisationWindow := minimumAvailability
 
 	for _, condition := range co.Status.Conditions {
 		switch condition.Type {

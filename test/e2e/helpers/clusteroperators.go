@@ -31,7 +31,9 @@ import (
 // EventuallyClusterOperatorsShouldStabilise checks that the cluster operators stabilise over time.
 // Stabilise means that they are available, are not progressing, and are not degraded.
 func EventuallyClusterOperatorsShouldStabilise(minimumAvailability, timeout, interval time.Duration) {
-	key := format.RegisterCustomFormatter(formatClusterOperatorsConditions)
+	key := format.RegisterCustomFormatter(func(in interface{}) (string, bool) {
+		return formatClusterOperatorsConditions(in, minimumAvailability)
+	})
 	defer format.UnregisterCustomFormatter(key)
 
 	// The following assertion checks:
