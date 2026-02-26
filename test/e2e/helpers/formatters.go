@@ -47,12 +47,18 @@ type filteredClusterOperatorConditions struct {
 	ClusterOperators []clusterOperatorConditions
 }
 
-// formateClusterOperatorConditions formats the cluster operator conditions into a string.
+// formatClusterOperatorsConditions formats the cluster operator conditions into a string.
 // It filters any cluster operators that are available, not progressing and not degraded
-// as these are the expected conditions.
-func formatClusterOperatorsCondtions(in interface{}) (string, bool) {
-	clusterOperators, ok := in.([]configv1.ClusterOperator)
-	if !ok {
+// as these are the expected conditions. Handles both *configv1.ClusterOperatorList (as
+// returned by Eventually(komega.ObjectList(...))) and []configv1.ClusterOperator.
+func formatClusterOperatorsConditions(in interface{}) (string, bool) {
+	var clusterOperators []configv1.ClusterOperator
+	switch v := in.(type) {
+	case *configv1.ClusterOperatorList:
+		clusterOperators = v.Items
+	case []configv1.ClusterOperator:
+		clusterOperators = v
+	default:
 		return "", false
 	}
 
@@ -77,8 +83,22 @@ func formatClusterOperatorsCondtions(in interface{}) (string, bool) {
 		coNames = append(coNames, co.Name)
 	}
 
+	var msg string
+	if len(coConditions) == 0 {
+		// No COs failed the availability/progressing/degraded filter; failure may be due to
+		// conditions not being stable long enough. Show all COs so the user can see current state.
+		msg = "Some cluster operators did not met the required conditions stability criteria (i.e. conditions not stable for the required minimumAvailability duration)."
+
+		// Show all COs so the user can see last transition times for the conditions of each CO.
+		for _, co := range clusterOperators {
+			coConditions = append(coConditions, clusterOperatorConditions{Name: co.Name, Conditions: co.Status.Conditions})
+		}
+	} else {
+		msg = fmt.Sprintf("Cluster operators %s are either not available, are progressing or are degraded.", coNames)
+	}
+
 	out := filteredClusterOperatorConditions{
-		Message:          fmt.Sprintf("Cluster operators %s are either not available, are progressing or are degraded.", coNames),
+		Message:          msg,
 		ClusterOperators: coConditions,
 	}
 
@@ -92,17 +112,20 @@ func getClusterOperatorStatus(co configv1.ClusterOperator) clusterOperatorStatus
 		Name: co.Name,
 	}
 
+	// Operators that transitioned more recently than the stabilisationWindow are considered not yet stabilised.
+	stabilisationWindow := 1 * time.Minute
+
 	for _, condition := range co.Status.Conditions {
 		switch condition.Type {
 		case configv1.OperatorAvailable:
-			// We consider the operator to be available if it is True and has not transitioned in the last minute.
-			coStatus.Available = condition.Status == configv1.ConditionTrue && time.Now().Add(-1*time.Minute).After(condition.LastTransitionTime.Time)
+			// We consider the operator to be available if it is True and has been stable for the stabilisationWindow.
+			coStatus.Available = condition.Status == configv1.ConditionTrue && time.Now().Add(-stabilisationWindow).After(condition.LastTransitionTime.Time)
 		case configv1.OperatorProgressing:
-			// We consider the operator to be progressing if it is either True or has transitioned in the last minute.
-			coStatus.Progressing = condition.Status == configv1.ConditionTrue || time.Now().Add(-1*time.Minute).Before(condition.LastTransitionTime.Time)
+			// We consider the operator to be progressing if it is True or transitioned within the stabilisationWindow.
+			coStatus.Progressing = condition.Status == configv1.ConditionTrue || time.Now().Add(-stabilisationWindow).Before(condition.LastTransitionTime.Time)
 		case configv1.OperatorDegraded:
-			// We consider the operator to be degraded if it is either True or has transitioned in the last minute.
-			coStatus.Degraded = condition.Status == configv1.ConditionTrue || time.Now().Add(-1*time.Minute).Before(condition.LastTransitionTime.Time)
+			// We consider the operator to be degraded if it is True or transitioned within the stabilisationWindow.
+			coStatus.Degraded = condition.Status == configv1.ConditionTrue || time.Now().Add(-stabilisationWindow).Before(condition.LastTransitionTime.Time)
 		case configv1.OperatorUpgradeable, configv1.EvaluationConditionsDetected, configv1.RetrievedUpdates:
 			continue
 		}
