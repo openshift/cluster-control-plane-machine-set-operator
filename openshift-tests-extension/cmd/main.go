@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
 	e "github.com/openshift-eng/openshift-tests-extension/pkg/extension"
@@ -36,14 +37,22 @@ func main() {
 	extensionRegistry := e.NewRegistry()
 	ext := e.NewExtension("openshift", "payload", "cluster-control-plane-machine-set-operator")
 
+	// all test cases
+	defaultTimeout := 90 * time.Minute
 	ext.AddSuite(e.Suite{
 		Name:       "cpmso/periodic",
 		Qualifiers: []string{`labels.exists(l, l == "Periodic")`},
+		Parallelism: 1, 
+		ClusterStability: e.ClusterStabilityDisruptive,
+		TestTimeout:      &defaultTimeout,
 	})
 
 	ext.AddSuite(e.Suite{
 		Name:       "cpmso/presubmit",
 		Qualifiers: []string{`labels.exists(l, l == "PreSubmit")`},
+		Parallelism: 1, 
+		ClusterStability: e.ClusterStabilityDisruptive,
+		TestTimeout:      &defaultTimeout,
 	})
 
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
