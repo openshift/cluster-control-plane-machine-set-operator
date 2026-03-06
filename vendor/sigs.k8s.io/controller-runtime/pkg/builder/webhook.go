@@ -79,14 +79,6 @@ func (blder *WebhookBuilder[T]) WithDefaulter(defaulter admission.Defaulter[T], 
 	return blder
 }
 
-// WithCustomValidator takes a admission.CustomValidator interface, a ValidatingWebhook will be wired for this type.
-//
-// Deprecated: Use WithValidator instead.
-func (blder *WebhookBuilder[T]) WithCustomValidator(validator admission.CustomValidator) *WebhookBuilder[T] {
-	blder.customValidator = validator
-	return blder
-}
-
 // WithValidator sets up the provided admission.Validator in a validating webhook.
 func (blder *WebhookBuilder[T]) WithValidator(validator admission.Validator[T]) *WebhookBuilder[T] {
 	blder.validator = validator
