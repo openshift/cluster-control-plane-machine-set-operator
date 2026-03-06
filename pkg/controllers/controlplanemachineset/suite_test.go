@@ -113,7 +113,11 @@ var _ = BeforeSuite(func() {
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
 
-	// Increase default values for Consistently to ensure there is enough time for reconciliation of objects
+	// Increase default values for Eventually and Consistently to ensure there is enough time for
+	// reconciliation of objects. controller-runtime v0.23 changed cache sync to be blocking, so
+	// informers may take longer to become ready before the controller starts processing events.
+	SetDefaultEventuallyTimeout(30 * time.Second)
+	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(500 * time.Millisecond)
 	SetDefaultConsistentlyPollingInterval(50 * time.Millisecond)
 })

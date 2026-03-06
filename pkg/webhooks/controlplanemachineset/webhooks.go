@@ -100,9 +100,8 @@ func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager
 	r.client = mgr.GetClient()
 	r.logger = logger
 
-	if err := ctrl.NewWebhookManagedBy(mgr).
-		WithValidator(r).
-		For(&machinev1.ControlPlaneMachineSet{}).
+	if err := ctrl.NewWebhookManagedBy(mgr, &machinev1.ControlPlaneMachineSet{}).
+		WithCustomValidator(r).
 		Complete(); err != nil {
 		return fmt.Errorf("error constructing ControlPlaneMachineSet webhook: %w", err)
 	}
