@@ -26,12 +26,10 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -75,9 +73,6 @@ const (
 )
 
 var (
-	// errObjNotCPMS is an error when casting to ControlPlaneMachineSet fails.
-	errObjNotCPMS = errors.New("validated object is not of type control plane machine set")
-
 	// errUpdateNilCPMS is an error when update is called with nil ControlPlaneMachineSet.
 	errUpdateNilCPMS = errors.New("cannot update nil control plane machine set")
 
@@ -93,6 +88,7 @@ var (
 type ControlPlaneMachineSetWebhook struct {
 	client client.Client
 	logger logr.Logger
+	admission.Validator[*machinev1.ControlPlaneMachineSet]
 }
 
 // SetupWebhookWithManager sets up a new ControlPlaneMachineSet webhook with the manager.
@@ -100,9 +96,8 @@ func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager
 	r.client = mgr.GetClient()
 	r.logger = logger
 
-	if err := ctrl.NewWebhookManagedBy(mgr).
+	if err := ctrl.NewWebhookManagedBy(mgr, &machinev1.ControlPlaneMachineSet{}).
 		WithValidator(r).
-		For(&machinev1.ControlPlaneMachineSet{}).
 		Complete(); err != nil {
 		return fmt.Errorf("error constructing ControlPlaneMachineSet webhook: %w", err)
 	}
@@ -110,12 +105,12 @@ func (r *ControlPlaneMachineSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager
 	return nil
 }
 
-//+kubebuilder:webhook:verbs=create;update,path=/validate-machine-openshift-io-v1-controlplanemachineset,mutating=false,failurePolicy=fail,groups=machine.openshift.io,resources=controlplanemachinesets,versions=v1,name=controlplanemachineset.machine.openshift.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-machine-openshift-io-v1-controlplanemachineset,mutating=false,failurePolicy=fail,groups=machine.openshift.io,resources=controlplanemachinesets,versions=v1,name=controlplanemachineset.machine.openshift.io,sideEffects=None,admissionReviewVersions=v1
 
-var _ webhook.CustomValidator = &ControlPlaneMachineSetWebhook{}
+var _ admission.Validator[*machinev1.ControlPlaneMachineSet] = &ControlPlaneMachineSetWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, cpms *machinev1.ControlPlaneMachineSet) (admission.Warnings, error) {
 	var errs []error
 
 	var warnings []string
@@ -123,11 +118,6 @@ func (r *ControlPlaneMachineSetWebhook) ValidateCreate(ctx context.Context, obj 
 	infrastructure, err := util.GetInfrastructure(ctx, r.client)
 	if err != nil {
 		return warnings, fmt.Errorf("error getting infrastructure resource: %w", err)
-	}
-
-	cpms, ok := obj.(*machinev1.ControlPlaneMachineSet)
-	if !ok {
-		return warnings, errObjNotCPMS
 	}
 
 	errs = append(errs, validateMetadata(field.NewPath("metadata"), cpms.ObjectMeta)...)
@@ -158,23 +148,13 @@ func shouldValidateSpecUpdate(oldCpms, newCpms *machinev1.ControlPlaneMachineSet
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldCpms, cpms *machinev1.ControlPlaneMachineSet) (admission.Warnings, error) {
 	var errs []error
 
 	var warnings []string
 
-	if oldObj == nil {
+	if oldCpms == nil {
 		return warnings, errUpdateNilCPMS
-	}
-
-	oldCpms, ok := oldObj.(*machinev1.ControlPlaneMachineSet)
-	if !ok {
-		return warnings, errObjNotCPMS
-	}
-
-	cpms, ok := newObj.(*machinev1.ControlPlaneMachineSet)
-	if !ok {
-		return warnings, errObjNotCPMS
 	}
 
 	// This prevents a race condition between an actor intending to activate outdated CPMS and controlplanemachinesetgenerator deleting the CPMS.
@@ -204,7 +184,7 @@ func (r *ControlPlaneMachineSetWebhook) ValidateUpdate(ctx context.Context, oldO
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (r *ControlPlaneMachineSetWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (r *ControlPlaneMachineSetWebhook) ValidateDelete(ctx context.Context, cpms *machinev1.ControlPlaneMachineSet) (admission.Warnings, error) {
 	return nil, nil
 }
 
