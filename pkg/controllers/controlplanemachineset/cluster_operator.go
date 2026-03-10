@@ -51,6 +51,11 @@ func relatedObjects() []configv1.ObjectReference {
 			Resource: "machines",
 			Name:     "",
 		},
+		{
+			Group:    "rbac.authorization.k8s.io",
+			Resource: "clusterroles",
+			Name:     "control-plane-machine-set-operator",
+		},
 	}
 }
 
