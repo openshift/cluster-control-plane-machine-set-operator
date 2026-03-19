@@ -595,7 +595,7 @@ func machineInfosByIndex(cpms *machinev1.ControlPlaneMachineSet, machineInfos []
 	// If for any reason there aren't enough indexes to meet the replica count,
 	// populate empty indexes starting from index 0 until we have the correct
 	// number of indexes.
-	for i := int32(0); int32(len(out)) < *cpms.Spec.Replicas; i++ { //nolint:gosec
+	for i := int32(0); int32(len(out)) < *cpms.Spec.Replicas; i++ {
 		if _, ok := out[i]; !ok {
 			out[i] = []machineproviders.MachineInfo{}
 		}
@@ -728,7 +728,7 @@ func (r *ControlPlaneMachineSetReconciler) checkReadyControlPlaneMachineExists(l
 
 // checkCorrectNumberOfIndexes checks that the number of control plane machine set indexes found in the cluster is valid.
 func (r *ControlPlaneMachineSetReconciler) checkCorrectNumberOfIndexes(logger logr.Logger, cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs []indexToMachineInfos) bool {
-	currentIndexesCount := int32(len(sortedIndexedMs)) //nolint:gosec
+	currentIndexesCount := int32(len(sortedIndexedMs))
 
 	switch {
 	case currentIndexesCount == *cpms.Spec.Replicas:

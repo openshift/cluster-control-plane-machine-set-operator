@@ -31,6 +31,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	configv1builder "github.com/openshift/cluster-api-actuator-pkg/testutils/resourcebuilder/config/v1"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,7 +114,11 @@ var _ = BeforeSuite(func() {
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
 
-	// Increase default values for Consistently to ensure there is enough time for reconciliation of objects
+	// Increase default values for Eventually and Consistently to ensure there is enough time for
+	// reconciliation of objects. controller-runtime v0.23 changed cache sync to be blocking, so
+	// informers may take longer to become ready before the controller starts processing events.
+	SetDefaultEventuallyTimeout(framework.DefaultTimeout)
+	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(500 * time.Millisecond)
 	SetDefaultConsistentlyPollingInterval(50 * time.Millisecond)
 })

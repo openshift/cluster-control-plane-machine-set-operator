@@ -32,6 +32,8 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -65,6 +67,7 @@ var vSphereResourcePoolWarningCounter = NewMessageCounter(fmt.Sprintf("spec.temp
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.RawZapOpts(uberZap.Hooks(targetPoolsNotSetWarningCounter.Trigger,
 		vSphereTemplateWarningCounter.Trigger, vSphereFolderWarningCounter.Trigger, vSphereResourcePoolWarningCounter.Trigger)), zap.UseDevMode(true)))
+	SetDefaultEventuallyTimeout(framework.DefaultTimeout)
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
