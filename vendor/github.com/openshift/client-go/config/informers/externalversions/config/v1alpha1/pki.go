@@ -16,70 +16,70 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ClusterImagePolicyInformer provides access to a shared informer and lister for
-// ClusterImagePolicies.
-type ClusterImagePolicyInformer interface {
+// PKIInformer provides access to a shared informer and lister for
+// PKIs.
+type PKIInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() configv1alpha1.ClusterImagePolicyLister
+	Lister() configv1alpha1.PKILister
 }
 
-type clusterImagePolicyInformer struct {
+type pKIInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewClusterImagePolicyInformer constructs a new informer for ClusterImagePolicy type.
+// NewPKIInformer constructs a new informer for PKI type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewClusterImagePolicyInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterImagePolicyInformer(client, resyncPeriod, indexers, nil)
+func NewPKIInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPKIInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredClusterImagePolicyInformer constructs a new informer for ClusterImagePolicy type.
+// NewFilteredPKIInformer constructs a new informer for PKI type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredClusterImagePolicyInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPKIInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1alpha1().ClusterImagePolicies().List(context.Background(), options)
+				return client.ConfigV1alpha1().PKIs().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1alpha1().ClusterImagePolicies().Watch(context.Background(), options)
+				return client.ConfigV1alpha1().PKIs().Watch(context.Background(), options)
 			},
 			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1alpha1().ClusterImagePolicies().List(ctx, options)
+				return client.ConfigV1alpha1().PKIs().List(ctx, options)
 			},
 			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1alpha1().ClusterImagePolicies().Watch(ctx, options)
+				return client.ConfigV1alpha1().PKIs().Watch(ctx, options)
 			},
 		}, client),
-		&apiconfigv1alpha1.ClusterImagePolicy{},
+		&apiconfigv1alpha1.PKI{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *clusterImagePolicyInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterImagePolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *pKIInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPKIInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *clusterImagePolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiconfigv1alpha1.ClusterImagePolicy{}, f.defaultInformer)
+func (f *pKIInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apiconfigv1alpha1.PKI{}, f.defaultInformer)
 }
 
-func (f *clusterImagePolicyInformer) Lister() configv1alpha1.ClusterImagePolicyLister {
-	return configv1alpha1.NewClusterImagePolicyLister(f.Informer().GetIndexer())
+func (f *pKIInformer) Lister() configv1alpha1.PKILister {
+	return configv1alpha1.NewPKILister(f.Informer().GetIndexer())
 }

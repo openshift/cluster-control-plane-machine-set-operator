@@ -11,79 +11,72 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterImagePolicyApplyConfiguration represents a declarative configuration of the ClusterImagePolicy type for use
+// PKIApplyConfiguration represents a declarative configuration of the PKI type for use
 // with apply.
 //
-// # ClusterImagePolicy holds cluster-wide configuration for image signature verification
+// PKI configures cryptographic parameters for certificates generated
+// internally by OpenShift components.
 //
 // Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
-type ClusterImagePolicyApplyConfiguration struct {
+type PKIApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
 	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// spec contains the configuration for the cluster image policy.
-	Spec *ClusterImagePolicySpecApplyConfiguration `json:"spec,omitempty"`
-	// status contains the observed state of the resource.
-	Status *ClusterImagePolicyStatusApplyConfiguration `json:"status,omitempty"`
+	// spec holds user settable values for configuration
+	Spec *PKISpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// ClusterImagePolicy constructs a declarative configuration of the ClusterImagePolicy type for use with
+// PKI constructs a declarative configuration of the PKI type for use with
 // apply.
-func ClusterImagePolicy(name string) *ClusterImagePolicyApplyConfiguration {
-	b := &ClusterImagePolicyApplyConfiguration{}
+func PKI(name string) *PKIApplyConfiguration {
+	b := &PKIApplyConfiguration{}
 	b.WithName(name)
-	b.WithKind("ClusterImagePolicy")
+	b.WithKind("PKI")
 	b.WithAPIVersion("config.openshift.io/v1alpha1")
 	return b
 }
 
-// ExtractClusterImagePolicyFrom extracts the applied configuration owned by fieldManager from
-// clusterImagePolicy for the specified subresource. Pass an empty string for subresource to extract
+// ExtractPKIFrom extracts the applied configuration owned by fieldManager from
+// pKI for the specified subresource. Pass an empty string for subresource to extract
 // the main resource. Common subresources include "status", "scale", etc.
-// clusterImagePolicy must be a unmodified ClusterImagePolicy API object that was retrieved from the Kubernetes API.
-// ExtractClusterImagePolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// pKI must be a unmodified PKI API object that was retrieved from the Kubernetes API.
+// ExtractPKIFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractClusterImagePolicyFrom(clusterImagePolicy *configv1alpha1.ClusterImagePolicy, fieldManager string, subresource string) (*ClusterImagePolicyApplyConfiguration, error) {
-	b := &ClusterImagePolicyApplyConfiguration{}
-	err := managedfields.ExtractInto(clusterImagePolicy, internal.Parser().Type("com.github.openshift.api.config.v1alpha1.ClusterImagePolicy"), fieldManager, b, subresource)
+func ExtractPKIFrom(pKI *configv1alpha1.PKI, fieldManager string, subresource string) (*PKIApplyConfiguration, error) {
+	b := &PKIApplyConfiguration{}
+	err := managedfields.ExtractInto(pKI, internal.Parser().Type("com.github.openshift.api.config.v1alpha1.PKI"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}
-	b.WithName(clusterImagePolicy.Name)
+	b.WithName(pKI.Name)
 
-	b.WithKind("ClusterImagePolicy")
+	b.WithKind("PKI")
 	b.WithAPIVersion("config.openshift.io/v1alpha1")
 	return b, nil
 }
 
-// ExtractClusterImagePolicy extracts the applied configuration owned by fieldManager from
-// clusterImagePolicy. If no managedFields are found in clusterImagePolicy for fieldManager, a
-// ClusterImagePolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// ExtractPKI extracts the applied configuration owned by fieldManager from
+// pKI. If no managedFields are found in pKI for fieldManager, a
+// PKIApplyConfiguration is returned with only the Name, Namespace (if applicable),
 // APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
-// clusterImagePolicy must be a unmodified ClusterImagePolicy API object that was retrieved from the Kubernetes API.
-// ExtractClusterImagePolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// pKI must be a unmodified PKI API object that was retrieved from the Kubernetes API.
+// ExtractPKI provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractClusterImagePolicy(clusterImagePolicy *configv1alpha1.ClusterImagePolicy, fieldManager string) (*ClusterImagePolicyApplyConfiguration, error) {
-	return ExtractClusterImagePolicyFrom(clusterImagePolicy, fieldManager, "")
+func ExtractPKI(pKI *configv1alpha1.PKI, fieldManager string) (*PKIApplyConfiguration, error) {
+	return ExtractPKIFrom(pKI, fieldManager, "")
 }
 
-// ExtractClusterImagePolicyStatus extracts the applied configuration owned by fieldManager from
-// clusterImagePolicy for the status subresource.
-func ExtractClusterImagePolicyStatus(clusterImagePolicy *configv1alpha1.ClusterImagePolicy, fieldManager string) (*ClusterImagePolicyApplyConfiguration, error) {
-	return ExtractClusterImagePolicyFrom(clusterImagePolicy, fieldManager, "status")
-}
-
-func (b ClusterImagePolicyApplyConfiguration) IsApplyConfiguration() {}
+func (b PKIApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithKind(value string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithKind(value string) *PKIApplyConfiguration {
 	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
@@ -91,7 +84,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithKind(value string) *ClusterIm
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithAPIVersion(value string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithAPIVersion(value string) *PKIApplyConfiguration {
 	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
@@ -99,7 +92,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithAPIVersion(value string) *Clu
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithName(value string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithName(value string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
@@ -108,7 +101,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithName(value string) *ClusterIm
 // WithGenerateName sets the GenerateName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the GenerateName field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithGenerateName(value string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithGenerateName(value string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
@@ -117,7 +110,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithGenerateName(value string) *C
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Namespace field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithNamespace(value string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithNamespace(value string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
@@ -126,7 +119,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithNamespace(value string) *Clus
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UID field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithUID(value types.UID) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithUID(value types.UID) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
@@ -135,7 +128,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithUID(value types.UID) *Cluster
 // WithResourceVersion sets the ResourceVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithResourceVersion(value string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithResourceVersion(value string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
@@ -144,7 +137,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithResourceVersion(value string)
 // WithGeneration sets the Generation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Generation field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithGeneration(value int64) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithGeneration(value int64) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
@@ -153,7 +146,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithGeneration(value int64) *Clus
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -162,7 +155,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithCreationTimestamp(value metav
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -171,7 +164,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithDeletionTimestamp(value metav
 // WithDeletionGracePeriodSeconds sets the DeletionGracePeriodSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
@@ -181,7 +174,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithDeletionGracePeriodSeconds(va
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Labels field,
 // overwriting an existing map entries in Labels field with the same key.
-func (b *ClusterImagePolicyApplyConfiguration) WithLabels(entries map[string]string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithLabels(entries map[string]string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
 		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
@@ -196,7 +189,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithLabels(entries map[string]str
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Annotations field,
 // overwriting an existing map entries in Annotations field with the same key.
-func (b *ClusterImagePolicyApplyConfiguration) WithAnnotations(entries map[string]string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithAnnotations(entries map[string]string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
 		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
@@ -210,7 +203,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithAnnotations(entries map[strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ClusterImagePolicyApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -224,7 +217,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithOwnerReferences(values ...*v1
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
-func (b *ClusterImagePolicyApplyConfiguration) WithFinalizers(values ...string) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithFinalizers(values ...string) *PKIApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
@@ -232,7 +225,7 @@ func (b *ClusterImagePolicyApplyConfiguration) WithFinalizers(values ...string) 
 	return b
 }
 
-func (b *ClusterImagePolicyApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
+func (b *PKIApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
 		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
 	}
@@ -241,37 +234,29 @@ func (b *ClusterImagePolicyApplyConfiguration) ensureObjectMetaApplyConfiguratio
 // WithSpec sets the Spec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Spec field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithSpec(value *ClusterImagePolicySpecApplyConfiguration) *ClusterImagePolicyApplyConfiguration {
+func (b *PKIApplyConfiguration) WithSpec(value *PKISpecApplyConfiguration) *PKIApplyConfiguration {
 	b.Spec = value
 	return b
 }
 
-// WithStatus sets the Status field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Status field is set to the value of the last call.
-func (b *ClusterImagePolicyApplyConfiguration) WithStatus(value *ClusterImagePolicyStatusApplyConfiguration) *ClusterImagePolicyApplyConfiguration {
-	b.Status = value
-	return b
-}
-
 // GetKind retrieves the value of the Kind field in the declarative configuration.
-func (b *ClusterImagePolicyApplyConfiguration) GetKind() *string {
+func (b *PKIApplyConfiguration) GetKind() *string {
 	return b.TypeMetaApplyConfiguration.Kind
 }
 
 // GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
-func (b *ClusterImagePolicyApplyConfiguration) GetAPIVersion() *string {
+func (b *PKIApplyConfiguration) GetAPIVersion() *string {
 	return b.TypeMetaApplyConfiguration.APIVersion
 }
 
 // GetName retrieves the value of the Name field in the declarative configuration.
-func (b *ClusterImagePolicyApplyConfiguration) GetName() *string {
+func (b *PKIApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
 }
 
 // GetNamespace retrieves the value of the Namespace field in the declarative configuration.
-func (b *ClusterImagePolicyApplyConfiguration) GetNamespace() *string {
+func (b *PKIApplyConfiguration) GetNamespace() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Namespace
 }
