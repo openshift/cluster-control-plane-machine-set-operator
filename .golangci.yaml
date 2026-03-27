@@ -110,6 +110,11 @@ issues:
         - gosec
         - gochecknoglobals
         - goerr113
+    # TODO: migrate from deprecated GetEventRecorderFor to GetEventRecorder (new events API).
+    - path: pkg/controllers/controlplanemachineset/controller\.go
+      text: "SA1019:.*GetEventRecorderFor"
+      linters:
+        - staticcheck
     #  Exclude some linters from running within the 'test/e2e/' directory.
     - path: test/e2e/.*
       linters:
