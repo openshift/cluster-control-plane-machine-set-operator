@@ -51,6 +51,51 @@ func relatedObjects() []configv1.ObjectReference {
 			Resource: "machines",
 			Name:     "",
 		},
+		{
+			Group:     "",
+			Resource:  "serviceaccounts",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "",
+			Resource:  "services",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "apps",
+			Resource:  "deployments",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "rbac.authorization.k8s.io",
+			Resource:  "roles",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "rbac.authorization.k8s.io",
+			Resource:  "rolebindings",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:    "rbac.authorization.k8s.io",
+			Resource: "clusterroles",
+			Name:     "control-plane-machine-set-operator",
+		},
+		{
+			Group:    "rbac.authorization.k8s.io",
+			Resource: "clusterrolebindings",
+			Name:     "control-plane-machine-set-operator",
+		},
+		{
+			Group:    "admissionregistration.k8s.io",
+			Resource: "validatingwebhookconfigurations",
+			Name:     "controlplanemachineset.machine.openshift.io",
+		},
 	}
 }
 
