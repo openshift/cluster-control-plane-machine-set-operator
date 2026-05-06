@@ -21,6 +21,26 @@ status:
   - group: machine.openshift.io
     name: ""
     resource: machines
+  - group: ""
+    name: control-plane-machine-set-operator
+    namespace: openshift-machine-api
+    resource: serviceaccounts
+  - group: ""
+    name: control-plane-machine-set-operator
+    namespace: openshift-machine-api
+    resource: services
+  - group: apps
+    name: control-plane-machine-set-operator
+    namespace: openshift-machine-api
+    resource: deployments
+  - group: rbac.authorization.k8s.io
+    name: control-plane-machine-set-operator
+    namespace: openshift-machine-api
+    resource: roles
+  - group: rbac.authorization.k8s.io
+    name: control-plane-machine-set-operator
+    namespace: openshift-machine-api
+    resource: rolebindings
   - group: rbac.authorization.k8s.io
     name: control-plane-machine-set-operator
     resource: clusterroles

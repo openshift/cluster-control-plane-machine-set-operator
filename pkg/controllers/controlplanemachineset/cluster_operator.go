@@ -52,6 +52,36 @@ func relatedObjects() []configv1.ObjectReference {
 			Name:     "",
 		},
 		{
+			Group:     "",
+			Resource:  "serviceaccounts",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "",
+			Resource:  "services",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "apps",
+			Resource:  "deployments",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "rbac.authorization.k8s.io",
+			Resource:  "roles",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
+			Group:     "rbac.authorization.k8s.io",
+			Resource:  "rolebindings",
+			Name:      "control-plane-machine-set-operator",
+			Namespace: machineAPINamespace,
+		},
+		{
 			Group:    "rbac.authorization.k8s.io",
 			Resource: "clusterroles",
 			Name:     "control-plane-machine-set-operator",
