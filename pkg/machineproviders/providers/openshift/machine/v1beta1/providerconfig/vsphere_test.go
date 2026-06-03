@@ -262,4 +262,15 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 			Expect(expected).To(Equal(v1.VSphereFailureDomain{}))
 		})
 	})
+
+	Context("no workspace configured in provider spec", func() {
+		BeforeEach(func() {
+			providerConfig.providerConfig.Workspace = nil
+		})
+
+		It("should return empty failure domain without panicking", func() {
+			Expect(providerConfig.ExtractFailureDomain()).To(Equal(v1.VSphereFailureDomain{}),
+				"expected empty failure domain when workspace is nil, but ExtractFailureDomain panicked")
+		})
+	})
 })
