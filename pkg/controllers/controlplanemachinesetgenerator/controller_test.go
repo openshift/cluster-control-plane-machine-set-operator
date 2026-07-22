@@ -1777,18 +1777,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		ns := corev1resourcebuilder.Namespace().WithGenerateName("control-plane-machine-set-controller-").Build()
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		namespaceName = ns.GetName()
-	})
 
-	AfterEach(func() {
-		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
-			&corev1.Node{},
-			&machinev1beta1.Machine{},
-			&configv1.Infrastructure{},
-			&machinev1.ControlPlaneMachineSet{},
-		)
-	})
-
-	JustBeforeEach(func() {
 		By("Setting up a manager and controller")
 		var err error
 		mgr, err = ctrl.NewManager(cfg, managerOptions)
@@ -1803,7 +1792,18 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 			FeatureGateAccessor: featureGateAccessor,
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
+	})
 
+	AfterEach(func() {
+		testutils.CleanupResources(Default, ctx, cfg, k8sClient, namespaceName,
+			&corev1.Node{},
+			&machinev1beta1.Machine{},
+			&configv1.Infrastructure{},
+			&machinev1.ControlPlaneMachineSet{},
+		)
+	})
+
+	JustBeforeEach(func() {
 		By("Starting the manager")
 		mgrCancel, mgrDone = startManager(&mgr)
 	})
