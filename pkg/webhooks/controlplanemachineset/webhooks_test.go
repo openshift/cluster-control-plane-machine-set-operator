@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -140,7 +141,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 		// Wait for the webhook server to be ready before running tests.
 		By("Waiting for the webhook server to be ready")
-		webhookAddr := fmt.Sprintf("%s:%d", testEnv.WebhookInstallOptions.LocalServingHost, testEnv.WebhookInstallOptions.LocalServingPort)
+		webhookAddr := net.JoinHostPort(testEnv.WebhookInstallOptions.LocalServingHost, strconv.Itoa(testEnv.WebhookInstallOptions.LocalServingPort))
 		Eventually(func() error {
 			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 1 * time.Second}, "tcp", webhookAddr, &tls.Config{InsecureSkipVerify: true}) //nolint:gosec
 			if err != nil {
