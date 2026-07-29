@@ -143,12 +143,13 @@ var _ = Describe("Webhooks", Ordered, func() {
 		By("Waiting for the webhook server to be ready")
 		webhookAddr := net.JoinHostPort(testEnv.WebhookInstallOptions.LocalServingHost, strconv.Itoa(testEnv.WebhookInstallOptions.LocalServingPort))
 		Eventually(func() error {
-			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 1 * time.Second}, "tcp", webhookAddr, &tls.Config{InsecureSkipVerify: true}) //nolint:gosec
+			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 1 * time.Second}, "tcp", webhookAddr, &tls.Config{InsecureSkipVerify: true})
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to dial webhook server: %w", err)
 			}
+
 			return conn.Close()
-		}).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond).Should(Succeed(), "Webhook server should be reachable")
+		}).WithTimeout(10*time.Second).WithPolling(100*time.Millisecond).Should(Succeed(), "Webhook server should be reachable")
 	})
 
 	AfterEach(func() {
