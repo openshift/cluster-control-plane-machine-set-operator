@@ -18,7 +18,11 @@ package controlplanemachineset
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
+	"strconv"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -134,6 +138,18 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 			Expect(mgr.Start(mgrCtx)).To(Succeed())
 		}()
+
+		// Wait for the webhook server to be ready before running tests.
+		By("Waiting for the webhook server to be ready")
+		webhookAddr := net.JoinHostPort(testEnv.WebhookInstallOptions.LocalServingHost, strconv.Itoa(testEnv.WebhookInstallOptions.LocalServingPort))
+		Eventually(func() error {
+			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 1 * time.Second}, "tcp", webhookAddr, &tls.Config{InsecureSkipVerify: true})
+			if err != nil {
+				return fmt.Errorf("failed to dial webhook server: %w", err)
+			}
+
+			return conn.Close()
+		}).WithTimeout(10*time.Second).WithPolling(100*time.Millisecond).Should(Succeed(), "Webhook server should be reachable")
 	})
 
 	AfterEach(func() {
