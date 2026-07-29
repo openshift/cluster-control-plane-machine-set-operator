@@ -1247,6 +1247,97 @@ var _ = Describe("Webhooks", Ordered, func() {
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines"),
 				))
 			})
+
+			It("without an internal load balancer and with ARO image", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				).WithProviderSpecBuilder(
+					machinev1beta1resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer(""),
+				)).Build()
+
+				azureProviderSpec := &machinev1beta1.AzureMachineProviderSpec{}
+				Expect(json.Unmarshal(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw, azureProviderSpec)).
+					To(Succeed(), "expect to unmarshal current provider spec")
+				azureProviderSpec.Image = machinev1beta1.Image{
+					Publisher: "azureopenshift",
+					Offer:     "aro4",
+					SKU:       "aro_43",
+					Version:   "43.81.20200311",
+				}
+				specData, err := json.Marshal(azureProviderSpec)
+				Expect(err).To(BeNil(), "expect to be able to marshal changes")
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = &runtime.RawExtension{
+					Raw: specData,
+				}
+
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+			})
+
+			It("without an internal load balancer and with ARO image publisher but non-ARO offer", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				).WithProviderSpecBuilder(
+					machinev1beta1resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer(""),
+				)).Build()
+
+				azureProviderSpec := &machinev1beta1.AzureMachineProviderSpec{}
+				Expect(json.Unmarshal(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw, azureProviderSpec)).
+					To(Succeed(), "expect to unmarshal current provider spec")
+				azureProviderSpec.Image = machinev1beta1.Image{
+					Publisher: "azureopenshift",
+					Offer:     "not-aro",
+					SKU:       "aro_43",
+					Version:   "43.81.20200311",
+				}
+				specData, err := json.Marshal(azureProviderSpec)
+				Expect(err).To(BeNil(), "expect to be able to marshal changes")
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = &runtime.RawExtension{
+					Raw: specData,
+				}
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines"),
+				))
+			})
+
+			It("without an internal load balancer and with non-ARO image publisher but ARO offer", func() {
+				cpms := builder.WithMachineTemplateBuilder(machineTemplate.WithFailureDomainsBuilder(
+					machinev1resourcebuilder.AzureFailureDomains().WithFailureDomainBuilders(
+						zone1Builder,
+						zone2Builder,
+						zone3Builder,
+					),
+				).WithProviderSpecBuilder(
+					machinev1beta1resourcebuilder.AzureProviderSpec().WithInternalLoadBalancer(""),
+				)).Build()
+
+				azureProviderSpec := &machinev1beta1.AzureMachineProviderSpec{}
+				Expect(json.Unmarshal(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value.Raw, azureProviderSpec)).
+					To(Succeed(), "expect to unmarshal current provider spec")
+				azureProviderSpec.Image = machinev1beta1.Image{
+					Publisher: "not-azureopenshift",
+					Offer:     "aro4",
+					SKU:       "aro_43",
+					Version:   "43.81.20200311",
+				}
+				specData, err := json.Marshal(azureProviderSpec)
+				Expect(err).To(BeNil(), "expect to be able to marshal changes")
+				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.Spec.ProviderSpec.Value = &runtime.RawExtension{
+					Raw: specData,
+				}
+
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines"),
+				))
+			})
 		})
 
 		Context("on GCP", Ordered, func() {
