@@ -306,21 +306,21 @@ var _ = Describe("Webhooks", Ordered, func() {
 				})
 			})
 
-		Context("when validating failure domains", func() {
-			var infrastructure *configv1.Infrastructure
-			BeforeAll(func() {
-				By("Configuring a vSphere infrastructure spec")
+			Context("when validating failure domains", func() {
+				var infrastructure *configv1.Infrastructure
+				BeforeAll(func() {
+					By("Configuring a vSphere infrastructure spec")
 
-				// Passing in nil for FD will result in defaults being generated.
-				infrastructure = configv1builder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
-				infrastructure.Spec.PlatformSpec.VSphere.VCenters = []configv1.VSpherePlatformVCenterSpec{
-					{
-						Server:      "vcenter.test.com",
-						Datacenters: []string{"test-dc1", "test-dc2", "test-dc3"},
-					},
-				}
-				Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
-			})
+					// Passing in nil for FD will result in defaults being generated.
+					infrastructure = configv1builder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+					infrastructure.Spec.PlatformSpec.VSphere.VCenters = []configv1.VSpherePlatformVCenterSpec{
+						{
+							Server:      "vcenter.test.com",
+							Datacenters: []string{"test-dc1", "test-dc2", "test-dc3"},
+						},
+					}
+					Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
+				})
 
 				AfterAll(func() {
 					Expect(k8sClient.Delete(ctx, infrastructure)).To(Succeed())
