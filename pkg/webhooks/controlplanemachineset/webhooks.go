@@ -71,10 +71,10 @@ const (
 	// warnVSphereResourcePoolMayBeIgnored is a warning when cpms has resource pool configured when failure domains are in use.
 	warnVSphereResourcePoolMayBeIgnored = "resourcePool field is configured and may be ignored if configured in the failure domain."
 
-	// aroImagePublisher is used in validateOpenShiftAzureProviderConfig to bypass the internalLoadBalancer field validation for ARO images
+	// aroImagePublisher is used in validateOpenShiftAzureProviderConfig to bypass the internalLoadBalancer field validation for ARO images.
 	aroImagePublisher = "azureopenshift"
 
-	// aroImageOffer is used in validateOpenShiftAzureProviderConfig to bypass the internalLoadBalancer field validation for ARO images
+	// aroImageOffer is used in validateOpenShiftAzureProviderConfig to bypass the internalLoadBalancer field validation for ARO images.
 	aroImageOffer = "aro4"
 )
 
