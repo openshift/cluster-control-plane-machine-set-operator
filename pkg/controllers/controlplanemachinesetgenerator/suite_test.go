@@ -124,7 +124,9 @@ var _ = BeforeSuite(func() {
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
 
-	// Increase default values for Consistently to ensure there is enough time for reconciliation of objects
+	// Increase default timeouts to ensure there is enough time for reconciliation of objects
+	SetDefaultEventuallyTimeout(5 * time.Second)
+	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(500 * time.Millisecond)
 	SetDefaultConsistentlyPollingInterval(50 * time.Millisecond)
 })

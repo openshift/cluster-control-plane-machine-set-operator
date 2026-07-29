@@ -4,7 +4,7 @@
 package tools
 
 import (
-	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
 	_ "go.uber.org/mock/mockgen"
 	_ "go.uber.org/mock/mockgen/model"
 	_ "github.com/onsi/ginkgo/v2/ginkgo"
