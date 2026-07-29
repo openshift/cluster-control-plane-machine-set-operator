@@ -1274,7 +1274,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					Raw: specData,
 				}
 
-				Expect(k8sClient.Create(ctx, cpms)).To(Succeed())
+				Expect(k8sClient.Create(ctx, cpms)).To(Succeed(), "ARO image without an internal load balancer must be admitted")
 			})
 
 			It("without an internal load balancer and with ARO image publisher but non-ARO offer", func() {
@@ -1305,7 +1305,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines"),
-				))
+				), "non-ARO offer must still be rejected when internal load balancer is missing")
 			})
 
 			It("without an internal load balancer and with non-ARO image publisher but ARO offer", func() {
@@ -1336,7 +1336,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(
 					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.internalLoadBalancer: Required value: internalLoadBalancer is required for control plane machines"),
-				))
+				), "non-ARO publisher must still be rejected when internal load balancer is missing")
 			})
 		})
 
