@@ -141,7 +141,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 		checker := mgr.GetWebhookServer().StartedChecker()
 		Eventually(func() error {
 			return checker(nil)
-		}).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond).Should(Succeed(), "Webhook server should be reachable")
+		}).WithTimeout(10*time.Second).WithPolling(100*time.Millisecond).Should(Succeed(), "Webhook server should be reachable")
 	})
 
 	AfterEach(func() {

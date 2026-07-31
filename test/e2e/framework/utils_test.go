@@ -87,8 +87,15 @@ var _ = Describe("Async utils", func() {
 			runCheckResult := RunCheckUntil(
 				ctx,
 				func(ctx context.Context, g GomegaAssertions) bool {
-					once.Do(func() { close(checked) })
-					return g.Expect(signal).ShouldNot(BeClosed())
+					// Observe an open signal first, then allow the closer to proceed.
+					// Signaling before the assertion can let the closer win the race and
+					// skip the intended "open then closed" transition.
+					stillOpen := g.Expect(signal).ShouldNot(BeClosed())
+					if stillOpen {
+						once.Do(func() { close(checked) })
+					}
+
+					return stillOpen
 				},
 				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(signal).Should(BeClosed())

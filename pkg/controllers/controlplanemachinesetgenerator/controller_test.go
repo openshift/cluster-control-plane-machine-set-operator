@@ -42,6 +42,7 @@ import (
 
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/util"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 )
 
 const (
@@ -109,7 +110,6 @@ func createFeatureGate() {
 	Expect(k8sClient.Status().Update(ctx, featureGate)).To(Succeed())
 }
 
-
 // startTestManager starts mgr and waits until the CPMS/Machine informers have synced.
 // Informers are pre-created with BlockUntilSynced(false) so WaitForCacheSync waits on a
 // known set instead of racing Controller.Start's lazy Watch registration.
@@ -130,15 +130,16 @@ func startTestManager(mgr manager.Manager) (context.CancelFunc, chan struct{}) {
 	}()
 
 	By("Waiting for the manager cache to sync")
-	Expect(mgr.GetCache().WaitForCacheSync(mgrCtx)).To(BeTrue(), "Manager cache should sync before assertions")
+	syncCtx, syncCancel := context.WithTimeout(mgrCtx, framework.DefaultTimeout)
+	defer syncCancel()
+	Expect(mgr.GetCache().WaitForCacheSync(syncCtx)).To(BeTrue(), "Manager cache should sync before assertions")
 
 	return mgrCancel, mgrDone
 }
 
 func stopTestManager(cancel context.CancelFunc, done <-chan struct{}) {
 	cancel()
-	// Wait for done to close once the manager has stopped.
-	<-done
+	Eventually(done).Should(BeClosed(), "Manager should stop")
 }
 
 var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
@@ -355,7 +356,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 	var infra *configv1.Infrastructure
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
-
 
 	create3CPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
@@ -836,7 +836,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 
-
 	create3CPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
 		// so then we can reliably check which machine Provider Spec is picked for the ControlPlaneMachineSet.
@@ -1278,7 +1277,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 
-
 	create3CPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
 		// so then we can reliably check which machine Provider Spec is picked for the ControlPlaneMachineSet.
@@ -1694,7 +1692,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		return infra
 	}
 
-
 	create3CPMachines := func(infra *configv1.Infrastructure, withFailureDomain bool) *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
 		// so then we can reliably check which machine Provider Spec is picked for the ControlPlaneMachineSet.
@@ -2085,7 +2082,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 	var infra *configv1.Infrastructure
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
-
 
 	create3DefaultCPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with the same Provider Spec (no failure domain),
