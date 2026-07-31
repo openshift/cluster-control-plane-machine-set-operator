@@ -19,6 +19,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -60,10 +61,14 @@ var _ = Describe("Async utils", func() {
 		})
 
 		It("Should return true when the check fails exactly when the condition passes", MustPassRepeatedly(5), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			// Keep a generous deadline for -race/CI scheduling, but gate signal close on an
+			// observed check invocation so the race is structural rather than time-based.
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			signal := make(chan struct{})
+			checked := make(chan struct{})
+			var once sync.Once
 
 			errs := []error{}
 			fail := func(message string, callerSkip ...int) {
@@ -75,13 +80,14 @@ var _ = Describe("Async utils", func() {
 			RegisterFailHandler(fail)
 
 			go func() {
-				time.Sleep(1 * time.Second)
+				<-checked
 				close(signal)
 			}()
 
 			runCheckResult := RunCheckUntil(
 				ctx,
 				func(ctx context.Context, g GomegaAssertions) bool {
+					once.Do(func() { close(checked) })
 					return g.Expect(signal).ShouldNot(BeClosed())
 				},
 				func(ctx context.Context, g GomegaAssertions) bool {
