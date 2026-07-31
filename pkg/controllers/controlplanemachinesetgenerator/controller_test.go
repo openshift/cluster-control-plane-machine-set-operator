@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -106,6 +107,38 @@ func createFeatureGate() {
 	Expect(k8sClient.Create(ctx, featureGate)).To(Succeed())
 	featureGate.Status = *fgStatus
 	Expect(k8sClient.Status().Update(ctx, featureGate)).To(Succeed())
+}
+
+
+// startTestManager starts mgr and waits until the CPMS/Machine informers have synced.
+// Informers are pre-created with BlockUntilSynced(false) so WaitForCacheSync waits on a
+// known set instead of racing Controller.Start's lazy Watch registration.
+func startTestManager(mgr manager.Manager) (context.CancelFunc, chan struct{}) {
+	mgrCtx, mgrCancel := context.WithCancel(context.Background())
+	mgrDone := make(chan struct{})
+
+	_, err := mgr.GetCache().GetInformer(mgrCtx, &machinev1.ControlPlaneMachineSet{}, cache.BlockUntilSynced(false))
+	Expect(err).ToNot(HaveOccurred(), "CPMS informer should be created before manager start")
+	_, err = mgr.GetCache().GetInformer(mgrCtx, &machinev1beta1.Machine{}, cache.BlockUntilSynced(false))
+	Expect(err).ToNot(HaveOccurred(), "Machine informer should be created before manager start")
+
+	go func() {
+		defer GinkgoRecover()
+		defer close(mgrDone)
+
+		Expect(mgr.Start(mgrCtx)).To(Succeed())
+	}()
+
+	By("Waiting for the manager cache to sync")
+	Expect(mgr.GetCache().WaitForCacheSync(mgrCtx)).To(BeTrue(), "Manager cache should sync before assertions")
+
+	return mgrCancel, mgrDone
+}
+
+func stopTestManager(cancel context.CancelFunc, done <-chan struct{}) {
+	cancel()
+	// Wait for done to close once the manager has stopped.
+	<-done
 }
 
 var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
@@ -323,25 +356,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 
-	startManager := func(mgr *manager.Manager) (context.CancelFunc, chan struct{}) {
-		mgrCtx, mgrCancel := context.WithCancel(context.Background())
-		mgrDone := make(chan struct{})
-
-		go func() {
-			defer GinkgoRecover()
-			defer close(mgrDone)
-
-			Expect((*mgr).Start(mgrCtx)).To(Succeed())
-		}()
-
-		return mgrCancel, mgrDone
-	}
-
-	stopManager := func() {
-		mgrCancel()
-		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-		<-mgrDone
-	}
 
 	create3CPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
@@ -442,12 +456,12 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 
 	JustBeforeEach(func() {
 		By("Starting the manager")
-		mgrCancel, mgrDone = startManager(&mgr)
+		mgrCancel, mgrDone = startTestManager(mgr)
 	})
 
 	JustAfterEach(func() {
 		By("Stopping the manager")
-		stopManager()
+		stopTestManager(mgrCancel, mgrDone)
 	})
 
 	Context("when a Control Plane Machine Set doesn't exist", func() {
@@ -822,25 +836,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 
-	startManager := func(mgr *manager.Manager) (context.CancelFunc, chan struct{}) {
-		mgrCtx, mgrCancel := context.WithCancel(context.Background())
-		mgrDone := make(chan struct{})
-
-		go func() {
-			defer GinkgoRecover()
-			defer close(mgrDone)
-
-			Expect((*mgr).Start(mgrCtx)).To(Succeed())
-		}()
-
-		return mgrCancel, mgrDone
-	}
-
-	stopManager := func() {
-		mgrCancel()
-		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-		<-mgrDone
-	}
 
 	create3CPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
@@ -928,12 +923,12 @@ var _ = Describe("controlplanemachinesetgenerator controller on Azure", func() {
 
 	JustBeforeEach(func() {
 		By("Starting the manager")
-		mgrCancel, mgrDone = startManager(&mgr)
+		mgrCancel, mgrDone = startTestManager(mgr)
 	})
 
 	JustAfterEach(func() {
 		By("Stopping the manager")
-		stopManager()
+		stopTestManager(mgrCancel, mgrDone)
 	})
 
 	Context("when a Control Plane Machine Set doesn't exist", func() {
@@ -1283,25 +1278,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 
-	startManager := func(mgr *manager.Manager) (context.CancelFunc, chan struct{}) {
-		mgrCtx, mgrCancel := context.WithCancel(context.Background())
-		mgrDone := make(chan struct{})
-
-		go func() {
-			defer GinkgoRecover()
-			defer close(mgrDone)
-
-			Expect((*mgr).Start(mgrCtx)).To(Succeed())
-		}()
-
-		return mgrCancel, mgrDone
-	}
-
-	stopManager := func() {
-		mgrCancel()
-		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-		<-mgrDone
-	}
 
 	create3CPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
@@ -1389,12 +1365,12 @@ var _ = Describe("controlplanemachinesetgenerator controller on GCP", func() {
 
 	JustBeforeEach(func() {
 		By("Starting the manager")
-		mgrCancel, mgrDone = startManager(&mgr)
+		mgrCancel, mgrDone = startTestManager(mgr)
 	})
 
 	JustAfterEach(func() {
 		By("Stopping the manager")
-		stopManager()
+		stopTestManager(mgrCancel, mgrDone)
 	})
 
 	Context("when a Control Plane Machine Set doesn't exist", func() {
@@ -1718,25 +1694,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		return infra
 	}
 
-	startManager := func(mgr *manager.Manager) (context.CancelFunc, chan struct{}) {
-		mgrCtx, mgrCancel := context.WithCancel(context.Background())
-		mgrDone := make(chan struct{})
-
-		go func() {
-			defer GinkgoRecover()
-			defer close(mgrDone)
-
-			Expect((*mgr).Start(mgrCtx)).To(Succeed())
-		}()
-
-		return mgrCancel, mgrDone
-	}
-
-	stopManager := func() {
-		mgrCancel()
-		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-		<-mgrDone
-	}
 
 	create3CPMachines := func(infra *configv1.Infrastructure, withFailureDomain bool) *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with differing Provider Specs,
@@ -1805,12 +1762,12 @@ var _ = Describe("controlplanemachinesetgenerator controller on Nutanix", func()
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed(), "Reconciler should be able to setup with manager")
 
 		By("Starting the manager")
-		mgrCancel, mgrDone = startManager(&mgr)
+		mgrCancel, mgrDone = startTestManager(mgr)
 	})
 
 	JustAfterEach(func() {
 		By("Stopping the manager")
-		stopManager()
+		stopTestManager(mgrCancel, mgrDone)
 	})
 
 	Context("when nutanix failure domains are not defined", func() {
@@ -2129,25 +2086,6 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 	var cpms *machinev1.ControlPlaneMachineSet
 	var machine0, machine1, machine2 *machinev1beta1.Machine
 
-	startManager := func(mgr *manager.Manager) (context.CancelFunc, chan struct{}) {
-		mgrCtx, mgrCancel := context.WithCancel(context.Background())
-		mgrDone := make(chan struct{})
-
-		go func() {
-			defer GinkgoRecover()
-			defer close(mgrDone)
-
-			Expect((*mgr).Start(mgrCtx)).To(Succeed())
-		}()
-
-		return mgrCancel, mgrDone
-	}
-
-	stopManager := func() {
-		mgrCancel()
-		// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
-		<-mgrDone
-	}
 
 	create3DefaultCPMachines := func() *[]machinev1beta1.Machine {
 		// Create 3 control plane machines with the same Provider Spec (no failure domain),
@@ -2281,12 +2219,12 @@ var _ = Describe("controlplanemachinesetgenerator controller on OpenStack", func
 
 	JustBeforeEach(func() {
 		By("Starting the manager")
-		mgrCancel, mgrDone = startManager(&mgr)
+		mgrCancel, mgrDone = startTestManager(mgr)
 	})
 
 	JustAfterEach(func() {
 		By("Stopping the manager")
-		stopManager()
+		stopTestManager(mgrCancel, mgrDone)
 	})
 
 	Context("when a Control Plane Machine Set doesn't exist", func() {
