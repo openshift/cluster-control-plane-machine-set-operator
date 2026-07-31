@@ -130,8 +130,11 @@ func startTestManager(mgr manager.Manager) (context.CancelFunc, chan struct{}) {
 	}()
 
 	By("Waiting for the manager cache to sync")
+
 	syncCtx, syncCancel := context.WithTimeout(mgrCtx, framework.DefaultTimeout)
+
 	defer syncCancel()
+
 	Expect(mgr.GetCache().WaitForCacheSync(syncCtx)).To(BeTrue(), "Manager cache should sync before assertions")
 
 	return mgrCancel, mgrDone
@@ -139,7 +142,9 @@ func startTestManager(mgr manager.Manager) (context.CancelFunc, chan struct{}) {
 
 func stopTestManager(cancel context.CancelFunc, done <-chan struct{}) {
 	cancel()
-	Eventually(done).Should(BeClosed(), "Manager should stop")
+	// Blocking receive: Eventually(done) would treat done as a receive channel and
+	// change shutdown semantics; wait for the Start goroutine to finish instead.
+	<-done
 }
 
 var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
