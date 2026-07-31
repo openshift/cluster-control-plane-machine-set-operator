@@ -1177,7 +1177,7 @@ var _ = Describe("With a running controller", func() {
 
 			// Wait for the machines to all report running before creating the CPMS.
 			By("Waiting for the machines to become ready")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", HaveEach(
 				HaveField("Status.Phase", HaveValue(Equal("Running"))),
 			)))
 
@@ -1280,7 +1280,7 @@ var _ = Describe("With a running controller", func() {
 
 			// Wait for the machines to all report running before creating the CPMS.
 			By("Waiting for the machines to become ready")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", HaveEach(
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", HaveEach(
 				HaveField("Status.Phase", HaveValue(Equal("Running"))),
 			)))
 
@@ -1302,7 +1302,7 @@ var _ = Describe("With a running controller", func() {
 				// We expect the CPMS to observe the current state of the cluster.
 				// The cluster has 3 machines in a single failure domain so we expect
 				// it to report 3 replicas, but only 1 updated replica.
-				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
 					HaveField("Replicas", Equal(int32(3))),
 					HaveField("UpdatedReplicas", Equal(int32(1))),
 					HaveField("ReadyReplicas", Equal(int32(3))),
@@ -1321,7 +1321,7 @@ var _ = Describe("With a running controller", func() {
 				Expect(k8sClient.Delete(ctx, machine)).Should(Succeed())
 
 				By("Checking that a new machine is created in the expected failure domain")
-				Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(HaveField("Items", ContainElement(SatisfyAll(
+				Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", ContainElement(SatisfyAll(
 					HaveField("ObjectMeta.Name", HaveSuffix(fmt.Sprintf("-%d", index))),
 					HaveField("Spec.ProviderSpec.Value.Raw", MatchJSON(providerSpec.Raw)),
 				))))
@@ -1338,7 +1338,7 @@ var _ = Describe("With a running controller", func() {
 					})
 
 					It("should then report a healthy status", func() {
-						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+						Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
 							HaveField("Replicas", Equal(int32(3))),
 							HaveField("UpdatedReplicas", Equal(int32(3))),
 							HaveField("ReadyReplicas", Equal(int32(3))),
@@ -1359,7 +1359,7 @@ var _ = Describe("With a running controller", func() {
 					})
 
 					It("should then report a healthy status", func() {
-						Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+						Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
 							HaveField("Replicas", Equal(int32(3))),
 							HaveField("UpdatedReplicas", Equal(int32(3))),
 							HaveField("ReadyReplicas", Equal(int32(3))),
@@ -1398,7 +1398,7 @@ var _ = Describe("With a running controller", func() {
 				// We expect the CPMS to observe the current state of the cluster.
 				// The cluster has 3 machines in a single failure domain so we expect
 				// it to report 3 replicas, but only 1 updated replica.
-				Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+				Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
 					HaveField("Replicas", Equal(int32(3))),
 					HaveField("UpdatedReplicas", Equal(int32(1))),
 					HaveField("ReadyReplicas", Equal(int32(3))),
@@ -1418,7 +1418,7 @@ var _ = Describe("With a running controller", func() {
 
 				var expectIndexToBeReplacedWithProviderSpec = func(index int, oldProviderSpec, providerSpec *runtime.RawExtension) {
 					By(fmt.Sprintf("Checking that machine with index %d is rebalanced (deleted, recreated) across failure domains", index))
-					Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 5*time.Second).Should(
+					Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(
 						SatisfyAll(
 							// A machine with this index and the old, unbalanced providerSpec, shouldn't
 							// exist anymore as it should be deleted.
@@ -1443,7 +1443,7 @@ var _ = Describe("With a running controller", func() {
 
 				It("should then report a healthy status", func() {
 					By("Waiting for the ControlPlaneMachineSet to report a stable status (machines rebalanced)")
-					Eventually(komega.Object(cpms), 5*time.Second).Should(HaveField("Status", SatisfyAll(
+					Eventually(komega.Object(cpms)).Should(HaveField("Status", SatisfyAll(
 						HaveField("Replicas", Equal(int32(3))),
 						HaveField("UpdatedReplicas", Equal(int32(3))),
 						HaveField("ReadyReplicas", Equal(int32(3))),
@@ -1630,7 +1630,7 @@ var _ = Describe("With a running controller and machine name prefix", func() {
 
 			// Wait for the machines to all report running before creating the CPMS.
 			By("Waiting for the machines to become ready")
-			Eventually(komega.ObjectList(&machinev1beta1.MachineList{}), 2*time.Second).Should(HaveField("Items", HaveEach(
+			Eventually(komega.ObjectList(&machinev1beta1.MachineList{})).Should(HaveField("Items", HaveEach(
 				HaveField("Status.Phase", HaveValue(Equal("Running"))),
 			)))
 
