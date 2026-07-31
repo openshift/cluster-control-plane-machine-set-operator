@@ -669,7 +669,7 @@ var _ = Describe("controlplanemachinesetgenerator controller on AWS", func() {
 			})
 
 			It("should update ControlPlaneMachineSet with the expected failure domains", func() {
-				Eventually(komega.Object(cpms), 1*time.Second).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains()))))
+				Eventually(komega.Object(cpms)).Should(HaveField("Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains", HaveValue(Equal(cpms3FailureDomainsBuilderAWS.BuildFailureDomains()))))
 			})
 
 			Context("With additional Machines adding additional failure domains", func() {
