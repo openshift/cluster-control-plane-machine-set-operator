@@ -89,7 +89,9 @@ test: generate fmt vet unit ## Run tests.
 
 .PHONY: unit
 unit: ## Run only the tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin --index https://raw.githubusercontent.com/openshift/api/master/envtest-releases.yaml)" ./hack/test.sh
+	@assets="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin --index https://raw.githubusercontent.com/openshift/api/master/envtest-releases.yaml)" || { echo "ERROR: envtest failed for $(ENVTEST_K8S_VERSION)"; exit 1; }; \
+	if [ -z "$$assets" ]; then echo "ERROR: envtest returned empty KUBEBUILDER_ASSETS for $(ENVTEST_K8S_VERSION)"; exit 1; fi; \
+	KUBEBUILDER_ASSETS="$$assets" ./hack/test.sh
 
 .PHONY: e2e-presubmit
 e2e-presubmit:
