@@ -16,6 +16,7 @@ testbin/*
 # editor and IDE paraphernalia
 .idea
 *.swp
+!vendor/**/*.swp
 *.swo
 *~
 

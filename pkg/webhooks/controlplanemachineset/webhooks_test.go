@@ -313,6 +313,12 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 					// Passing in nil for FD will result in defaults being generated.
 					infrastructure = configv1builder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build()
+					infrastructure.Spec.PlatformSpec.VSphere.VCenters = []configv1.VSpherePlatformVCenterSpec{
+						{
+							Server:      "vcenter.test.com",
+							Datacenters: []string{"test-dc1", "test-dc2", "test-dc3"},
+						},
+					}
 					Expect(k8sClient.Create(ctx, infrastructure)).To(Succeed())
 				})
 
@@ -752,7 +758,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					}),
 				).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-cluster' is required"))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("label 'machine.openshift.io/cluster-api-cluster' is required")))
 			})
 
 			It("with no master role label on the template", func() {
@@ -768,7 +774,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					}),
 				).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-machine-role' is required, and must have value 'master'")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-machine-role' is required, and must have value 'master'")))
 			})
 
 			It("with an incorrect role label on the template", func() {
@@ -786,7 +792,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					}),
 				).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-machine-role' is required, and must have value 'master'")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-machine-role' is required, and must have value 'master'")))
 			})
 
 			It("with no master type label on the template", func() {
@@ -802,7 +808,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					}),
 				).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-machine-type' is required, and must have value 'master'")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-machine-type' is required, and must have value 'master'")))
 			})
 
 			It("with an incorrect type label on the template", func() {
@@ -820,7 +826,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 					}),
 				).Build()
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-machine-type' is required, and must have value 'master'")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-machine-type' is required, and must have value 'master'")))
 			})
 
 			It("with no machine template", func() {
@@ -836,7 +842,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 				// Leave the union discriminator but set no values.
 				cpms.Spec.Template.OpenShiftMachineV1Beta1Machine = nil
 
-				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template: Invalid value: \"object\": machines_v1beta1_machine_openshift_io configuration is required when machineType is machines_v1beta1_machine_openshift_io, and forbidden otherwise")))
+				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template: Invalid value: machines_v1beta1_machine_openshift_io configuration is required when machineType is machines_v1beta1_machine_openshift_io, and forbidden otherwise")))
 			})
 
 			It("with machine template zone not matching machines", func() {
@@ -860,8 +866,8 @@ var _ = Describe("Webhooks", Ordered, func() {
 				}
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: \"object\": aws configuration is required when platform is AWS, and forbidden otherwise"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: \"object\": azure configuration is required when platform is Azure, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: aws configuration is required when platform is AWS, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: azure configuration is required when platform is Azure, and forbidden otherwise"),
 				)))
 			})
 
@@ -881,8 +887,8 @@ var _ = Describe("Webhooks", Ordered, func() {
 				}
 
 				Expect(k8sClient.Create(ctx, cpms)).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": id is required when type is ID, and forbidden otherwise"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": arn is required when type is ARN, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: id is required when type is ID, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: arn is required when type is ARN, and forbidden otherwise"),
 				)))
 			})
 		})
@@ -1524,7 +1530,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 				Expect(komega.Update(cpms, func() {
 					five := int32(5)
 					cpms.Spec.Replicas = &five
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: \"integer\": replicas is immutable")), "Replicas should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: 5: replicas is immutable")), "Replicas should be immutable")
 			})
 
 			It("when modifying the machine labels and the selector still matches", func() {
@@ -1547,13 +1553,13 @@ var _ = Describe("Webhooks", Ordered, func() {
 			It("when modifying the machine labels to remove the cluster ID label", func() {
 				Expect(komega.Update(cpms, func() {
 					delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
 			})
 
 			It("when mutating the selector", func() {
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: \"object\": selector is immutable")), "The selector should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: selector is immutable")), "The selector should be immutable")
 			})
 
 			It("when adding invalid failure domain information", func() {
@@ -1567,8 +1573,8 @@ var _ = Describe("Webhooks", Ordered, func() {
 						},
 					}
 				})()).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: \"object\": aws configuration is required when platform is AWS, and forbidden otherwise"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: \"object\": azure configuration is required when platform is Azure, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: aws configuration is required when platform is AWS, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains: Invalid value: azure configuration is required when platform is Azure, and forbidden otherwise"),
 				)))
 			})
 
@@ -1586,8 +1592,8 @@ var _ = Describe("Webhooks", Ordered, func() {
 						},
 					}
 				})()).To(MatchError(SatisfyAll(
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": id is required when type is ID, and forbidden otherwise"),
-					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: \"object\": arn is required when type is ARN, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: id is required when type is ID, and forbidden otherwise"),
+					ContainSubstring("spec.template.machines_v1beta1_machine_openshift_io.failureDomains.aws[0].subnet: Invalid value: arn is required when type is ARN, and forbidden otherwise"),
 				)))
 			})
 		})
@@ -1635,7 +1641,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 				Expect(komega.Update(cpms, func() {
 					five := int32(5)
 					cpms.Spec.Replicas = &five
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: \"integer\": replicas is immutable")), "Replicas should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: 5: replicas is immutable")), "Replicas should be immutable")
 			})
 
 			It("when modifying the machine labels and the selector still matches", func() {
@@ -1658,13 +1664,13 @@ var _ = Describe("Webhooks", Ordered, func() {
 			It("when modifying the machine labels to remove the cluster ID label", func() {
 				Expect(komega.Update(cpms, func() {
 					delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
 			})
 
 			It("when mutating the selector", func() {
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: \"object\": selector is immutable")), "The selector should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: selector is immutable")), "The selector should be immutable")
 			})
 
 			It("when removing the internal load balancer", func() {
@@ -1720,7 +1726,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 				Expect(komega.Update(cpms, func() {
 					five := int32(5)
 					cpms.Spec.Replicas = &five
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: \"integer\": replicas is immutable")), "Replicas should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: 5: replicas is immutable")), "Replicas should be immutable")
 			})
 
 			It("when modifying the machine labels and the selector still matches", func() {
@@ -1743,13 +1749,13 @@ var _ = Describe("Webhooks", Ordered, func() {
 			It("when modifying the machine labels to remove the cluster ID label", func() {
 				Expect(komega.Update(cpms, func() {
 					delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
 			})
 
 			It("when mutating the selector", func() {
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: \"object\": selector is immutable")), "The selector should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: selector is immutable")), "The selector should be immutable")
 			})
 
 			It("when removing the target pools", func() {
@@ -1810,7 +1816,7 @@ var _ = Describe("Webhooks", Ordered, func() {
 				Expect(komega.Update(cpms, func() {
 					five := int32(5)
 					cpms.Spec.Replicas = &five
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: \"integer\": replicas is immutable")), "Replicas should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.replicas: Invalid value: 5: replicas is immutable")), "Replicas should be immutable")
 			})
 
 			It("when modifying the machine labels and the selector still matches", func() {
@@ -1833,13 +1839,13 @@ var _ = Describe("Webhooks", Ordered, func() {
 			It("when modifying the machine labels to remove the cluster ID label", func() {
 				Expect(komega.Update(cpms, func() {
 					delete(cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.ObjectMeta.Labels, machinev1beta1.MachineClusterIDLabel)
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: \"object\": label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.template.machines_v1beta1_machine_openshift_io.metadata.labels: Invalid value: label 'machine.openshift.io/cluster-api-cluster' is required")), "The labels must always contain a cluster ID label")
 			})
 
 			It("when mutating the selector", func() {
 				Expect(komega.Update(cpms, func() {
 					cpms.Spec.Selector.MatchLabels["new"] = dummyValue
-				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: \"object\": selector is immutable")), "The selector should be immutable")
+				})()).Should(MatchError(ContainSubstring("ControlPlaneMachineSet.machine.openshift.io \"cluster\" is invalid: spec.selector: Invalid value: selector is immutable")), "The selector should be immutable")
 			})
 		})
 	})
