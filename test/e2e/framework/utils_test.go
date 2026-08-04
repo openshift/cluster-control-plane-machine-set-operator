@@ -61,8 +61,6 @@ var _ = Describe("Async utils", func() {
 		})
 
 		It("Should return true when the check fails exactly when the condition passes", MustPassRepeatedly(5), func() {
-			// Keep a generous deadline for -race/CI scheduling, but gate signal close on an
-			// observed check invocation so the race is structural rather than time-based.
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
@@ -87,9 +85,9 @@ var _ = Describe("Async utils", func() {
 			runCheckResult := RunCheckUntil(
 				ctx,
 				func(ctx context.Context, g GomegaAssertions) bool {
-					// Observe an open signal first, then allow the closer to proceed.
-					// Signaling before the assertion can let the closer win the race and
-					// skip the intended "open then closed" transition.
+					// Require one successful "still open" observation, then close
+					// signal so the next poll can see condition pass. Closing
+					// earlier makes check fail while condition is still false.
 					stillOpen := g.Expect(signal).ShouldNot(BeClosed())
 					if stillOpen {
 						once.Do(func() { close(checked) })

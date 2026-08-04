@@ -125,8 +125,7 @@ var _ = BeforeSuite(func() {
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
 
-	// Align with the other envtest suites: under -race, informer sync and reconcile
-	// regularly exceed gomega's 1s default (see CI flakes Timing out after 1.000s / NotFound).
+	// Match other envtest suites (framework.DefaultTimeout).
 	SetDefaultEventuallyTimeout(framework.DefaultTimeout)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(500 * time.Millisecond)
