@@ -8,7 +8,8 @@ REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
 OPENSHIFT_CI=${OPENSHIFT_CI:-""}
 ARTIFACT_DIR=${ARTIFACT_DIR:-""}
 GINKGO=${GINKGO:-"go run -mod=vendor ${REPO_ROOT}/vendor/github.com/onsi/ginkgo/v2/ginkgo"}
-GINKGO_ARGS=${GINKGO_ARGS:-"-v --randomize-all --randomize-suites --keep-going --race --trace --timeout=15m"}
+GINKGO_BUILD_ARGS=${GINKGO_BUILD_ARGS:-"--race"}
+GINKGO_ARGS=${GINKGO_ARGS:-"-v --randomize-all --randomize-suites --keep-going --trace --timeout=25m"}
 GINKGO_EXTRA_ARGS=${GINKGO_EXTRA_ARGS:-""}
 
 # Ensure that some home var is set and that it's not the root.
@@ -19,18 +20,41 @@ if [ $HOME == "/" ]; then
 fi
 
 if [ "$OPENSHIFT_CI" == "true" ] && [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then # detect ci environment there
-  GINKGO_ARGS="${GINKGO_ARGS} --junit-report=junit_control_plane_machine_set_operator.xml --cover --coverprofile=test-unit-coverage.out --output-dir=${ARTIFACT_DIR}"
+  GINKGO_BUILD_ARGS="${GINKGO_BUILD_ARGS} --cover"
+  GINKGO_ARGS="${GINKGO_ARGS} --junit-report=junit_control_plane_machine_set_operator.xml --coverprofile=test-unit-coverage.out --output-dir=${ARTIFACT_DIR}"
 fi
 
 # Exclude the specific E2E package as this is not a unit test.
 # This regex should allow packages under the e2e dir to still be tested.
 TEST_PACKAGES=${TEST_PACKAGES:-$(go list -f "{{ .Dir }}" ./... | grep -v cluster-control-plane-machine-set-operator/test/e2e$)}
 
-# Print the command we are going to run as Make would.
-echo ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} "<omitted>"
-GOGC=50 ${GINKGO} ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} ${TEST_PACKAGES}
-# Capture the test result to exit on error after coverage.
+# Build outside --timeout, then run the precompiled binaries.
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) ginkgo build starting"
+build_start=$SECONDS
+echo ${GINKGO} build ${GINKGO_BUILD_ARGS} "<omitted>"
+GOGC=50 ${GINKGO} build ${GINKGO_BUILD_ARGS} ${TEST_PACKAGES} || exit $?
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) ginkgo build finished in $((SECONDS - build_start))s"
+
+TEST_BINARIES=()
+for pkg in ${TEST_PACKAGES}; do
+  bin="${pkg}/$(basename "${pkg}").test"
+  [ -x "${bin}" ] && TEST_BINARIES+=("${bin}")
+done
+
+if ((${#TEST_BINARIES[@]} == 0)); then
+  echo "ERROR: no test binaries were built" >&2
+  exit 1
+fi
+
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) ginkgo run starting (${#TEST_BINARIES[@]} binaries)"
+run_start=$SECONDS
+echo ${GINKGO} run ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} "<omitted>"
+GOGC=50 ${GINKGO} run ${GINKGO_ARGS} ${GINKGO_EXTRA_ARGS} "${TEST_BINARIES[@]}"
 TEST_RESULT=$?
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) ginkgo run finished in $((SECONDS - run_start))s"
+
+# Match prior ginkgo run behavior: drop the test binaries after the run.
+rm -f "${TEST_BINARIES[@]}"
 
 if [ -f "${ARTIFACT_DIR}/test-unit-coverage.out" ]; then
   # Convert the coverage to html for spyglass.

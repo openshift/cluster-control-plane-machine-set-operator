@@ -19,6 +19,7 @@ package controlplanemachineset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -134,6 +135,13 @@ var _ = Describe("Webhooks", Ordered, func() {
 
 			Expect(mgr.Start(mgrCtx)).To(Succeed())
 		}()
+
+		// Wait for the webhook server to be ready before running tests.
+		By("Waiting for the webhook server to be ready")
+		checker := mgr.GetWebhookServer().StartedChecker()
+		Eventually(func() error {
+			return checker(nil)
+		}).WithTimeout(10*time.Second).WithPolling(100*time.Millisecond).Should(Succeed(), "Webhook server should be reachable")
 	})
 
 	AfterEach(func() {

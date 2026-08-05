@@ -19,6 +19,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -60,10 +61,12 @@ var _ = Describe("Async utils", func() {
 		})
 
 		It("Should return true when the check fails exactly when the condition passes", MustPassRepeatedly(5), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			signal := make(chan struct{})
+			checked := make(chan struct{})
+			var once sync.Once
 
 			errs := []error{}
 			fail := func(message string, callerSkip ...int) {
@@ -75,14 +78,22 @@ var _ = Describe("Async utils", func() {
 			RegisterFailHandler(fail)
 
 			go func() {
-				time.Sleep(1 * time.Second)
+				<-checked
 				close(signal)
 			}()
 
 			runCheckResult := RunCheckUntil(
 				ctx,
 				func(ctx context.Context, g GomegaAssertions) bool {
-					return g.Expect(signal).ShouldNot(BeClosed())
+					// Require one successful "still open" observation, then close
+					// signal so the next poll can see condition pass. Closing
+					// earlier makes check fail while condition is still false.
+					stillOpen := g.Expect(signal).ShouldNot(BeClosed())
+					if stillOpen {
+						once.Do(func() { close(checked) })
+					}
+
+					return stillOpen
 				},
 				func(ctx context.Context, g GomegaAssertions) bool {
 					return g.Expect(signal).Should(BeClosed())

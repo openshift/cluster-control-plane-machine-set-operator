@@ -29,6 +29,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/cluster-control-plane-machine-set-operator/test/e2e/framework"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -124,8 +125,8 @@ var _ = BeforeSuite(func() {
 	komega.SetClient(k8sClient)
 	komega.SetContext(ctx)
 
-	// Increase default timeouts to ensure there is enough time for reconciliation of objects
-	SetDefaultEventuallyTimeout(5 * time.Second)
+	// Match other envtest suites (framework.DefaultTimeout).
+	SetDefaultEventuallyTimeout(framework.DefaultTimeout)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(500 * time.Millisecond)
 	SetDefaultConsistentlyPollingInterval(50 * time.Millisecond)
