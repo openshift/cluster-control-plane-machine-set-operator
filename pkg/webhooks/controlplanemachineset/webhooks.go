@@ -70,6 +70,12 @@ const (
 
 	// warnVSphereResourcePoolMayBeIgnored is a warning when cpms has resource pool configured when failure domains are in use.
 	warnVSphereResourcePoolMayBeIgnored = "resourcePool field is configured and may be ignored if configured in the failure domain."
+
+	// aroImagePublisher is used in validateOpenShiftAzureProviderConfig to bypass the internalLoadBalancer field validation for ARO images.
+	aroImagePublisher = "azureopenshift"
+
+	// aroImageOffer is used in validateOpenShiftAzureProviderConfig to bypass the internalLoadBalancer field validation for ARO images.
+	aroImageOffer = "aro4"
 )
 
 var (
@@ -422,13 +428,14 @@ func validateOpenShiftNutanixProviderConfig(parentPath *field.Path, providerConf
 }
 
 // validateOpenShiftAzureProviderConfig runs Azure specific checks on the provider config on the ControlPlaneMachineSet.
-// This ensure that the ControlPlaneMachineSet can safely replace Azure control plane machines.
+// This ensures that the ControlPlaneMachineSet can safely replace Azure control plane machines.
+// The internalLoadBalancer field validation can be skipped for machines running ARO images.
 func validateOpenShiftAzureProviderConfig(parentPath *field.Path, providerConfig providerconfig.AzureProviderConfig) []error {
 	errs := []error{}
 
 	config := providerConfig.Config()
 
-	if config.InternalLoadBalancer == "" {
+	if config.InternalLoadBalancer == "" && (config.Image.Publisher != aroImagePublisher || config.Image.Offer != aroImageOffer) {
 		errs = append(errs, field.Required(parentPath.Child("internalLoadBalancer"), "internalLoadBalancer is required for control plane machines"))
 	}
 
