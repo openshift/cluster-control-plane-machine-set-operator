@@ -885,7 +885,7 @@ func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, m
 			// different instance shape from GCP, which can trigger capacity-related
 			// provisioning failures (see OCPBUGS-105222).
 			// For E2 custom, the ratio of memory per vCPU is 0.5 GB to 8 GB inclusive.
-			if mem >= ivCPU*8*1024 {
+			if mem+1024 > ivCPU*8*1024 {
 				return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
 			}
 

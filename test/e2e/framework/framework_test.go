@@ -243,6 +243,20 @@ var _ = Describe("Framwork", func() {
 						currentMachineSize: "e2-custom-2-1024",
 						expectedNextSize:   "e2-custom-2-2048",
 					}),
+					Entry("when the current Machine size is e2-custom-2-16384 (at max)", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-2-16384",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-2-16384", errInstanceTypeNotSupported),
+					}),
+					Entry("when the current Machine size is e2-custom-2-15360 (last valid increment)", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-2-15360",
+						expectedNextSize:   "e2-custom-2-16384",
+					}),
+					Entry("when the current Machine size is e2-custom-2-15616 (would exceed after increment)", nextInstanceSizeTableInput{
+						currentMachineSize: "e2-custom-2-15616",
+						expectedNextSize:   "",
+						expectedError:      fmt.Errorf("%w: e2-custom-2-15616", errInstanceTypeNotSupported),
+					}),
 					Entry("when the current Machine size is e2-custom-micro-0.25-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-custom-micro-0.25-1024",
 						expectedNextSize:   "e2-custom-micro-0.25-2048",
