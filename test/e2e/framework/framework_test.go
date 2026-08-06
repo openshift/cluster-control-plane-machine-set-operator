@@ -241,7 +241,7 @@ var _ = Describe("Framwork", func() {
 					}),
 					Entry("when the current Machine size is e2-custom-2-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-custom-2-1024",
-						expectedNextSize:   "e2-custom-4-12288",
+						expectedNextSize:   "e2-custom-2-2048",
 					}),
 					Entry("when the current Machine size is e2-custom-micro-0.25-1024", nextInstanceSizeTableInput{
 						currentMachineSize: "e2-custom-micro-0.25-1024",
