@@ -881,13 +881,15 @@ func setNextGCPMachineSize(current, family, subfamily, subfamilyflavor string, m
 			return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, ivCPU, mem), nil
 
 		case family == "e2" && subfamilyflavor == "":
-			// You can create E2 custom machine types with vCPUs in multiples of 2, up to 32 vCPUs.
-			// The minimum acceptable number of vCPUs for a VM is 2.
-			if ivCPU < 32 {
-				ivCPU += 2
+			// Only bump memory, not vCPUs, to avoid requesting a fundamentally
+			// different instance shape from GCP, which can trigger capacity-related
+			// provisioning failures (see OCPBUGS-105222).
+			// For E2 custom, the ratio of memory per vCPU is 0.5 GB to 8 GB inclusive.
+			if mem+1024 > ivCPU*8*1024 {
+				return "", fmt.Errorf("%w: %s", errInstanceTypeNotSupported, current)
 			}
-			// For E2, the ratio of memory per vCPU is 0.5 GB to 8 GB inclusive.
-			mem = ivCPU * 3 * 1024
+
+			mem += 1024
 		}
 
 		return fmt.Sprintf("%s-%s-%d-%d", family, subfamily, ivCPU, mem), nil
