@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -65,6 +66,12 @@ const (
 	// infrastructureName is the name of the Infrastructure resource. Any changes to this resource will need to be
 	// reflected in changes to the ControlPlaneMachineSet configuration.
 	infrastructureName = "cluster"
+
+	// newNodeUnmanagedGracePeriod is the period allowed for a new node
+	// to not be managed by a machine
+	// (e.g. the node has just been created and the machine to node linking has not happened yet).
+	// This leaves some leeway to avoid immediately reacting on node unmanagement.
+	newNodeUnmanagedGracePeriod = time.Minute * 1
 )
 
 var (
@@ -108,6 +115,15 @@ type ControlPlaneMachineSetReconciler struct {
 
 	// FeatureGateAccessor enables checking of enabled featuregates
 	FeatureGateAccessor featuregates.FeatureGateAccess
+
+	// Clock allows for injecting fake or real clocks for testing.
+	// If nil, uses time.Now() directly.
+	Clock ClockInterface
+}
+
+// ClockInterface allows for injecting fake or real clocks for testing.
+type ClockInterface interface {
+	Now() time.Time
 }
 
 // lastErrorTracker tracks the last error that occurred during reconciliation.
@@ -637,7 +653,7 @@ func isOwnedByCurrentCPMS(cpms *machinev1.ControlPlaneMachineSet, machineObjectM
 func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappings(ctx context.Context, logger logr.Logger,
 	cpms *machinev1.ControlPlaneMachineSet, sortedIndexedMs []indexToMachineInfos) (bool, error) {
 	var (
-		unmanagedNodeNames []string
+		unmanagedNodes []corev1.Node
 	)
 
 	cpmsNodes, err := r.fetchControlPlaneNodes(ctx)
@@ -659,34 +675,55 @@ func (r *ControlPlaneMachineSetReconciler) checkControlPlaneNodesToMachinesMappi
 		}
 
 		if !found {
-			unmanagedNodeNames = append(unmanagedNodeNames, node.ObjectMeta.Name)
+			unmanagedNodes = append(unmanagedNodes, node)
 		}
 	}
 
-	if len(unmanagedNodeNames) > 0 {
-		logger.Error(
-			fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, strings.Join(unmanagedNodeNames, ", ")),
-			"Observed unmanaged control plane nodes",
-			"unmanagedNodes", strings.Join(unmanagedNodeNames, ","),
-		)
+	if len(unmanagedNodes) == 0 {
+		return true, nil
+	}
 
-		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
-			Type:   conditionProgressing,
-			Status: metav1.ConditionFalse,
-			Reason: reasonOperatorDegraded,
-		})
+	var unmanagedNodeNamesAfterGracePeriod []string
 
-		meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
-			Type:    conditionDegraded,
-			Status:  metav1.ConditionTrue,
-			Reason:  reasonUnmanagedNodes,
-			Message: fmt.Sprintf("Found %d unmanaged node(s)", len(unmanagedNodeNames)),
-		})
+	// Use the injected "fake" clock if available, otherwise use time.Now().
+	now := time.Now()
+	if r.Clock != nil {
+		now = r.Clock.Now()
+	}
 
+	for _, unmanagedNode := range unmanagedNodes {
+		if unmanagedNode.CreationTimestamp.Add(newNodeUnmanagedGracePeriod).Before(now) {
+			unmanagedNodeNamesAfterGracePeriod = append(unmanagedNodeNamesAfterGracePeriod, unmanagedNode.Name)
+		}
+	}
+
+	if len(unmanagedNodeNamesAfterGracePeriod) == 0 {
+		// There are some unmanaged nodes that haven't yet exceeded the grace period.
+		// Not every node has a control plane machine associated with it yet,
+		// but do not log an error or set any degraded condition as for the moment we are within the grace period for them.
 		return false, nil
 	}
 
-	return true, nil
+	logger.Error(
+		fmt.Errorf("%w: %s", errFoundUnmanagedControlPlaneNodes, strings.Join(unmanagedNodeNamesAfterGracePeriod, ", ")),
+		"Observed unmanaged control plane nodes",
+		"unmanagedNodes", strings.Join(unmanagedNodeNamesAfterGracePeriod, ","),
+	)
+
+	meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+		Type:   conditionProgressing,
+		Status: metav1.ConditionFalse,
+		Reason: reasonOperatorDegraded,
+	})
+
+	meta.SetStatusCondition(&cpms.Status.Conditions, metav1.Condition{
+		Type:    conditionDegraded,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonUnmanagedNodes,
+		Message: fmt.Sprintf("Found %d unmanaged node(s)", len(unmanagedNodeNamesAfterGracePeriod)),
+	})
+
+	return false, nil
 }
 
 // checkReadyControlPlaneMachineExists checks that at least one ready control plane machine exists in the cluster.
