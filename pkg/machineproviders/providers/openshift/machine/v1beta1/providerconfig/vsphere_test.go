@@ -150,6 +150,44 @@ var _ = Describe("VSphere Provider Config", Label("vSphereProviderConfig"), func
 		})
 	})
 
+	Context("StaticIP with Nameservers", func() {
+		BeforeEach(func() {
+			machineProviderConfig := machinev1beta1resourcebuilder.VSphereProviderSpec().
+				WithZone(usCentral1a).WithIPPool().
+				Build()
+
+			// Add nameservers to the network configuration
+			machineProviderConfig.Network.Devices[0].Nameservers = []string{"8.8.8.8", "8.8.4.4"}
+
+			providerConfig = VSphereProviderConfig{
+				providerConfig: *machineProviderConfig,
+				infrastructure: configv1resourcebuilder.Infrastructure().AsVSphereWithFailureDomains("vsphere-test", nil).Build(),
+			}
+		})
+
+		It("preserves nameservers when resetting topology related fields", func() {
+			resetConfig := providerConfig.ResetTopologyRelatedFields()
+			vsphereConfig := resetConfig.VSphere()
+
+			Expect(vsphereConfig.providerConfig.Network.Devices).To(HaveLen(1),
+				"expected one network device after reset")
+			Expect(vsphereConfig.providerConfig.Network.Devices[0].AddressesFromPools).To(Not(BeEmpty()),
+				"expected AddressesFromPools to be preserved after reset")
+			Expect(vsphereConfig.providerConfig.Network.Devices[0].Nameservers).To(Equal([]string{"8.8.8.8", "8.8.4.4"}),
+				"expected nameservers to be preserved after reset")
+		})
+
+		It("preserves nameservers when injecting failure domain", func() {
+			injectedConfig, err := providerConfig.InjectFailureDomain(providerConfig.ExtractFailureDomain())
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(injectedConfig.providerConfig.Network.Devices[0].AddressesFromPools).To(Not(BeEmpty()),
+				"expected AddressesFromPools to be present after injecting failure domain")
+			Expect(injectedConfig.providerConfig.Network.Devices[0].Nameservers).To(Equal([]string{"8.8.8.8", "8.8.4.4"}),
+				"expected nameservers to be preserved after injecting failure domain")
+		})
+	})
+
 	Context("newVSphereProviderConfig", func() {
 		var providerConfig ProviderConfig
 		var expectedVSphereConfig machinev1beta1.VSphereMachineProviderSpec
