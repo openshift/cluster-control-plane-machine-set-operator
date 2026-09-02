@@ -213,11 +213,12 @@ func (v VSphereProviderConfig) ResetTopologyRelatedFields() ProviderConfig {
 	networkSpec := machinev1beta1.NetworkSpec{}
 	devices := networkSpec.Devices
 
-	// preserve ippools if they are defined
+	// preserve ippools and nameservers if they are defined
 	for _, network := range v.providerConfig.Network.Devices {
 		if len(network.AddressesFromPools) > 0 {
 			networkDeviceSpec := machinev1beta1.NetworkDeviceSpec{
 				AddressesFromPools: network.AddressesFromPools,
+				Nameservers:        network.Nameservers,
 			}
 			devices = append(devices, networkDeviceSpec)
 		}
