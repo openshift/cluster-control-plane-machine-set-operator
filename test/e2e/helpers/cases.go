@@ -19,13 +19,13 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	ote "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	"sync"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -163,7 +163,7 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		})
 
 		framework.Async(wg, cancel, func() bool {
-			return CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.RollingUpdate)
+			return CheckRolloutForIndex(testFramework, rolloutCtx, index, machinev1.RollingUpdate)
 		})
 
 		wg.Wait()
@@ -252,6 +252,72 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 		// Check every 20 seconds.
 		// The timeout includes the 2 minutes to stabilise, hence 22 minutes.
 		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 22*time.Minute, 20*time.Second)
+		By("Cluster stabilised after the rollout")
+	})
+}
+
+// ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously checks that the control plane machine set replaces
+// all three master machines when the update strategy is OnDelete and all three machines are deleted simultaneously.
+func ItShouldOnDeleteReplaceAllThreeMastersWhenDeletedSimultaneously(testFramework framework.Framework) {
+	// TODO: https://issues.redhat.com/browse/OCPBUGS-74151
+	It("should replace all three masters when deleted simultaneously", ote.Informing(), func() {
+		k8sClient := testFramework.GetClient()
+		ctx := testFramework.GetContext()
+
+		// Make sure the CPMS exists before we delete the Machines.
+		cpms := &machinev1.ControlPlaneMachineSet{}
+		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
+
+		// Get all three machines
+		machine0, err := machineForIndex(testFramework, 0)
+		Expect(err).ToNot(HaveOccurred(), "control plane machine 0 should exist")
+
+		machine1, err := machineForIndex(testFramework, 1)
+		Expect(err).ToNot(HaveOccurred(), "control plane machine 1 should exist")
+
+		machine2, err := machineForIndex(testFramework, 2)
+		Expect(err).ToNot(HaveOccurred(), "control plane machine 2 should exist")
+
+		// Delete all three Machines simultaneously.
+		By("Deleting all three master machines")
+		Expect(k8sClient.Delete(ctx, machine0)).To(Succeed(), "control plane machine 0 should be able to be deleted")
+		Expect(k8sClient.Delete(ctx, machine1)).To(Succeed(), "control plane machine 1 should be able to be deleted")
+		Expect(k8sClient.Delete(ctx, machine2)).To(Succeed(), "control plane machine 2 should be able to be deleted")
+
+		// Deleting all three Machines triggers a rollout, give the rollout 90 minutes to complete.
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 90*time.Minute)
+		defer cancel()
+
+		wg := &sync.WaitGroup{}
+
+		framework.Async(wg, cancel, func() bool {
+			return WaitForControlPlaneMachineSetDesiredReplicas(rolloutCtx, cpms.DeepCopy())
+		})
+
+		// Check rollout for all three indexes
+		framework.Async(wg, cancel, func() bool {
+			return CheckRolloutForIndex(testFramework, rolloutCtx, 0, machinev1.OnDelete)
+		})
+
+		framework.Async(wg, cancel, func() bool {
+			return CheckRolloutForIndex(testFramework, rolloutCtx, 1, machinev1.OnDelete)
+		})
+
+		framework.Async(wg, cancel, func() bool {
+			return CheckRolloutForIndex(testFramework, rolloutCtx, 2, machinev1.OnDelete)
+		})
+
+		wg.Wait()
+
+		// If there's an error in the context, either it timed out or one of the async checks failed.
+		Expect(rolloutCtx.Err()).ToNot(HaveOccurred(), "rollout should have completed successfully")
+		By("Control plane machine rollout completed successfully for all three masters")
+
+		By("Waiting for the cluster to stabilise after the rollout")
+		// 30 minutes for the rollout to complete, 2 minutes for the cluster to stabilise.
+		// Check every 20 seconds.
+		// The timeout includes the 2 minutes to stabilise, hence 32 minutes.
+		EventuallyClusterOperatorsShouldStabilise(2*time.Minute, 32*time.Minute, 20*time.Second)
 		By("Cluster stabilised after the rollout")
 	})
 }
