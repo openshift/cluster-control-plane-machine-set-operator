@@ -81,12 +81,13 @@ func main() { //nolint:funlen,cyclop
 	}
 
 	var (
-		metricsAddr         string
-		probeAddr           string
-		webhookPort         int
-		managedNamespace    string
-		tlsMinVersionFlag   string
-		tlsCipherSuitesFlag []string
+		metricsAddr             string
+		probeAddr               string
+		webhookPort             int
+		managedNamespace        string
+		tlsMinVersionFlag       string
+		tlsCipherSuitesFlag     []string
+		tlsCurvePreferencesFlag []int32
 
 		leaderElectionConfig = config.LeaderElectionConfiguration{
 			LeaderElect:  true,
@@ -103,6 +104,7 @@ func main() { //nolint:funlen,cyclop
 	pflag.StringVar(&managedNamespace, "namespace", "openshift-machine-api", "The namespace for managed objects, where the machines and control plane machine set will operate.")
 	pflag.StringVar(&tlsMinVersionFlag, "tls-min-version", "", "Minimum TLS version supported. When set with --tls-cipher-suites, overrides the cluster-wide TLS profile. Possible values: "+strings.Join(cliflag.TLSPossibleVersions(), ", "))
 	pflag.StringSliceVar(&tlsCipherSuitesFlag, "tls-cipher-suites", nil, "Comma-separated list of cipher suites for the server. When set with --tls-min-version, overrides the cluster-wide TLS profile. Possible values: "+strings.Join(cliflag.TLSCipherPossibleValues(), ", "))
+	pflag.Int32SliceVar(&tlsCurvePreferencesFlag, "tls-curve-preferences", nil, "Comma-separated list of numeric Go crypto/tls CurveID values for the server (e.g. 23,24 for P-256,P-384). When set, overrides the entire cluster-wide TLS profile and disables profile watching. May be used alone (TLS 1.2 minimum and Go default cipher suites) or with both --tls-min-version and --tls-cipher-suites. Go chooses the negotiation order. See https://pkg.go.dev/crypto/tls#CurveID for supported values.")
 	options.BindLeaderElectionFlags(&leaderElectionConfig, pflag.CommandLine)
 
 	textLoggerConfig := textlogger.NewConfig()
@@ -127,12 +129,18 @@ func main() { //nolint:funlen,cyclop
 	// Ensure the context is cancelled when the program exits.
 	defer cancel()
 
-	tlsOverrideFromFlags := tlsMinVersionFlag != "" || len(tlsCipherSuitesFlag) > 0
-	if tlsOverrideFromFlags && (tlsMinVersionFlag == "" || len(tlsCipherSuitesFlag) == 0) {
+	tlsOverrideFromFlags := pkgtls.HasTLSOverrides(tlsMinVersionFlag, tlsCipherSuitesFlag, tlsCurvePreferencesFlag)
+
+	if (tlsMinVersionFlag != "" || len(tlsCipherSuitesFlag) > 0) && (tlsMinVersionFlag == "" || len(tlsCipherSuitesFlag) == 0) {
 		klog.Fatal("Both --tls-min-version and --tls-cipher-suites must be provided when either is set.")
 	}
 
-	tlsResult, err := pkgtls.ResolveTLSConfig(context.Background(), cfg, tlsMinVersionFlag, tlsCipherSuitesFlag)
+	// Bound startup TLS profile reads and cancel them when shutdown is requested.
+	startupCtx, startupCancel := context.WithTimeout(ctx, 30*time.Second)
+	tlsResult, err := pkgtls.ResolveTLSConfig(startupCtx, cfg, tlsMinVersionFlag, tlsCipherSuitesFlag, tlsCurvePreferencesFlag)
+
+	startupCancel()
+
 	if err != nil {
 		setupLog.Error(err, "unable to configure TLS")
 		exit(cancel, 1)

@@ -43,7 +43,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 			result, err := ResolveTLSConfig(ctx, cfg, "VersionTLS12", []string{
 				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
 				"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-			})
+			}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -59,7 +59,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 		It("should not set cipher suites when TLS 1.3 is specified", func() {
 			result, err := ResolveTLSConfig(ctx, cfg, "VersionTLS13", []string{
 				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-			})
+			}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -72,7 +72,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 		It("should not populate TLSAdherencePolicy or TLSProfileSpec", func() {
 			result, err := ResolveTLSConfig(ctx, cfg, "VersionTLS12", []string{
 				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-			})
+			}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(result.TLSAdherencePolicy).To(BeEmpty())
@@ -82,7 +82,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 		It("should return an error for an invalid TLS version", func() {
 			_, err := ResolveTLSConfig(ctx, cfg, "InvalidVersion", []string{
 				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-			})
+			}, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid --tls-min-version"))
 		})
@@ -90,7 +90,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 		It("should return an error for an invalid cipher suite", func() {
 			_, err := ResolveTLSConfig(ctx, cfg, "VersionTLS12", []string{
 				"INVALID_CIPHER_SUITE",
-			})
+			}, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid --tls-cipher-suites"))
 		})
@@ -121,7 +121,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				return k8sClient.Create(ctx, apiServer)
 			}).Should(Succeed())
 
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -150,7 +150,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				return k8sClient.Create(ctx, apiServer)
 			}).Should(Succeed())
 
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -182,7 +182,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				return k8sClient.Create(ctx, apiServer)
 			}).Should(Succeed())
 
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -217,7 +217,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				return k8sClient.Create(ctx, apiServer)
 			}).Should(Succeed())
 
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -238,7 +238,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 		})
 
 		It("should gracefully default when no APIServer resource exists", func() {
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -259,7 +259,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				apiServer := customAPIServer(version, groups, configv1.TLSAdherencePolicyStrictAllComponents)
 				Expect(k8sClient.Create(ctx, apiServer)).To(Succeed())
 
-				result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+				result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 				Expect(err).NotTo(HaveOccurred())
 
 				tlsCfg := &tls.Config{}
@@ -293,7 +293,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				apiServer := customAPIServer(configv1.VersionTLS12, []configv1.TLSGroup{configv1.TLSGroupSecP521r1}, policy)
 				Expect(k8sClient.Create(ctx, apiServer)).To(Succeed())
 
-				result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+				result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 				Expect(err).NotTo(HaveOccurred())
 
 				tlsCfg := &tls.Config{}
@@ -310,7 +310,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				[]configv1.TLSGroup{configv1.TLSGroupSecP521r1}, configv1.TLSAdherencePolicyStrictAllComponents)
 			Expect(k8sClient.Create(ctx, apiServer)).To(Succeed())
 
-			result, err := ResolveTLSConfig(ctx, cfg, "VersionTLS12", []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"})
+			result, err := ResolveTLSConfig(ctx, cfg, "VersionTLS12", []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -322,12 +322,29 @@ var _ = Describe("ResolveTLSConfig", func() {
 			Expect(result.TLSProfileSpec).To(Equal(configv1.TLSProfileSpec{}))
 		})
 
+		It("should bypass the entire cluster profile when only CLI curves are provided", func() {
+			apiServer := customAPIServer(configv1.VersionTLS13,
+				[]configv1.TLSGroup{configv1.TLSGroupSecP521r1}, configv1.TLSAdherencePolicyStrictAllComponents)
+			Expect(k8sClient.Create(ctx, apiServer)).To(Succeed())
+
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, []int32{int32(tls.CurveP256)})
+			Expect(err).NotTo(HaveOccurred())
+
+			tlsCfg := &tls.Config{}
+			result.TLSConfig(tlsCfg)
+			Expect(tlsCfg.MinVersion).To(Equal(uint16(tls.VersionTLS12)))
+			Expect(tlsCfg.CipherSuites).To(BeNil())
+			Expect(tlsCfg.CurvePreferences).To(Equal([]tls.CurveID{tls.CurveP256}))
+			Expect(result.TLSAdherencePolicy).To(BeEmpty())
+			Expect(result.TLSProfileSpec).To(Equal(configv1.TLSProfileSpec{}))
+		})
+
 		It("should trigger shutdown and reload the configuration after a groups-only change", func() {
 			apiServer := customAPIServer(configv1.VersionTLS13,
 				[]configv1.TLSGroup{configv1.TLSGroupSecP256r1}, configv1.TLSAdherencePolicyStrictAllComponents)
 			Expect(k8sClient.Create(ctx, apiServer)).To(Succeed())
 
-			initial, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			initial, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			shutdownCtx, cancel := context.WithCancel(ctx)
@@ -361,7 +378,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 			Expect(observedNew.Ciphers).To(Equal(observedOld.Ciphers))
 			Expect(observedNew.MinTLSVersion).To(Equal(observedOld.MinTLSVersion))
 
-			reloaded, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			reloaded, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			tlsCfg := &tls.Config{}
@@ -384,7 +401,7 @@ var _ = Describe("ResolveTLSConfig", func() {
 				return k8sClient.Create(ctx, apiServer)
 			}).Should(Succeed())
 
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(result.TLSAdherencePolicy).To(Equal(configv1.TLSAdherencePolicyStrictAllComponents))
@@ -424,7 +441,7 @@ var _ = Describe("TLS group compatibility", func() {
 				Expect(k8sClient.Delete(ctx, apiServer)).To(Succeed())
 			})
 
-			result, err := ResolveTLSConfig(ctx, cfg, "", nil)
+			result, err := ResolveTLSConfig(ctx, cfg, "", nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Metrics and webhooks both receive this same callback through TLSOpts.

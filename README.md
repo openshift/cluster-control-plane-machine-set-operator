@@ -81,6 +81,45 @@ It is deployed based on the [`manifests`](/manifests) defined in this repository
 
 Installation instructions for control plane machine set can be found in the [installation docs](./docs/user/installation.md).
 
+### Serving TLS configuration
+
+The HTTPS metrics endpoint and admission webhook use the cluster's
+`apiservers.config.openshift.io/cluster` TLS security profile when `spec.tlsAdherence` is
+`StrictAllComponents`. Otherwise, they use the default Intermediate profile.
+Changes to the profile or adherence policy trigger a graceful operator restart to reload the configuration.
+
+With the `TLSGroupPreferences` feature gate enabled, a custom profile can specify key-exchange groups, for example:
+
+```yaml
+spec:
+  tlsAdherence: StrictAllComponents
+  tlsSecurityProfile:
+    type: Custom
+    custom:
+      minTLSVersion: VersionTLS13
+      ciphers:
+        - TLS_AES_128_GCM_SHA256
+      groups:
+        - secp256r1
+        - secp384r1
+```
+
+Groups restrict the allowed key-exchange algorithms for TLS 1.2 and TLS 1.3; Go chooses its own negotiation order.
+Supported groups include classical curves and ML-KEM hybrids supported by the operator's Go runtime.
+When a custom profile omits groups, Go's curve defaults are retained. Built-in profiles use their predefined groups.
+Unsupported cipher or group names are logged and ignored. If no supported groups remain, curve defaults are retained.
+TLS 1.3 cipher suites are not configurable in Go, independently of group configuration.
+
+The existing `--tls-min-version` and `--tls-cipher-suites` flags must still be provided together.
+The optional `--tls-curve-preferences` flag accepts comma-separated numeric Go `crypto/tls.CurveID` values,
+for example `--tls-curve-preferences=23,24` allows P-256 and P-384. IDs must be unique and supported by the Go runtime.
+
+Curve preferences may be supplied alone or alongside the minimum-version/cipher-suite pair.
+**Any TLS CLI override bypasses the entire cluster profile and disables the profile watcher**; it is not merged
+with cluster settings. A curve-only override uses a TLS 1.2 minimum and Go's default cipher suites.
+When the curve flag is omitted from an existing CLI override, Go's curve defaults are retained.
+Go chooses its own negotiation order from the allowed curve list.
+
 ## Contributing
 
 Please review the dedicated [contributing guide](/docs/contributing.md) for code conventions and other pointers on

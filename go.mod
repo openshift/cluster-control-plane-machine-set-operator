@@ -9,11 +9,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
-	github.com/openshift/api v0.0.0-20260728120005-8ba0b25b0f29
-	github.com/openshift/client-go v0.0.0-20260728123811-92b24dd0dd1f
+	github.com/openshift/api v0.0.0-20260805215214-cfb63858e9d7
+	github.com/openshift/client-go v0.0.0-20260806041845-b74fb348f1e7
 	github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20260728142959-55685d7a715b
-	github.com/openshift/controller-runtime-common v0.0.0-20260722095319-fea68df23430
-	github.com/openshift/library-go v0.0.0-20260728142710-3205d36dc716
+	github.com/openshift/controller-runtime-common v0.0.0-20260813135806-e1187ec555fc
+	github.com/openshift/library-go v0.0.0-20260807194649-ee0a87843dda
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
