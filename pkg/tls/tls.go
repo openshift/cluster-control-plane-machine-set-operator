@@ -31,6 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// unsupportedTLSValuesMessage reports profile values ignored by the shared TLS helper.
+	unsupportedTLSValuesMessage = "TLS configuration contains unsupported ciphers or groups that will be ignored"
+)
+
 // TLSConfigResult holds the resolved TLS configuration along with the
 // cluster-wide TLS profile metadata needed by the SecurityProfileWatcher.
 type TLSConfigResult struct {
@@ -122,9 +127,9 @@ func resolveClusterTLSConfig(ctx context.Context, restConfig *rest.Config) (TLSC
 	// If the cluster-wide TLS adherence policy is set to honor the cluster-wide TLS profile,
 	// use the cluster-wide TLS profile-based configuration.
 	if libgocrypto.ShouldHonorClusterTLSProfile(tlsAdherencePolicy) {
-		profileTLSConfig, unsupportedCiphers := utiltls.NewTLSConfigFromProfile(tlsProfileSpec)
-		if len(unsupportedCiphers) > 0 {
-			klog.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
+		profileTLSConfig, unsupported := utiltls.NewTLSConfigFromProfile(tlsProfileSpec)
+		if len(unsupported) > 0 {
+			klog.InfoS(unsupportedTLSValuesMessage, "unsupportedValues", unsupported)
 		}
 
 		// Set the TLS configuration to the cluster-wide TLS profile-based configuration.
@@ -132,9 +137,9 @@ func resolveClusterTLSConfig(ctx context.Context, restConfig *rest.Config) (TLSC
 	} else {
 		// If the cluster-wide TLS adherence policy is not set to honor the cluster-wide TLS profile,
 		// use the default TLS profile-based configuration.
-		defaultTLSConfig, unsupportedCiphers := utiltls.NewTLSConfigFromProfile(*configv1.TLSProfiles[libgocrypto.DefaultTLSProfileType])
-		if len(unsupportedCiphers) > 0 {
-			klog.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
+		defaultTLSConfig, unsupported := utiltls.NewTLSConfigFromProfile(*configv1.TLSProfiles[libgocrypto.DefaultTLSProfileType])
+		if len(unsupported) > 0 {
+			klog.InfoS(unsupportedTLSValuesMessage, "unsupportedValues", unsupported)
 		}
 
 		// Set the TLS configuration to the default TLS profile-based configuration.
