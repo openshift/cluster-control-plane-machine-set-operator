@@ -55,7 +55,7 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDInstallOptions: envtest.CRDInstallOptions{
 			Paths: []string{
-				// Use the TechPreview CRD variant which includes the tlsAdherence field.
+				// Use the TechPreview CRD variant which includes tlsAdherence and groups.
 				filepath.Join("..", "..", "vendor", "github.com", "openshift", "api", "config", "v1",
 					"zz_generated.crd-manifests", "0000_10_config-operator_01_apiservers-TechPreviewNoUpgrade.crd.yaml"),
 			},

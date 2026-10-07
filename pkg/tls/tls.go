@@ -31,6 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// unsupportedTLSValuesMessage reports profile values ignored by the shared TLS helper.
+	unsupportedTLSValuesMessage = "TLS configuration contains unsupported ciphers or groups that will be ignored"
+)
+
 // TLSConfigResult holds the resolved TLS configuration along with the
 // cluster-wide TLS profile metadata needed by the SecurityProfileWatcher.
 type TLSConfigResult struct {
@@ -47,19 +52,26 @@ type TLSConfigResult struct {
 // ResolveTLSConfig builds the TLS configuration. When CLI flags are set, they
 // take precedence over the cluster-wide TLS profile. When not set, the profile
 // from apiservers.config.openshift.io/cluster is fetched and applied if the
-// adherence policy requires it.
-func ResolveTLSConfig(ctx context.Context, restConfig *rest.Config, tlsMinVersion string, tlsCipherSuites []string) (TLSConfigResult, error) {
+// adherence policy requires it. A curve-only override uses a TLS 1.2 minimum
+// and Go's default cipher suites, without fetching the cluster profile.
+func ResolveTLSConfig(ctx context.Context, restConfig *rest.Config, tlsMinVersion string, tlsCipherSuites []string, tlsCurvePreferences []int32) (TLSConfigResult, error) {
 	// If CLI flags are set they take precedence over the cluster-wide TLS profile.
-	if tlsMinVersion != "" || len(tlsCipherSuites) > 0 {
-		return resolveTLSConfigFromFlags(tlsMinVersion, tlsCipherSuites)
+	if HasTLSOverrides(tlsMinVersion, tlsCipherSuites, tlsCurvePreferences) {
+		return resolveTLSConfigFromFlags(tlsMinVersion, tlsCipherSuites, tlsCurvePreferences)
 	}
 
 	return resolveClusterTLSConfig(ctx, restConfig)
 }
 
+// HasTLSOverrides reports whether CLI values override the entire cluster TLS
+// profile. The resolver and serving endpoint watcher must use the same decision.
+func HasTLSOverrides(tlsMinVersion string, tlsCipherSuites []string, tlsCurvePreferences []int32) bool {
+	return tlsMinVersion != "" || len(tlsCipherSuites) > 0 || len(tlsCurvePreferences) > 0
+}
+
 // resolveTLSConfigFromFlags builds a TLS configuration from CLI flag values,
 // bypassing the cluster-wide TLS profile.
-func resolveTLSConfigFromFlags(tlsMinVersion string, tlsCipherSuites []string) (TLSConfigResult, error) {
+func resolveTLSConfigFromFlags(tlsMinVersion string, tlsCipherSuites []string, tlsCurvePreferences []int32) (TLSConfigResult, error) {
 	klog.Info("TLS configuration overridden via CLI flags, skipping honoring the cluster-wide TLS profile")
 
 	minVersion, err := cliflag.TLSVersion(tlsMinVersion)
@@ -72,9 +84,17 @@ func resolveTLSConfigFromFlags(tlsMinVersion string, tlsCipherSuites []string) (
 		return TLSConfigResult{}, fmt.Errorf("invalid --tls-cipher-suites value: %w", err)
 	}
 
+	curvePreferences, err := cliflag.TLSCurvePreferences(tlsCurvePreferences)
+	if err != nil {
+		return TLSConfigResult{}, fmt.Errorf("invalid --tls-curve-preferences value: %w", err)
+	}
+
 	return TLSConfigResult{
 		TLSConfig: func(cfg *tls.Config) {
 			cfg.MinVersion = minVersion
+			if len(curvePreferences) > 0 {
+				cfg.CurvePreferences = curvePreferences
+			}
 			// Only set CipherSuites when MinVersion is below TLS 1.3, as Go's TLS 1.3 implementation
 			// does not allow configuring cipher suites - all TLS 1.3 ciphers are always enabled.
 			// See: https://github.com/golang/go/issues/29349
@@ -122,9 +142,9 @@ func resolveClusterTLSConfig(ctx context.Context, restConfig *rest.Config) (TLSC
 	// If the cluster-wide TLS adherence policy is set to honor the cluster-wide TLS profile,
 	// use the cluster-wide TLS profile-based configuration.
 	if libgocrypto.ShouldHonorClusterTLSProfile(tlsAdherencePolicy) {
-		profileTLSConfig, unsupportedCiphers := utiltls.NewTLSConfigFromProfile(tlsProfileSpec)
-		if len(unsupportedCiphers) > 0 {
-			klog.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
+		profileTLSConfig, unsupported := utiltls.NewTLSConfigFromProfile(tlsProfileSpec)
+		if len(unsupported) > 0 {
+			klog.InfoS(unsupportedTLSValuesMessage, "unsupportedValues", unsupported)
 		}
 
 		// Set the TLS configuration to the cluster-wide TLS profile-based configuration.
@@ -132,9 +152,9 @@ func resolveClusterTLSConfig(ctx context.Context, restConfig *rest.Config) (TLSC
 	} else {
 		// If the cluster-wide TLS adherence policy is not set to honor the cluster-wide TLS profile,
 		// use the default TLS profile-based configuration.
-		defaultTLSConfig, unsupportedCiphers := utiltls.NewTLSConfigFromProfile(*configv1.TLSProfiles[libgocrypto.DefaultTLSProfileType])
-		if len(unsupportedCiphers) > 0 {
-			klog.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
+		defaultTLSConfig, unsupported := utiltls.NewTLSConfigFromProfile(*configv1.TLSProfiles[libgocrypto.DefaultTLSProfileType])
+		if len(unsupported) > 0 {
+			klog.InfoS(unsupportedTLSValuesMessage, "unsupportedValues", unsupported)
 		}
 
 		// Set the TLS configuration to the default TLS profile-based configuration.
