@@ -44,7 +44,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 				helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 			})
 
-			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+			helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(1)
 		})
 
 		Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", func() {
@@ -61,7 +61,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 				})
 
 				// Machine name should follow prefixed naming convention
-				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(1)
 
 				Context("and again MachineNamePrefix is reset", Ordered, func() {
 					BeforeAll(func() {
@@ -70,7 +70,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 					})
 
 					// Machine name should follow general naming convention
-					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(1)
 				})
 			})
 		})
@@ -97,9 +97,9 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 					helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 2, originalProviderSpec)
 				})
 
-				helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 2)
+				helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(2)
 
-				helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 2)
+				helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(2)
 			})
 
 			Context("and ControlPlaneMachineSet is updated to set MachineNamePrefix [OCPFeatureGate:CPMSMachineNamePrefix]", Ordered, func() {
@@ -121,10 +121,10 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 						helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 1, originalProviderSpec)
 					})
 
-					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(1)
 
 					// Machine name should follow prefixed naming convention
-					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 1)
+					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(1)
 
 					Context("and again MachineNamePrefix is reset", Ordered, func() {
 						BeforeAll(func() {
@@ -132,10 +132,10 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 							helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 1)
 						})
 
-						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(1)
 
 						// Machine name should follow general naming convention
-						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 1)
+						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(1)
 					})
 				})
 			})
@@ -155,8 +155,8 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 					helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
 				})
 
-				helpers.ItShouldUninstallTheControlPlaneMachineSet(framework.GlobalFramework)
-				helpers.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(framework.GlobalFramework)
+				helpers.ItShouldUninstallTheControlPlaneMachineSet()
+				helpers.ItShouldHaveTheControlPlaneMachineSetReplicasUpdated()
 
 				Context("and the ControlPlaneMachineSet is reactivated", func() {
 					BeforeEach(func() {
@@ -164,8 +164,8 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 						helpers.EnsureActiveControlPlaneMachineSet(framework.GlobalFramework)
 					})
 
-					helpers.ItShouldNotCauseARollout(framework.GlobalFramework)
-					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(framework.GlobalFramework)
+					helpers.ItShouldNotCauseARollout()
+					helpers.ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences()
 				})
 			})
 		})
@@ -188,7 +188,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.PreSubmit(), Label
 				helpers.UpdateControlPlaneMachineSetProviderSpec(framework.GlobalFramework, originalProviderSpec)
 			})
 
-			helpers.ItShouldNotCauseARollout(framework.GlobalFramework)
+			helpers.ItShouldNotCauseARollout()
 		})
 	})
 
