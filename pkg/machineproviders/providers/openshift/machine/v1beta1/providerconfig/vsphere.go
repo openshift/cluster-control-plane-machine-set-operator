@@ -168,6 +168,11 @@ func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDo
 func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDomain { //nolint:cyclop
 	workspace := v.providerConfig.Workspace
 
+	// If workspace is not set on the CPMS's config, the Machines will have one injected from the Infra object.
+	if workspace == nil {
+		return machinev1.VSphereFailureDomain{}
+	}
+
 	if v.infrastructure.Spec.PlatformSpec.Type != configv1.VSpherePlatformType {
 		return machinev1.VSphereFailureDomain{}
 	}
