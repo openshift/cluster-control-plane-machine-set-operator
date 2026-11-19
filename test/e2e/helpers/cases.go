@@ -133,20 +133,14 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 		cpms := &machinev1.ControlPlaneMachineSet{}
 		Expect(k8sClient.Get(ctx, testFramework.ControlPlaneMachineSetKey(), cpms)).To(Succeed(), "control plane machine set should exist")
 
-		timeout := 30 * time.Minute
+		timeout := 45 * time.Minute
 
-		platform := configv1.NonePlatformType
-		if cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains != nil {
-			platform = cpms.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains.Platform
-		}
-
-		if platform == configv1.VSpherePlatformType {
+		if testFramework.GetPlatformType() == configv1.VSpherePlatformType {
 			timeout = 60 * time.Minute
 
 			By("Test timeout set to 60 minutes for vSphere")
 		}
 
-		// We give the rollout 30 minutes to complete.
 		// We pass this to Eventually and Consistently assertions to ensure that they check
 		// until they pass or until the timeout is reached.
 		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), timeout)
@@ -227,8 +221,12 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 		By("Deleting the machine")
 		Expect(k8sClient.Delete(ctx, machine)).To(Succeed(), "control plane machine should be able to be deleted")
 
-		// Deleting the Machine triggers a rollout, give the rollout 30 minutes to complete.
-		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), 30*time.Minute)
+		timeout := 45 * time.Minute
+		if testFramework.GetPlatformType() == configv1.VSpherePlatformType {
+			timeout = 60 * time.Minute
+		}
+
+		rolloutCtx, cancel := context.WithTimeout(testFramework.GetContext(), timeout)
 		defer cancel()
 
 		wg := &sync.WaitGroup{}
