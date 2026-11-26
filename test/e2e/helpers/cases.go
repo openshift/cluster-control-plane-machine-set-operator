@@ -35,9 +35,9 @@ import (
 
 // ItShouldHaveAnActiveControlPlaneMachineSet returns an It that checks
 // there is an active control plane machine set installed within the cluster.
-func ItShouldHaveAnActiveControlPlaneMachineSet(testFramework framework.Framework) {
+func ItShouldHaveAnActiveControlPlaneMachineSet() {
 	It("should have an active control plane machine set", Offset(1), func() {
-		ExpectControlPlaneMachineSetToBeActive(testFramework)
+		ExpectControlPlaneMachineSetToBeActive(framework.GlobalFramework)
 	})
 }
 
@@ -63,9 +63,12 @@ type ControlPlaneMachineSetRegenerationTestOptions struct {
 func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 	It("should perform a rolling update", Offset(1), func() {
 		Expect(opts).ToNot(BeNil(), "test options are required")
-		Expect(opts.TestFramework).ToNot(BeNil(), "testFramework is required")
 
+		// Use TestFramework from opts if provided, otherwise use GlobalFramework
 		testFramework := opts.TestFramework
+		if testFramework == nil {
+			testFramework = framework.GlobalFramework
+		}
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
@@ -125,8 +128,10 @@ func ItShouldPerformARollingUpdate(opts *RollingUpdatePeriodicTestOptions) {
 
 // ItShouldRollingUpdateReplaceTheOutdatedMachine checks that the control plane machine set replaces, via a rolling update,
 // the outdated machine in the given index.
-func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Framework, index int) {
+func ItShouldRollingUpdateReplaceTheOutdatedMachine(index int) {
 	It("should rolling update replace the outdated machine", func() {
+		// Always use GlobalFramework at runtime
+		testFramework := framework.GlobalFramework
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
@@ -183,8 +188,9 @@ func ItShouldRollingUpdateReplaceTheOutdatedMachine(testFramework framework.Fram
 
 // ItShouldNotOnDeleteReplaceTheOutdatedMachine checks that the control plane machine set does not replace the outdated
 // machine in the given index when the update strategy is OnDelete.
-func ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework framework.Framework, index int) {
+func ItShouldNotOnDeleteReplaceTheOutdatedMachine(index int) {
 	It("should not replace the outdated machine", func() {
+		testFramework := framework.GlobalFramework
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
@@ -211,8 +217,9 @@ func ItShouldNotOnDeleteReplaceTheOutdatedMachine(testFramework framework.Framew
 
 // ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted checks that the control plane machine set replaces the outdated
 // machine in the given index when the update strategy is OnDelete and the outdated machine is deleted.
-func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framework.Framework, index int) {
+func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(index int) {
 	It("should replace the outdated machine when deleted", func() {
+		testFramework := framework.GlobalFramework
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
@@ -258,8 +265,9 @@ func ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(testFramework framewor
 
 // ItShouldUninstallTheControlPlaneMachineSet checks that the control plane machine set is correctly uninstalled
 // when a deletion is triggered, without triggering control plane machines changes.
-func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framework) {
+func ItShouldUninstallTheControlPlaneMachineSet() {
 	It("should uninstall the control plane machine set without control plane machine changes", func() {
+		testFramework := framework.GlobalFramework
 		ExpectControlPlaneMachineSetToBeInactiveOrNotFound(testFramework)
 		ExpectControlPlaneMachinesAllRunning(testFramework)
 		ExpectControlPlaneMachinesNotOwned(testFramework)
@@ -269,10 +277,11 @@ func ItShouldUninstallTheControlPlaneMachineSet(testFramework framework.Framewor
 }
 
 // ItShouldHaveTheControlPlaneMachineSetReplicasUpdated checks that the control plane machine set replicas are updated.
-func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework framework.Framework) {
+func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated() {
 	It("should have the control plane machine set replicas up to date", func() {
 		By("Checking the control plane machine set replicas are up to date")
 
+		testFramework := framework.GlobalFramework
 		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
 		k8sClient := testFramework.GetClient()
 
@@ -293,12 +302,12 @@ func ItShouldHaveTheControlPlaneMachineSetReplicasUpdated(testFramework framewor
 }
 
 // ItShouldNotCauseARollout checks that the control plane machine set doesn't cause a rollout.
-func ItShouldNotCauseARollout(testFramework framework.Framework) {
+func ItShouldNotCauseARollout() {
 	It("should have the control plane machine set not cause a rollout", func() {
 		By("Checking the control plane machine set replicas are consistently up to date")
 
+		testFramework := framework.GlobalFramework
 		Expect(testFramework).ToNot(BeNil(), "test framework should not be nil")
-
 		k8sClient := testFramework.GetClient()
 		ctx := testFramework.GetContext()
 
@@ -326,8 +335,9 @@ func ItShouldNotCauseARollout(testFramework framework.Framework) {
 
 // ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences checks that all the control plane machines
 // have the correct owner references set.
-func ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences(testFramework framework.Framework) {
+func ItShouldCheckAllControlPlaneMachinesHaveCorrectOwnerReferences() {
 	It("should find all control plane machines to have owner references set", func() {
+		testFramework := framework.GlobalFramework
 		// Check that all the control plane machines are owned.
 		ExpectControlPlaneMachinesOwned(testFramework)
 

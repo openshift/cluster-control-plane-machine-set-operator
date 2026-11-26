@@ -61,7 +61,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 				})
 
 				// Machine name should follow prefixed naming convention
-				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+				helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(1)
 
 				Context("and again MachineNamePrefix is reset", Ordered, func() {
 					BeforeAll(func() {
@@ -70,7 +70,7 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 					})
 
 					// Machine name should follow general naming convention
-					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(framework.GlobalFramework, 1)
+					helpers.ItShouldRollingUpdateReplaceTheOutdatedMachine(1)
 				})
 			})
 		})
@@ -105,10 +105,10 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 						helpers.UpdateControlPlaneMachineProviderSpec(framework.GlobalFramework, 2, originalProviderSpec)
 					})
 
-					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 2)
+					helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(2)
 
 					// Machine name should follow prefixed naming convention
-					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 2)
+					helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(2)
 
 					Context("and again MachineNamePrefix is reset", Ordered, func() {
 						BeforeAll(func() {
@@ -116,10 +116,10 @@ var _ = Describe("ControlPlaneMachineSet Operator", framework.Periodic(), Label(
 							helpers.ModifyMachineProviderSpecToTriggerRollout(framework.GlobalFramework, 2)
 						})
 
-						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(framework.GlobalFramework, 2)
+						helpers.ItShouldNotOnDeleteReplaceTheOutdatedMachine(2)
 
 						// Machine name should follow general naming convention
-						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(framework.GlobalFramework, 2)
+						helpers.ItShouldOnDeleteReplaceTheOutDatedMachineWhenDeleted(2)
 					})
 				})
 			})
